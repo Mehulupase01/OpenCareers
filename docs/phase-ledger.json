@@ -1,0 +1,1359 @@
+{
+  "schemaVersion": 1,
+  "reference": "Job Autopilot Production Masterplan v2.0 (2026-09-16)",
+  "phases": [
+    {
+      "id": "P00",
+      "title": "Repository audit and implementation charter",
+      "status": "complete",
+      "dependsOn": [],
+      "tickets": [
+        [
+          "P00-01",
+          "Inspect before changing. Read applicable repository instructions, inventory files, detect package managers"
+        ],
+        [
+          "P00-02",
+          "Record architecture decisions. Write ADRs for database-backed workflow, SQLite/PostgreSQL parity,"
+        ],
+        [
+          "P00-03",
+          "Establish the requirement ledger. Create records for R01-R12, every phase, and each acceptance gate."
+        ],
+        [
+          "P00-04",
+          "Define scope and support claims. Create an initial adapter matrix with mock-only, planned, fixture-tested,"
+        ],
+        [
+          "P00-05",
+          "Plan reference reuse. Record upstream commit and license, candidate files, modifications needed, and"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P00-G1",
+          "requirement": "Every R01-R12 requirement maps to at least one implementation phase and a verification method.",
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P00-audit.md"
+          ]
+        },
+        {
+          "id": "P00-G2",
+          "requirement": "The architecture contains exactly one authoritative application state store per deployment.",
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P00-audit.md"
+          ]
+        },
+        {
+          "id": "P00-G3",
+          "requirement": "The first genuine submission milestone is P08, not hidden behind a later optional agent framework.",
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P00-audit.md"
+          ]
+        },
+        {
+          "id": "P00-G4",
+          "requirement": "Existing changes are preserved and the audit explains any conflicts requiring owner input.",
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P00-audit.md"
+          ]
+        },
+        {
+          "id": "P00-G5",
+          "requirement": "A clean-room reader can identify how to start, where private configuration belongs, and how progress is recorded.",
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P00-audit.md"
+          ]
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null,
+      "evidence": [
+        "docs/evidence/P00-audit.md",
+        "docs/architecture.md",
+        "docs/requirements.md",
+        "docs/sources/research.md",
+        "docs/amendments.md"
+      ]
+    },
+    {
+      "id": "P01",
+      "title": "Runnable skeleton, developer experience, and CI",
+      "status": "in_progress",
+      "dependsOn": [
+        "P00"
+      ],
+      "tickets": [
+        [
+          "P01-01",
+          "Scaffold boundaries. Create the apps and packages listed in chapter 05, but implement only the necessary"
+        ],
+        [
+          "P01-02",
+          "Define runtime profiles. Support explicit demo, local, and server configuration types. Default a public"
+        ],
+        [
+          "P01-03",
+          "Build health surfaces. Add version, liveness, readiness, and worker-heartbeat endpoints. Readiness must"
+        ],
+        [
+          "P01-04",
+          "Create the dashboard shell. Show source jobs, application stages, exceptions, workers, and settings using"
+        ],
+        [
+          "P01-05",
+          "Establish CI. Run formatting, linting, type checking, unit tests, dependency checks, and a production build."
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P01-G1",
+          "requirement": "A clean clone installs and starts using the documented process.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P01-G2",
+          "requirement": "The API, worker, and UI show consistent version and environment information.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P01-G3",
+          "requirement": "Invalid or missing configuration causes an actionable startup error.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P01-G4",
+          "requirement": "Secret-like fixture values are synthetic and a repository scan finds no real candidate data.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P01-G5",
+          "requirement": "CI passes without external paid services or candidate accounts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P01-G6",
+          "requirement": "The UI never labels sample data as real submitted applications.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P02",
+      "title": "Persistence, durable work, and audit events",
+      "status": "in_progress",
+      "dependsOn": [
+        "P01"
+      ],
+      "tickets": [
+        [
+          "P02-01",
+          "Schema and migrations. Create owner, candidate version, source, job, application, task, attempt, artifact,"
+        ],
+        [
+          "P02-02",
+          "Repository interfaces. Implement transaction boundaries and typed query methods. Keep"
+        ],
+        [
+          "P02-03",
+          "Queue worker. Implement claim, heartbeat, lease renewal, retry-wait, cancellation, dead letter, and"
+        ],
+        [
+          "P02-04",
+          "Pure state machine. Reject invalid transitions and stale revisions. Distinguish retryable preparation from"
+        ],
+        [
+          "P02-05",
+          "Outbox and audit. Atomically persist state plus event, then deliver events idempotently. Redact sensitive"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P02-G1",
+          "requirement": "Concurrent claims produce one owner for each task and one committing owner per application.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G2",
+          "requirement": "Killing a worker during a preparation task results in recoverable requeue after lease expiry.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G3",
+          "requirement": "Killing a worker after an in-flight attempt creates reconciliation work, not a fresh submission task.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G4",
+          "requirement": "At-least-once outbox delivery produces no duplicate downstream side effect.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G5",
+          "requirement": "The same repository contract suite passes on SQLite and PostgreSQL.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G6",
+          "requirement": "A migration from the previous schema retains application identity and audit history.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P02-G7",
+          "requirement": "Disk-full and database-unavailable errors prevent new external commits.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P03",
+      "title": "Candidate evidence and standing authorization",
+      "status": "not_started",
+      "dependsOn": [
+        "P02"
+      ],
+      "tickets": [
+        [
+          "P03-01",
+          "Source ingestion. Import DOCX/PDF files without modifying originals. Extract text, tables, hyperlinks, and"
+        ],
+        [
+          "P03-02",
+          "Fact ledger. Create typed employment, education, skills, language, project, metric, availability, and"
+        ],
+        [
+          "P03-03",
+          "Chronology validation. Compute experience in non-overlapping months, track full-time/part-time"
+        ],
+        [
+          "P03-04",
+          "Owner policy. Build onboarding for role scope, location, sponsorship wording, salary answers, account"
+        ],
+        [
+          "P03-05",
+          "Answer memory. Store approved semantic answers with valid dates, scope, exact meaning, and evidence."
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P03-G1",
+          "requirement": "Every material candidate claim is traceable to a source or explicit owner assertion.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G2",
+          "requirement": "Overlapping employment does not inflate computed experience.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G3",
+          "requirement": "A profile revision invalidates affected prepared packets while preserving historical ones.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G4",
+          "requirement": "Revoking auto-submit blocks new commits immediately at the policy gate.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G5",
+          "requirement": "Missing salary or ambiguous sponsorship answers create targeted exceptions without blocking unrelated applications.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G6",
+          "requirement": "The public repository contains synthetic examples only.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P03-G7",
+          "requirement": "The user can export and inspect the exact active authorization in plain language.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P04",
+      "title": "Discovery, job identity, and historical imports",
+      "status": "not_started",
+      "dependsOn": [
+        "P03"
+      ],
+      "tickets": [
+        [
+          "P04-01",
+          "Connector SDK. Implement source configuration, pagination, incremental polling, rate policy, raw"
+        ],
+        [
+          "P04-02",
+          "Initial connectors. Implement a small set of high-yield public ATS listing connectors and owner-added URL"
+        ],
+        [
+          "P04-03",
+          "Canonical identity. Resolve requisition IDs, application URLs, employers, source aliases, and likely"
+        ],
+        [
+          "P04-04",
+          "Historical import. Import existing application records and document-folder metadata. Preserve"
+        ],
+        [
+          "P04-05",
+          "Watchlist and freshness. Add Netherlands company lists, role aliases, first-seen/posted/updated times,"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P04-G1",
+          "requirement": "Repeated polling of the same feed creates no duplicate jobs or application work.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G2",
+          "requirement": "Pagination and delta cursors do not omit records across fixture boundary cases.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G3",
+          "requirement": "Closed, temporarily missing, and parser-failed states remain distinguishable.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G4",
+          "requirement": "Cross-postings map to one application where identity is established.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G5",
+          "requirement": "Historical user-asserted submissions block accidental repeat applications without inflating new confirmed totals.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G6",
+          "requirement": "Source 403/429 responses activate the configured pause/backoff behavior.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P04-G7",
+          "requirement": "At least one real current vacancy can be read, normalized, and displayed with source evidence, without submitting it.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P05",
+      "title": "Free-only inference and evaluated matching",
+      "status": "not_started",
+      "dependsOn": [
+        "P04"
+      ],
+      "tickets": [
+        [
+          "P05-01",
+          "Gateway policy. Implement model discovery, current price/capability checks, route allowlists, privacy"
+        ],
+        [
+          "P05-02",
+          "Resilience. Add schema validation, bounded repair, expiring model health, rate-limit backoff, daily-budget"
+        ],
+        [
+          "P05-03",
+          "Deterministic gates. Implement location, language, duplicate, closure, salary-feasibility, and explicit"
+        ],
+        [
+          "P05-04",
+          "Semantic assessment. Extract requirements with evidence spans and map them to candidate fact IDs."
+        ],
+        [
+          "P05-05",
+          "Evaluation dataset. Create at least 50 labeled, sanitized examples covering strong matches, adjacent roles,"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P05-G1",
+          "requirement": "A manually pinned paid model is rejected in free-only mode.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G2",
+          "requirement": "An unknown price field or paid tool configuration is rejected before inference.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G3",
+          "requirement": "Quota reservations remain consistent under concurrent requests and restarts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G4",
+          "requirement": "A 429 does not trigger account/key rotation or unbounded retry.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G5",
+          "requirement": "A schema-valid but unsupported candidate claim is rejected.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G6",
+          "requirement": "The ranking evaluation report includes held-out errors and score-component explanations.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P05-G7",
+          "requirement": "Lack of an eligible free route pauses inference but leaves discovery and deterministic work operational.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P06",
+      "title": "Tailored CVs, letters, and answer packets",
+      "status": "not_started",
+      "dependsOn": [
+        "P05"
+      ],
+      "tickets": [
+        [
+          "P06-01",
+          "Content schemas. Define CV, letter, claim, and answer ASTs with fact references, length constraints, and"
+        ],
+        [
+          "P06-02",
+          "Generation. Implement professional-evidence-first bullet selection, role-specific summaries, concise"
+        ],
+        [
+          "P06-03",
+          "Validation. Check claim support, years-of-experience wording, company/role correctness, language"
+        ],
+        [
+          "P06-04",
+          "Rendering. Produce DOCX and PDF using the chosen pinned pipeline. Add extraction checks, layout"
+        ],
+        [
+          "P06-05",
+          "Packet store. Write immutable manifests and content-addressed artifacts; export user-readable copies"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P06-G1",
+          "requirement": "Every material generated claim links to approved evidence and passes independent validation.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G2",
+          "requirement": "A prototype cannot be described as deployed in the test set.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G3",
+          "requirement": "Hands-on and professional experience totals remain distinct.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G4",
+          "requirement": "All representative PDFs render without clipping, unreadable text, or missing sections.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G5",
+          "requirement": "DOCX and PDF contain equivalent candidate facts and company/role references.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G6",
+          "requirement": "A changed artifact hash invalidates an existing readiness/intent record.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P06-G7",
+          "requirement": "A model outage still permits approved deterministic packets, while unresolved substantive questions are deferred.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P07",
+      "title": "Mock ATS and browser filling contract",
+      "status": "not_started",
+      "dependsOn": [
+        "P06"
+      ],
+      "tickets": [
+        [
+          "P07-01",
+          "Mock ATS server. Build synthetic job pages and forms with server-side application records, unique"
+        ],
+        [
+          "P07-02",
+          "Browser runtime. Launch owned browser contexts with resource limits, isolation, domain policies, trace"
+        ],
+        [
+          "P07-03",
+          "SDK. Implement the interfaces in chapter 10, including form snapshots, field plans, read-back validation,"
+        ],
+        [
+          "P07-04",
+          "Fill primitives. Support text, email, phone, textarea, select, radio, checkbox, date, file upload,"
+        ],
+        [
+          "P07-05",
+          "Challenge fixtures. Model CAPTCHA/MFA states with synthetic challenge screens, without implementing"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P07-G1",
+          "requirement": "Filled values read back exactly, including underlying option values where relevant.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G2",
+          "requirement": "Upload validation distinguishes selected, uploading, accepted, and failed states.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G3",
+          "requirement": "Conditional fields are reinspected and required answers cannot be missed.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G4",
+          "requirement": "A changed question invalidates an old answer plan.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G5",
+          "requirement": "Challenge detection creates a resumable exception without stopping other queue items.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G6",
+          "requirement": "A generic banner or HTTP 200 cannot create confirmed-submission state.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P07-G7",
+          "requirement": "The dry-run mode cannot accidentally invoke a final external commit, including implicit submission through Enter or a field-change event.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P08",
+      "title": "Actual submission vertical slice",
+      "status": "not_started",
+      "dependsOn": [
+        "P07"
+      ],
+      "tickets": [
+        [
+          "P08-01",
+          "Policy gate. Implement the complete precommit checklist and immutable intent binding. Verify profile,"
+        ],
+        [
+          "P08-02",
+          "Commit engine. Persist intent and in-flight attempt before the final action. Enforce exclusive commit"
+        ],
+        [
+          "P08-03",
+          "Receipt verification. Implement strong success, definitive validation failure, and unknown-outcome"
+        ],
+        [
+          "P08-04",
+          "Reconciliation. Recover from an in-flight record without replaying the final click. Read the mock ATS"
+        ],
+        [
+          "P08-05",
+          "First real adapter. Choose one high-yield portal family from current candidate opportunities. Implement"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P08-G1",
+          "requirement": "Auto-submit mode completes the mock workflow without a per-application owner click.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G2",
+          "requirement": "Each confirmed state has independently correlated receipt evidence.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G3",
+          "requirement": "Every crash case avoids blind duplicate submission; ambiguous cases remain explicit.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G4",
+          "requirement": "Revocation immediately before commit prevents the final action.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G5",
+          "requirement": "A stale worker cannot acquire a new valid commit capability.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G6",
+          "requirement": "At least one genuine, appropriate live submission is receipt-verified before the adapter is labeled live-verified.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P08-G7",
+          "requirement": "If a live prerequisite is unavailable, code completion and live verification are reported separately, and unrelated engineering continues.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P09",
+      "title": "High-yield portal coverage",
+      "status": "not_started",
+      "dependsOn": [
+        "P08"
+      ],
+      "tickets": [
+        [
+          "P09-01",
+          "Coverage analysis. Group eligible jobs by portal family, employer-specific variant, account requirement,"
+        ],
+        [
+          "P09-02",
+          "Adapter increments. Add the next high-yield families, normally from Recruitee, Greenhouse, Lever, and"
+        ],
+        [
+          "P09-03",
+          "Variant fixtures. Capture sanitized real form structures and rebuild representative variants in the mock"
+        ],
+        [
+          "P09-04",
+          "Drift detection. Monitor structural fingerprints and missing expected controls. Pause only the affected"
+        ],
+        [
+          "P09-05",
+          "Support matrix. Publish discovery, inspection, fill, account, commit, receipt, and reconciliation coverage"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P09-G1",
+          "requirement": "Every added adapter passes the common SDK contract and portal-specific fixtures.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P09-G2",
+          "requirement": "Each supported variant has at least one successful synthetic receipt and relevant negative cases.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P09-G3",
+          "requirement": "A new unknown mandatory field stops that application before commitment.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P09-G4",
+          "requirement": "A drifted adapter cannot degrade into unrestricted generic clicking.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P09-G5",
+          "requirement": "Each live-verified label has a genuine private receipt and date; untested variants remain explicitly provisional.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P09-G6",
+          "requirement": "At least two portal families complete the full synthetic pipeline without special workflow code outside the adapter boundary.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P10",
+      "title": "Accounts, secure handoffs, and exception resolution",
+      "status": "not_started",
+      "dependsOn": [
+        "P09"
+      ],
+      "tickets": [
+        [
+          "P10-01",
+          "Account registry. Map candidate identity to employer domain and applicant account. Store only vault"
+        ],
+        [
+          "P10-02",
+          "Signup workflow. Fill supported ordinary signup forms using approved identity, generate unique"
+        ],
+        [
+          "P10-03",
+          "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route,"
+        ],
+        [
+          "P10-04",
+          "Exception inbox. Show the exact question/blocker, affected job, suggested supported answer if any,"
+        ],
+        [
+          "P10-05",
+          "Propagation and resumption. An approved answer can resolve semantically equivalent pending questions"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P10-G1",
+          "requirement": "Supported signup stores credentials safely and never exposes them to model prompts or logs.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G2",
+          "requirement": "A lost signup response does not automatically create a second account.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G3",
+          "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G4",
+          "requirement": "Handoff URLs/handles expire, are owner-bound, and cannot control another session.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G5",
+          "requirement": "User interaction and automation cannot race the final submit.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G6",
+          "requirement": "Resolving one answer does not incorrectly propagate to differently worded legal or sponsorship questions.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P10-G7",
+          "requirement": "A resumed expired form is rebuilt safely, while an ambiguous prior commit is reconciled first.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P11",
+      "title": "Email integration and receipt reconciliation",
+      "status": "not_started",
+      "dependsOn": [
+        "P10"
+      ],
+      "tickets": [
+        [
+          "P11-01",
+          "OAuth lifecycle. Implement least-sufficient scopes, secure token storage, refresh, disconnect, revocation"
+        ],
+        [
+          "P11-02",
+          "Narrow message acquisition. Query only relevant time windows and application/account contexts, fetch"
+        ],
+        [
+          "P11-03",
+          "Correlation. Match messages to pending applications using expected recipient, employer/sender domain,"
+        ],
+        [
+          "P11-04",
+          "Verification links. Follow only links bound to a pending signup and validated destination chain. Reject"
+        ],
+        [
+          "P11-05",
+          "Outcome updates. Classify receipt, interview, rejection, or ambiguous message with supporting evidence."
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P11-G1",
+          "requirement": "OAuth refresh and revocation produce correct state transitions without exposing tokens.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G2",
+          "requirement": "Synthetic unrelated messages never trigger actions or appear in application records.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G3",
+          "requirement": "Account-created and application-received messages are correctly distinguished.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G4",
+          "requirement": "Two roles at the same employer do not receive the same receipt unless identity evidence supports it.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G5",
+          "requirement": "Unexpected verification-link domains are rejected.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G6",
+          "requirement": "Duplicate email delivery creates one outcome event.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P11-G7",
+          "requirement": "The app remains useful with Gmail disconnected.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P12",
+      "title": "Bounded multi-agent orchestration and cost optimization",
+      "status": "not_started",
+      "dependsOn": [
+        "P11"
+      ],
+      "tickets": [
+        [
+          "P12-01",
+          "Graph contracts. Implement extractor, match analyst, drafter, form-answer planner, critic, and bounded"
+        ],
+        [
+          "P12-02",
+          "Checkpointing. Save calculation checkpoints with graph/prompt/schema versions. Resume compatible"
+        ],
+        [
+          "P12-03",
+          "Batching. Batch only independent similarly sized tasks, require item IDs, validate each result separately,"
+        ],
+        [
+          "P12-04",
+          "Dynamic routing. Select eligible free models by measured task quality, context needs, health, and latency."
+        ],
+        [
+          "P12-05",
+          "Evaluation and ablation. Compare deterministic/template baseline, single-model generation, and"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P12-G1",
+          "requirement": "Agent execution has bounded steps, time, tokens, and request count.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P12-G2",
+          "requirement": "Graph replay cannot perform or repeat a final submission.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P12-G3",
+          "requirement": "Batch contamination, duplicate IDs, missing items, and truncated output are detected.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P12-G4",
+          "requirement": "Free-only routing remains enforced under fallback and manual model selection.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P12-G5",
+          "requirement": "The measured multi-agent variant improves a declared metric or is not enabled by default.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P12-G6",
+          "requirement": "A 50-request simulation exhausts predictably, preserves reserve accounting, and defers work without falsifying success.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P13",
+      "title": "Unattended Windows autopilot and throughput",
+      "status": "not_started",
+      "dependsOn": [
+        "P12"
+      ],
+      "tickets": [
+        [
+          "P13-01",
+          "Background runtime. Package a launcher and owner-approved startup mechanism. Add graceful"
+        ],
+        [
+          "P13-02",
+          "Scheduling. Implement source-specific polling, queue priorities, daily targets, browser concurrency limits,"
+        ],
+        [
+          "P13-03",
+          "Operations dashboard. Show actual stage counts, confirmed evidence, unresolved ambiguity, needs-help"
+        ],
+        [
+          "P13-04",
+          "Capacity testing. Run synthetic day workloads with varied fit, model latency, account friction, portal"
+        ],
+        [
+          "P13-05",
+          "Controlled live ramp. Under active policy, progress from the verified canary to small batches and then"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P13-G1",
+          "requirement": "Closing Codex does not stop the application runtime.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G2",
+          "requirement": "Restarting Windows or the worker resumes non-ambiguous work and reconciles in-flight attempts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G3",
+          "requirement": "Sleep/wake and network-loss tests do not cause duplicate commits.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G4",
+          "requirement": "A 24-hour synthetic soak shows no unbounded queue, memory, disk, or retry growth.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G5",
+          "requirement": "Pause and emergency stop behave as documented, including the limitation for already-sent requests.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G6",
+          "requirement": "The dashboard can explain the target shortfall using measured counts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P13-G7",
+          "requirement": "Live ramp evidence is genuine; reaching 50 is not a release claim unless actually observed.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P14",
+      "title": "Fully deployable server and hybrid profiles",
+      "status": "not_started",
+      "dependsOn": [
+        "P13"
+      ],
+      "tickets": [
+        [
+          "P14-01",
+          "Server images and Compose. Build reproducible images with pinned browser/runtime compatibility,"
+        ],
+        [
+          "P14-02",
+          "Secrets and storage. Support environment-mounted or external secret-store references without baking"
+        ],
+        [
+          "P14-03",
+          "Hybrid transport. Implement outbound worker registration, authenticated command delivery, owner"
+        ],
+        [
+          "P14-04",
+          "Secure browser handoff. Provide owner-authenticated, expiring access to a single waiting server browser"
+        ],
+        [
+          "P14-05",
+          "Migration. Export/import candidate and application state consistently, drain active commits, reconcile"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P14-G1",
+          "requirement": "A clean server deployment completes the full mock application workflow with the owner's PC disconnected.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G2",
+          "requirement": "Hybrid mode completes the same workflow with a local browser worker and server-owned state.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G3",
+          "requirement": "Replayed, expired, wrong-owner, and wrong-intent commands are rejected.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G4",
+          "requirement": "Loss of server connectivity prevents new local commits after lease/authorization expiry.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G5",
+          "requirement": "Database and browser-control ports are not publicly exposed in the production profile.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G6",
+          "requirement": "Local-to-server migration preserves application identity, packets, policy versions, and receipts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P14-G7",
+          "requirement": "TLS/authentication, backup, and resource requirements are documented and tested.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P15",
+      "title": "Security, fault injection, restore, and release gates",
+      "status": "not_started",
+      "dependsOn": [
+        "P14"
+      ],
+      "tickets": [
+        [
+          "P15-01",
+          "Threat review. Test malicious job descriptions, email instructions, document payloads, unsafe imported"
+        ],
+        [
+          "P15-02",
+          "Crash matrix. Execute every commit boundary under process kill, network loss, worker duplication, lease"
+        ],
+        [
+          "P15-03",
+          "Recovery drills. Back up, restore, rekey where supported, rotate credentials, revoke authorization, and"
+        ],
+        [
+          "P15-04",
+          "Supply-chain checks. Audit dependencies, pin CI actions where practical, generate an SBOM, scan release"
+        ],
+        [
+          "P15-05",
+          "Soak and performance. Run 72-hour synthetic operation with outages and quota resets. Measure resource"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P15-G1",
+          "requirement": "No critical unresolved finding can permit unauthorized submission, secret disclosure, wrong-owner access, or blind duplicate replay.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G2",
+          "requirement": "Zero duplicate external records occur in the supported mock crash suite; unresolved outcomes are retained honestly.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G3",
+          "requirement": "All free-only adversarial pricing/fallback tests pass.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G4",
+          "requirement": "A restored system remains commit-disabled until the external-submission gap is reconciled.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G5",
+          "requirement": "Backup restoration verifies database consistency and artifact checksums.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G6",
+          "requirement": "The 72-hour synthetic soak completes with bounded resource usage and no silently lost tasks.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P15-G7",
+          "requirement": "Real adapter claims are limited to the tested variants and dates.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P16",
+      "title": "Outcomes, calibration, and continuous improvement",
+      "status": "not_started",
+      "dependsOn": [
+        "P15"
+      ],
+      "tickets": [
+        [
+          "P16-01",
+          "Outcome ledger. Track receipt, screening, interview, rejection, offer, owner withdrawal, and unknown"
+        ],
+        [
+          "P16-02",
+          "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants"
+        ],
+        [
+          "P16-03",
+          "Score calibration. Evaluate whether high fit scores correspond to better reviewed relevance and"
+        ],
+        [
+          "P16-04",
+          "Quality regression loop. Turn corrected facts, rejected claims, misclassified forms, and adapter drift into"
+        ],
+        [
+          "P16-05",
+          "Controlled experiments. Compare approved wording or ordering variants without applying twice to the"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P16-G1",
+          "requirement": "Every outcome is linked to an existing application with provenance.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G2",
+          "requirement": "Recent and unresolved applications are not mislabeled as rejections.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G3",
+          "requirement": "Reported conversion rates include numerator, denominator, date range, and relevant exclusions.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G4",
+          "requirement": "No UI uses match score as a fabricated selection probability.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G5",
+          "requirement": "Experiments cannot create duplicate applications or unsupported claims.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G6",
+          "requirement": "Owner corrections become regression tests without leaking personal data into Git.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P16-G7",
+          "requirement": "A recommendation to change policy requires a new recorded owner policy revision before it affects commits.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    },
+    {
+      "id": "P17",
+      "title": "Release, portfolio, and autonomous maintenance handoff",
+      "status": "not_started",
+      "dependsOn": [
+        "P16"
+      ],
+      "tickets": [
+        [
+          "P17-01",
+          "Release package. Produce versioned Windows and server artifacts, checksums, release notes, migration"
+        ],
+        [
+          "P17-02",
+          "Public repository. Finalize README, architecture, ADRs, setup guides, contribution/security policies,"
+        ],
+        [
+          "P17-03",
+          "Demonstration. Create a synthetic end-to-end demo showing fit explanations, truthful documents, actual"
+        ],
+        [
+          "P17-04",
+          "Clean-room verification. Follow the published instructions on a clean environment and confirm demo,"
+        ],
+        [
+          "P17-05",
+          "Maintenance plan. Define dependency updates, source/adapter drift review, model-catalogue refresh,"
+        ]
+      ],
+      "gates": [
+        {
+          "id": "P17-G1",
+          "requirement": "A new user can install and run the synthetic demo from published instructions.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G2",
+          "requirement": "The private installation can make authorized real final submissions on live-verified adapters.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G3",
+          "requirement": "Local, server, and hybrid deployment behavior is documented and verified at the claimed level.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G4",
+          "requirement": "All R01-R12 requirements have a final evidence entry or a clearly scoped external verification status.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G5",
+          "requirement": "No critical security/correctness issue remains open.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G6",
+          "requirement": "The repository and release artifacts contain no real credentials, personal CVs, browser sessions, or private receipts.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P17-G7",
+          "requirement": "The release notes distinguish actual benchmark results from targets and synthetic demonstrations.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "externalPrerequisites": [],
+      "lastVerifiedCommit": null
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.cache/
+.data/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+*.log
+*.sqlite*
+*.db*
+private/
+browser-state/
+artifacts-private/
