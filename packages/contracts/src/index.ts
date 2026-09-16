@@ -52,6 +52,7 @@ export const errorCodeSchema = z.enum([
   "REVISION_STALE",
   "NOT_FOUND",
   "LEASE_STALE",
+  "TASK_CANCELLED",
   "POLICY_REVOKED",
   "DUPLICATE_CONFIRMED",
   "DUPLICATE_SUSPECTED",

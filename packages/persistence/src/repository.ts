@@ -102,6 +102,7 @@ export class Repository {
     action: string,
     revision: number,
     payload: Record<string, string | number | null> = {},
+    actor = "system",
   ) {
     const id = randomUUID();
     await tx.query(
@@ -112,7 +113,7 @@ export class Repository {
         objectId,
         action,
         revision,
-        "system",
+        actor,
         objectId,
         JSON.stringify(payload),
         this.now(),
@@ -135,14 +136,17 @@ export class Repository {
     return this.readControl(this.db);
   }
 
-  async setControl(patch: Partial<Omit<Control, "restoreBlocked">>): Promise<Control> {
+  async setControl(
+    patch: Partial<Omit<Control, "restoreBlocked">>,
+    actor = "system",
+  ): Promise<Control> {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const control = controlSchema.parse({ ...(await this.readControl(tx)), ...patch });
-      await tx.query("UPDATE controls SET data=$1, revision=revision+1 WHERE owner_id=$2", [
-        JSON.stringify(control),
-        this.ownerId,
-      ]);
+      const rows = await tx.query(
+        "UPDATE controls SET data=$1, revision=revision+1 WHERE owner_id=$2 RETURNING revision",
+        [JSON.stringify(control), this.ownerId],
+      );
       if (control.stopped || control.submissionsPaused) {
         const active = await tx.query(
           "SELECT * FROM tasks WHERE owner_id=$1 AND state='leased' AND type='submit'",
@@ -154,7 +158,9 @@ export class Repository {
         tx,
         this.ownerId,
         control.stopped ? "control.stopped" : "control.changed",
-        0,
+        Number(rows[0]?.revision),
+        {},
+        actor,
       );
       return control;
     });
@@ -327,8 +333,8 @@ export class Repository {
           ? "dead"
           : "retry_wait";
       await tx.query(
-        "UPDATE tasks SET state=$1,run_after=$2,lease_owner=NULL,lease_until=NULL,last_error='LEASE_STALE' WHERE owner_id=$3 AND id=$4",
-        [state, this.now(), this.ownerId, task.id],
+        "UPDATE tasks SET state=$1,run_after=$2,lease_owner=NULL,lease_until=NULL,last_error=$3 WHERE owner_id=$4 AND id=$5",
+        [state, this.now(), cancelled ? "TASK_CANCELLED" : "LEASE_STALE", this.ownerId, task.id],
       );
       if (state === "dead") await this.deadLetter(tx, task, "LEASE_STALE");
     }
@@ -367,7 +373,7 @@ export class Repository {
       if (active.length >= concurrency) return null;
       const placeholders = allowed.map((_, i) => `$${i + 3}`).join(",");
       const rows = await tx.query(
-        `SELECT t.* FROM tasks t WHERE t.owner_id=$1 AND t.state IN ('ready','retry_wait') AND t.run_after <= $2 AND t.type IN (${placeholders}) AND NOT EXISTS (SELECT 1 FROM tasks a WHERE a.owner_id=t.owner_id AND a.state='leased' AND (a.domain=t.domain OR (a.application_id IS NOT NULL AND a.application_id=t.application_id))) ORDER BY t.priority DESC,t.created_at,t.id LIMIT 1${tx.dialect === "postgres" ? " FOR UPDATE OF t SKIP LOCKED" : ""}`,
+        `SELECT t.* FROM tasks t WHERE t.owner_id=$1 AND t.state IN ('ready','retry_wait') AND t.run_after <= $2 AND t.type IN (${placeholders}) AND NOT EXISTS (SELECT 1 FROM tasks a WHERE a.owner_id=t.owner_id AND a.state='leased' AND (a.domain=t.domain OR (a.application_id IS NOT NULL AND a.application_id=t.application_id))) AND NOT (t.type='submit' AND EXISTS (SELECT 1 FROM applications a WHERE a.owner_id=t.owner_id AND a.id=t.application_id AND a.state IN ('IN_FLIGHT','UNKNOWN','RECONCILING','NEEDS_REVIEW','CONFIRMED','HISTORICAL_SUBMITTED','CLOSED','SKIPPED','DUPLICATE'))) ORDER BY t.priority DESC,t.created_at,t.id LIMIT 1${tx.dialect === "postgres" ? " FOR UPDATE OF t SKIP LOCKED" : ""}`,
         [this.ownerId, this.now(), ...allowed],
       );
       if (!rows[0]) return null;
@@ -393,12 +399,13 @@ export class Repository {
     });
   }
 
-  private async validLease(tx: SqlExecutor, task: Task): Promise<void> {
+  private async validLease(tx: SqlExecutor, task: Task): Promise<Task> {
     const rows = await tx.query(
-      "SELECT id FROM tasks WHERE owner_id=$1 AND id=$2 AND state='leased' AND fence=$3 AND lease_owner=$4 AND lease_until > $5",
+      "SELECT * FROM tasks WHERE owner_id=$1 AND id=$2 AND state='leased' AND fence=$3 AND lease_owner=$4 AND lease_until > $5",
       [this.ownerId, task.id, task.fence, task.leaseOwner, this.now()],
     );
-    if (!rows.length) throw new DomainError("LEASE_STALE", "Worker lease expired or was revoked.");
+    if (!rows[0]) throw new DomainError("LEASE_STALE", "Worker lease expired or was revoked.");
+    return taskFromRow(rows[0]);
   }
 
   async renew(task: Task, leaseMs = 30000): Promise<void> {
@@ -406,11 +413,11 @@ export class Repository {
       throw new DomainError("CONFIG_INVALID", "Invalid lease duration.");
     await this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
-      await this.validLease(tx, task);
+      const stored = await this.validLease(tx, task);
       const control = await this.readControl(tx);
       if (
         control.stopped ||
-        (task.type === "submit" && (control.submissionsPaused || control.restoreBlocked))
+        (stored.type === "submit" && (control.submissionsPaused || control.restoreBlocked))
       )
         throw new DomainError("LEASE_STALE", "Execution paused.");
       await tx.query("UPDATE tasks SET lease_until=$1 WHERE owner_id=$2 AND id=$3", [
@@ -424,12 +431,54 @@ export class Repository {
   async complete(task: Task): Promise<void> {
     await this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
-      await this.validLease(tx, task);
+      const stored = await this.validLease(tx, task);
+      if (stored.type === "submit") {
+        const application = (
+          await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            this.ownerId,
+            stored.applicationId,
+          ])
+        )[0];
+        if (
+          !application ||
+          !["CONFIRMED", "DEFINITIVE_FAILURE"].includes(String(application.state))
+        )
+          throw new DomainError(
+            "STATE_INVALID",
+            "Submission outcome must be resolved before acknowledgement.",
+          );
+      }
       await tx.query(
         "UPDATE tasks SET state='completed',lease_until=NULL,lease_owner=NULL WHERE owner_id=$1 AND id=$2",
         [this.ownerId, task.id],
       );
       await this.audit(tx, task.id, "task.completed", task.fence);
+    });
+  }
+
+  async cancelTask(id: string, actor = "system"): Promise<Task> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const rows = await tx.query("SELECT * FROM tasks WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        id,
+      ]);
+      if (!rows[0]) throw new DomainError("NOT_FOUND", "Task not found.");
+      const task = taskFromRow(rows[0]);
+      if (["completed", "cancelled", "dead"].includes(task.state)) return task;
+      if (task.type === "reconcile")
+        throw new DomainError(
+          "STATE_INVALID",
+          "Uncertain outcomes must retain reconciliation work.",
+        );
+      await this.recoverTask(tx, task, true);
+      await this.audit(tx, task.id, "task.cancelled", task.fence, {}, actor);
+      const updated = await tx.query("SELECT * FROM tasks WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        id,
+      ]);
+      if (!updated[0]) throw new DomainError("STORAGE_UNAVAILABLE", "Cancelled task missing.");
+      return taskFromRow(updated[0]);
     });
   }
 
@@ -443,23 +492,36 @@ export class Repository {
   async fail(task: Task, error: DomainError, random: () => number = Math.random): Promise<void> {
     await this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
-      await this.validLease(tx, task);
-      if (task.type === "submit") {
-        await this.recoverTask(tx, task);
-        return;
+      const stored = await this.validLease(tx, task);
+      if (stored.type === "submit") {
+        const application = (
+          await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            this.ownerId,
+            stored.applicationId,
+          ])
+        )[0];
+        if (
+          application &&
+          ["IN_FLIGHT", "UNKNOWN", "RECONCILING", "NEEDS_REVIEW", "CONFIRMED"].includes(
+            String(application.state),
+          )
+        ) {
+          await this.recoverTask(tx, stored);
+          return;
+        }
       }
-      const retry = error.retryable && task.attempts < task.maxAttempts;
+      const retry = error.retryable && stored.attempts < stored.maxAttempts;
       await tx.query(
         "UPDATE tasks SET state=$1,run_after=$2,lease_until=NULL,lease_owner=NULL,last_error=$3 WHERE owner_id=$4 AND id=$5",
         [
           retry ? "retry_wait" : "dead",
-          new Date(this.clock().getTime() + retryDelay(task.attempts, random)).toISOString(),
+          new Date(this.clock().getTime() + retryDelay(stored.attempts, random)).toISOString(),
           error.code,
           this.ownerId,
           task.id,
         ],
       );
-      if (!retry) await this.deadLetter(tx, task, error.code);
+      if (!retry) await this.deadLetter(tx, stored, error.code);
       await this.audit(tx, task.id, retry ? "task.retry_wait" : "task.dead", task.fence, {
         code: error.code,
       });

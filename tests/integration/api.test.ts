@@ -51,7 +51,7 @@ describe("API trust boundary", () => {
     ).toBe(403);
   });
   it("creates a protected demo session, applies controls and invalidates sign-out", async () => {
-    const { app, headers } = await setup();
+    const { app, headers, db } = await setup();
     const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
     expect(login.statusCode).toBe(200);
     expect(login.cookies[0]).toMatchObject({ name: "opencareers", httpOnly: true });
@@ -69,6 +69,9 @@ describe("API trust boundary", () => {
         })
       ).json().stopped,
     ).toBe(true);
+    expect(
+      (await db.query("SELECT actor,revision FROM audit_events WHERE action='control.stopped'"))[0],
+    ).toEqual({ actor: "owner:synthetic-owner", revision: 1 });
     await app.inject({ method: "DELETE", url: "/v1/session", headers: { ...headers, cookie } });
     expect(
       (await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } }))

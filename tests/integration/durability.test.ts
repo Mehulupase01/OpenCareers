@@ -118,36 +118,75 @@ for (const engine of ["sqlite", "postgres"] as const) {
   );
 }
 
-it("upgrades a populated SQLite schema without changing application identity or audit history", async () => {
-  const db = await openSqlite(":memory:");
-  try {
-    await migrate(db, 1);
-    const repository = new Repository(db, "migration-owner");
-    await repository.initialize();
-    await repository.putJob({
-      id: "job",
-      employerId: "employer",
-      requisitionId: "req",
-      title: "Synthetic",
-      company: "Synthetic",
-      location: "NL",
-      url: "https://synthetic.example",
-      description: "Fixture",
-      source: "fixture",
-      synthetic: true,
-    });
-    const app = await repository.createApplication("job", "candidate");
-    const before = await db.query("SELECT * FROM audit_events");
-    await migrate(db);
-    expect((await repository.summary("demo")).applications[0]).toEqual(app);
-    expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
-    expect(
-      (await db.query("SELECT MAX(version) AS version FROM schema_migrations"))[0]?.version,
-    ).toBe(2);
-  } finally {
-    await db.close();
-  }
-});
+for (const engine of ["sqlite", "postgres"] as const) {
+  it.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
+    `upgrades a populated ${engine} schema without changing application identity or audit history`,
+    async () => {
+      const schema = `migration_${randomUUID().replaceAll("-", "")}`;
+      const admin =
+        engine === "postgres"
+          ? await openPostgres(process.env.AUTOPILOT_TEST_DATABASE_URL as string)
+          : undefined;
+      let location = process.env.AUTOPILOT_TEST_DATABASE_URL ?? "";
+      if (admin) {
+        await admin.query(`CREATE SCHEMA ${schema}`);
+        const url = new URL(location);
+        url.searchParams.set("options", `-c search_path=${schema}`);
+        location = url.toString();
+      }
+      const db =
+        engine === "postgres" ? await openPostgres(location) : await openSqlite(":memory:");
+      try {
+        await migrate(db, 1);
+        const repository = new Repository(db, "migration-owner");
+        await repository.initialize();
+        await repository.putJob({
+          id: "job",
+          employerId: "employer",
+          requisitionId: "req",
+          title: "Synthetic",
+          company: "Synthetic",
+          location: "NL",
+          url: "https://synthetic.example",
+          description: "Fixture",
+          source: "fixture",
+          synthetic: true,
+        });
+        const app = await repository.createApplication("job", "candidate");
+        const before = await db.query("SELECT * FROM audit_events");
+        await migrate(db);
+        expect((await repository.summary("demo")).applications[0]).toEqual(app);
+        expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
+        expect(
+          (await db.query("SELECT MAX(version) AS version FROM schema_migrations"))[0]?.version,
+        ).toBe(2);
+      } finally {
+        await db.close();
+        if (admin) {
+          await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+          await admin.close();
+        }
+      }
+    },
+  );
+}
+
+it.skipIf(!process.env.AUTOPILOT_TEST_DATABASE_URL)(
+  "retains the original PostgreSQL connection-loss error when rollback also fails",
+  async () => {
+    const db = await openPostgres(process.env.AUTOPILOT_TEST_DATABASE_URL as string);
+    try {
+      await expect(
+        db.transaction(async (tx) => {
+          await tx.query("SELECT pg_terminate_backend(pg_backend_pid())");
+        }),
+      ).rejects.toMatchObject({ code: "57P01" });
+      expect((await db.query("SELECT 1 AS alive"))[0]?.alive).toBe(1);
+    } finally {
+      await db.close();
+    }
+  },
+);
 
 it("rolls back atomically on a real SQLite SQLITE_FULL write error", async () => {
   const db = await openSqlite(":memory:");

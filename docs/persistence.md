@@ -17,6 +17,18 @@ preparation requeues within budget; expired in-flight submission becomes UNKNOWN
 and enqueues reconciliation. Confirmation cannot be written through the general
 state transition method. The submission protocol remains a separate P08 deliverable.
 
+Task acknowledgement reloads the persisted task type, rather than trusting a worker
+copy. Submission acknowledgement requires a resolved outcome. Duplicate queued
+submission tasks cannot be claimed while their application is uncertain or terminal.
+Cancellation revokes leases; cancelling an in-flight submission preserves UNKNOWN
+and its reconciliation task. Reconciliation work cannot be discarded by cancellation.
+Owner control and cancellation events record the initiating actor. Controls have
+monotonically increasing audit revisions.
+
+PostgreSQL clients retain an error listener while checked out, not just while idle
+in the pool. Failed rollback does not replace the original failure; broken clients
+are discarded. A failed durable write or claim never grants execution authority.
+
 Audit events and outbox records commit with the state change. The transactional
 consumer interface is for database-only effects that share the transaction. Never
 send network requests in this callback. External consumers must use their own
@@ -26,3 +38,5 @@ The integration suite runs the same tests against SQLite and PostgreSQL. The
 multiprocess suite starts four actual Node workers and races them against one
 owner. A green repository test is not evidence for browser crash recovery; the
 mock ATS process-kill matrix will provide that evidence in P08/P15.
+
+See [P02 verification](evidence/P02-verification.md) for the actual acceptance matrix.

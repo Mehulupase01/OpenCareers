@@ -15,10 +15,11 @@ Verified P01 baseline: 37 unit/integration tests across SQLite/PostgreSQL, inclu
 four-process claim races; desktop/mobile browser workflow; typecheck; production
 build; public-source scan; dependency audit; isolated install/build/reset/start.
 SIGKILL recovery, populated SQLite migration and actual SQLITE_FULL rollback pass.
-P02 changes in progress add persisted task identity checks, cancellation, uncertain
+P02 phase candidate adds persisted task identity checks, cancellation, uncertain
 submission suppression, owner audit attribution, PostgreSQL migration and connection
-loss coverage. The expanded 47-test run passed assertions but exposed an unhandled
-PostgreSQL connection error; resolve and rerun before recording a green suite.
+loss coverage. The connection error is fixed; all 51 tests pass with zero skipped
+and no unhandled errors on pinned Node 24.21.0. Typecheck and lint also pass.
+Remote P02 candidate CI remains pending; see docs/evidence/P02-verification.md.
 
 Development services: API 127.0.0.1:4317, UI 127.0.0.1:4318, scheduler. Output is in
 ignored .cache/dev.stdout.log and .cache/dev.stderr.log. PostgreSQL test container:

@@ -90,6 +90,7 @@ export async function openSqlite(filename: string): Promise<Database> {
 }
 
 export async function openPostgres(connectionString: string): Promise<Database> {
+  const connectionFailures = new WeakMap<pg.Client, Error>();
   const pool = new pg.Pool({
     connectionString,
     max: 8,
@@ -98,6 +99,10 @@ export async function openPostgres(connectionString: string): Promise<Database> 
   });
   pool.on("error", () => {
     /* Individual requests surface storage availability failures. */
+  });
+  pool.on("connect", (client) => {
+    // A checked-out client emits connection errors independently of query rejection.
+    client.on("error", (error) => connectionFailures.set(client, error));
   });
   const executor = (client: pg.Pool | pg.PoolClient): SqlExecutor => ({
     dialect: "postgres",
@@ -115,17 +120,24 @@ export async function openPostgres(connectionString: string): Promise<Database> 
     ...executor(pool),
     async transaction<T>(operation: (tx: SqlExecutor) => Promise<T>): Promise<T> {
       const client = await pool.connect();
+      let discard = false;
       try {
         await client.query("BEGIN");
         await client.query("SET LOCAL lock_timeout = '5s'");
         const result = await operation(executor(client));
+        const failure = connectionFailures.get(client);
+        if (failure) throw failure;
         await client.query("COMMIT");
         return result;
       } catch (error) {
-        await client.query("ROLLBACK");
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          discard = true;
+        }
         throw error;
       } finally {
-        client.release();
+        client.release(discard || connectionFailures.has(client));
       }
     },
     close: () => pool.end(),

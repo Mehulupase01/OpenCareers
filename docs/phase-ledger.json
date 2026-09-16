@@ -143,7 +143,7 @@
     {
       "id": "P02",
       "title": "Persistence, durable work, and audit events",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": ["P01"],
       "tickets": [
         [
@@ -171,44 +171,44 @@
         {
           "id": "P02-G1",
           "requirement": "Concurrent claims produce one owner for each task and one committing owner per application.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G2",
           "requirement": "Killing a worker during a preparation task results in recoverable requeue after lease expiry.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G3",
           "requirement": "Killing a worker after an in-flight attempt creates reconciliation work, not a fresh submission task.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G4",
           "requirement": "At-least-once outbox delivery produces no duplicate downstream side effect.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G5",
           "requirement": "The same repository contract suite passes on SQLite and PostgreSQL.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G6",
           "requirement": "A migration from the previous schema retains application identity and audit history.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         },
         {
           "id": "P02-G7",
           "requirement": "Disk-full and database-unavailable errors prevent new external commits.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P02-verification.md"]
         }
       ],
       "externalPrerequisites": [],

@@ -12,7 +12,7 @@ process.once("message", () => {
     try {
       const task = await repository.claim(
         `child-${process.pid}`,
-        mode === "crash-submit" ? ["submit"] : ["prepare"],
+        mode === "crash-submit" || mode === "claim-submit" ? ["submit"] : ["prepare"],
         1000,
         2,
       );

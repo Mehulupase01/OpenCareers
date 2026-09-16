@@ -136,12 +136,17 @@ export async function buildServer(config: Config, repository: Repository) {
       .object({ stage: z.enum(["discovery", "preparation", "submissions"]), paused: z.boolean() })
       .strict()
       .parse(request.body);
-    return repository.setControl({ [`${body.stage}Paused`]: body.paused });
+    return repository.setControl(
+      { [`${body.stage}Paused`]: body.paused },
+      `owner:${config.ownerId}`,
+    );
   });
   app.post("/v1/control/stop", () =>
-    repository.setControl({ stopped: true, submissionsPaused: true }),
+    repository.setControl({ stopped: true, submissionsPaused: true }, `owner:${config.ownerId}`),
   );
-  app.post("/v1/control/resume", () => repository.setControl({ stopped: false }));
+  app.post("/v1/control/resume", () =>
+    repository.setControl({ stopped: false }, `owner:${config.ownerId}`),
+  );
   app.post("/v1/demo/probe", async () => {
     if (config.profile !== "demo") throw new DomainError("NOT_FOUND", "Demo command unavailable.");
     return repository.enqueue({

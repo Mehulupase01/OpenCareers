@@ -133,6 +133,148 @@ for (const engine of ["sqlite", "postgres"] as const) {
       expect((await repository.summary("demo")).counts.exceptions).toBe(1);
     });
 
+    it("uses persisted task identity and retains unknown work across duplicate submit tasks", async () => {
+      await repository.putJob(job);
+      const app = await repository.createApplication(job.id, "candidate");
+      await repository.setControl({ submissionsPaused: false });
+      for (const domain of ["first.example", "second.example"])
+        await repository.enqueue({
+          type: "submit",
+          domain,
+          applicationId: app.id,
+          dedupeKey: domain,
+        });
+      const claimed = await repository.claim("worker-a", ["submit"], 1000);
+      if (!claimed) throw new Error("Expected a claim");
+      expect(await peer.claim("worker-b", ["submit"])).toBeNull();
+      await db.query("UPDATE applications SET state='IN_FLIGHT' WHERE owner_id=$1 AND id=$2", [
+        owner,
+        app.id,
+      ]);
+      await expect(repository.complete({ ...claimed, type: "prepare" })).rejects.toMatchObject({
+        code: "STATE_INVALID",
+      });
+      await repository.fail(
+        { ...claimed, type: "prepare", applicationId: null },
+        new DomainError("COMMIT_UNKNOWN", "uncertain"),
+      );
+      expect((await repository.summary("demo")).applications[0]?.state).toBe("UNKNOWN");
+      expect(await peer.claim("worker-b", ["submit"])).toBeNull();
+      const reconciliation = await peer.claim("reconciler", ["reconcile"]);
+      expect(reconciliation?.applicationId).toBe(app.id);
+      if (!reconciliation) throw new Error("Expected reconciliation");
+      await expect(repository.cancelTask(reconciliation.id)).rejects.toMatchObject({
+        code: "STATE_INVALID",
+      });
+    });
+
+    it("cancels ready and leased tasks idempotently with owner audit and revokes stale workers", async () => {
+      const ready = await repository.enqueue({
+        type: "prepare",
+        domain: "ready.example",
+        dedupeKey: "cancel-ready",
+      });
+      expect((await repository.cancelTask(ready.id, `owner:${owner}`)).state).toBe("cancelled");
+      await repository.enqueue({
+        type: "prepare",
+        domain: "leased.example",
+        dedupeKey: "cancel-leased",
+      });
+      const claimed = await repository.claim("worker", ["prepare"]);
+      if (!claimed) throw new Error("Expected a claim");
+      const cancelled = await peer.cancelTask(claimed.id, `owner:${owner}`);
+      expect(cancelled).toMatchObject({
+        state: "cancelled",
+        lastError: "TASK_CANCELLED",
+        leaseOwner: null,
+        leaseUntil: null,
+      });
+      expect(await repository.cancelTask(claimed.id, `owner:${owner}`)).toEqual(cancelled);
+      await expect(repository.complete(claimed)).rejects.toMatchObject({ code: "LEASE_STALE" });
+      await expect(repository.renew(claimed)).rejects.toMatchObject({ code: "LEASE_STALE" });
+      expect(await repository.claim("replacement", ["prepare"])).toBeNull();
+      const other = new Repository(db, `other-${owner}`);
+      await other.initialize();
+      await expect(other.cancelTask(claimed.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      const events = await db.query(
+        "SELECT actor FROM audit_events WHERE owner_id=$1 AND action='task.cancelled'",
+        [owner],
+      );
+      expect(events).toEqual([{ actor: `owner:${owner}` }, { actor: `owner:${owner}` }]);
+    });
+
+    it("preserves reconciliation when an in-flight task is cancelled", async () => {
+      await repository.putJob(job);
+      const app = await repository.createApplication(job.id, "candidate");
+      await repository.setControl({ submissionsPaused: false });
+      await repository.enqueue({
+        type: "submit",
+        domain: "cancel.example",
+        applicationId: app.id,
+        dedupeKey: "cancel-in-flight",
+      });
+      const claimed = await repository.claim("worker", ["submit"]);
+      if (!claimed) throw new Error("Expected a claim");
+      await db.query("UPDATE applications SET state='IN_FLIGHT' WHERE owner_id=$1 AND id=$2", [
+        owner,
+        app.id,
+      ]);
+      expect((await peer.cancelTask(claimed.id)).lastError).toBe("COMMIT_UNKNOWN");
+      expect((await repository.summary("demo")).applications[0]?.state).toBe("UNKNOWN");
+      await expect(repository.complete(claimed)).rejects.toMatchObject({ code: "LEASE_STALE" });
+      expect((await peer.claim("reconciler", ["reconcile"]))?.applicationId).toBe(app.id);
+    });
+
+    it("records monotonic control revisions and the initiating actor", async () => {
+      await repository.setControl({ preparationPaused: true }, `owner:${owner}`);
+      await peer.setControl({ stopped: true }, `owner:${owner}`);
+      const events = await db.query(
+        "SELECT actor,revision FROM audit_events WHERE owner_id=$1 AND aggregate_id=$1 ORDER BY revision",
+        [owner],
+      );
+      expect(events).toEqual([
+        { actor: `owner:${owner}`, revision: 1 },
+        { actor: `owner:${owner}`, revision: 2 },
+      ]);
+    });
+
+    it("does not retry a definitive pre-commit failure and cannot dispatch on unavailable storage", async () => {
+      await repository.setControl({ submissionsPaused: false });
+      await repository.enqueue({
+        type: "submit",
+        domain: "unsupported.example",
+        dedupeKey: "unsupported",
+      });
+      const task = await repository.claim("worker", ["submit"]);
+      if (!task) throw new Error("Expected a claim");
+      await repository.fail(task, new DomainError("ADAPTER_UNSUPPORTED", "unsupported"));
+      expect(await peer.claim("worker", ["submit"])).toBeNull();
+      expect((await repository.summary("demo")).tasks[0]).toMatchObject({
+        state: "dead",
+        lastError: "ADAPTER_UNSUPPORTED",
+      });
+      const offline = new Repository(
+        {
+          dialect: db.dialect,
+          query: async () => {
+            throw new Error("storage offline");
+          },
+          transaction: async () => {
+            throw new Error("storage offline");
+          },
+          close: async () => undefined,
+        },
+        owner,
+      );
+      let dispatched = false;
+      await expect(
+        offline.claim("worker", ["submit"]).then(() => {
+          dispatched = true;
+        }),
+      ).rejects.toThrow("storage offline");
+      expect(dispatched).toBe(false);
+    });
+
     it("preserves retry budget, dedupe and ready time across connections", async () => {
       const task = await repository.enqueue({
         type: "discover",
