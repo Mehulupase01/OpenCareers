@@ -74,7 +74,7 @@
     {
       "id": "P01",
       "title": "Runnable skeleton, developer experience, and CI",
-      "status": "code_complete_verification_pending",
+      "status": "complete",
       "dependsOn": ["P00"],
       "tickets": [
         [
@@ -126,7 +126,7 @@
         {
           "id": "P01-G5",
           "requirement": "CI passes without external paid services or candidate accounts.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
@@ -137,7 +137,7 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null,
+      "lastVerifiedCommit": "74b45165fe26dce1c63a02fee761f05cdcf550bc",
       "evidence": ["docs/evidence/P01-verification.md"]
     },
     {

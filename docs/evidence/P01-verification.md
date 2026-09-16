@@ -1,7 +1,7 @@
 # P01 Runnable Workspace Verification
 
-2026-09-16. Local acceptance checks passed; remote clean-clone CI is pending the
-phase candidate push. This milestone is a runnable foundation, not job submission.
+2026-09-16. Local acceptance checks and remote clean-clone CI passed. This milestone
+is a runnable foundation, not job submission.
 
 Implemented: demo/local/server configuration validation, shared typed errors,
 database-aware health endpoints, owner sessions, Host/Origin checks, bounded login
@@ -29,8 +29,13 @@ Screenshots are synthetic and contain no owner profile, real job applications or
 private receipt data. Development UI is at 127.0.0.1:4318; API at 127.0.0.1:4317.
 The isolated verification API used 4321 and was stopped after the check.
 
-## Remaining Evidence
+## Remote Verification
 
-The new GitHub workflow must pass on Windows and Linux from clean checkouts and on
-PostgreSQL before P01 is marked complete. No live employer adapter, model gateway,
+GitHub Actions run [35061610769](https://github.com/Mehulupase01/OpenCareers/actions/runs/35061610769)
+passed all three jobs: Windows local contract, Linux local contract and PostgreSQL
+contract. Verified commit: `74b45165fe26dce1c63a02fee761f05cdcf550bc`.
+The first candidate failed only on phase-ledger formatting; that was corrected and
+the full workflow rerun. Matrix fail-fast is disabled to preserve both OS results.
+
+No live employer adapter, model gateway,
 candidate import, document factory or final-click engine is implemented in P01.
