@@ -1,6 +1,6 @@
 # P03 Candidate Evidence And Authorization Verification
 
-2026-09-17. Local verification complete; remote CI pending. All imported documents,
+2026-09-17. Local and remote verification complete. All imported documents,
 facts, profiles, grants and answers used for verification are synthetic.
 
 ## Acceptance Evidence
@@ -18,7 +18,7 @@ facts, profiles, grants and answers used for verification are synthetic.
 ## Checks
 
 - Strict typecheck, Biome format/lint and production build pass.
-- Full unit/integration run: 78 passed, zero skipped, both SQLite and PostgreSQL.
+- Full unit/integration run: 79 passed, zero skipped, both SQLite and PostgreSQL.
 - Browser suite: four passed across desktop Chromium and mobile Chromium, including
   existing operations controls. No uncaught page errors or measured horizontal overflow.
 - Inspected synthetic desktop/mobile profile screenshots; Playwright emits screenshots
@@ -29,6 +29,11 @@ facts, profiles, grants and answers used for verification are synthetic.
   unsafe XML, oversized files and parser timeouts.
 - Production dependency audit reports no known vulnerabilities.
 - Migration v3 passes populated-schema upgrade and checksum checks on both engines.
+- GitHub run [35162308425](https://github.com/Mehulupase01/OpenCareers/actions/runs/35162308425)
+  passed Windows, Linux and PostgreSQL at `857047c0b5c885fd3fa96db5d5bfce55b9ad32a3`.
+  The first candidate run exposed a Windows temporary-directory short-name alias
+  mismatch. Canonicalizing the trusted root fixed it; a regression test proves
+  redirected source subdirectories are still rejected.
 
 ## Boundaries
 

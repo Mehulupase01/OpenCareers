@@ -218,7 +218,7 @@
     {
       "id": "P03",
       "title": "Candidate evidence and standing authorization",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P02"],
       "tickets": [
         [
@@ -246,48 +246,48 @@
         {
           "id": "P03-G1",
           "requirement": "Every material candidate claim is traceable to a source or explicit owner assertion.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G2",
           "requirement": "Overlapping employment does not inflate computed experience.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G3",
           "requirement": "A profile revision invalidates affected prepared packets while preserving historical ones.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G4",
           "requirement": "Revoking auto-submit blocks new commits immediately at the policy gate.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G5",
           "requirement": "Missing salary or ambiguous sponsorship answers create targeted exceptions without blocking unrelated applications.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G6",
           "requirement": "The public repository contains synthetic examples only.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         },
         {
           "id": "P03-G7",
           "requirement": "The user can export and inspect the exact active authorization in plain language.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P03-verification.md"]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": "857047c0b5c885fd3fa96db5d5bfce55b9ad32a3"
     },
     {
       "id": "P04",

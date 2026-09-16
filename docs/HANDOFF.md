@@ -1,6 +1,6 @@
 # Handoff
 
-2026-09-17: P00, P01 and P02 complete. P03 locally verified, CI pending. Existing OpenCareers repository,
+2026-09-17: P00-P03 complete, locally and remotely verified. Existing OpenCareers repository,
 branch main. Owner requests commits and pushes at each completed phase.
 Read docs/amendments.md for repository, automatic final-click and portal-access scope.
 
@@ -33,12 +33,13 @@ Superseded bootstrap files remain in ignored .cache/initial-scaffold.
 P03 now implements migration v3, bounded PDF/DOCX import, reviewed fact revisions,
 immutable profiles, packet invalidation, scoped/expiring answer memory, standing
 authorization/export/revocation, protected API and desktop/mobile candidate UI.
-Latest local checks: 78 unit/integration tests passed across both engines with zero
+Latest local checks: 79 unit/integration tests passed across both engines with zero
 skips; four browser tests passed; typecheck, lint, build, public scan and dependency
 audit passed. See docs/evidence/P03-verification.md for gates and limitations.
 
-Next: commit/push P03 verification candidate, inspect remote CI, fix any failures,
-close its ledger, then continue directly into P04 discovery and historical imports.
+P03 CI 35162308425 passed Windows, Linux and PostgreSQL at
+857047c0b5c885fd3fa96db5d5bfce55b9ad32a3. Next: P04 discovery and historical imports,
+following docs/plans/P04-discovery.md. Continue directly after the closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,
 not stopping points. Private documents, real account access and live standing policy
 are not configured. Do not label live support or production readiness complete.

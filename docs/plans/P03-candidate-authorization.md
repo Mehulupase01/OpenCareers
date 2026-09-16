@@ -1,6 +1,6 @@
 # P03 Candidate Evidence And Standing Authorization
 
-Status: implemented and locally verified; remote CI pending. Source: masterplan page
+Status: complete, locally and remotely verified. Source: masterplan page
 32 and the conversation amendments. See `docs/evidence/P03-verification.md`.
 No private candidate source has been imported yet.
 
