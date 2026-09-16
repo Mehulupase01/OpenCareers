@@ -34,41 +34,31 @@
           "id": "P00-G1",
           "requirement": "Every R01-R12 requirement maps to at least one implementation phase and a verification method.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P00-audit.md"
-          ]
+          "evidence": ["docs/evidence/P00-audit.md"]
         },
         {
           "id": "P00-G2",
           "requirement": "The architecture contains exactly one authoritative application state store per deployment.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P00-audit.md"
-          ]
+          "evidence": ["docs/evidence/P00-audit.md"]
         },
         {
           "id": "P00-G3",
           "requirement": "The first genuine submission milestone is P08, not hidden behind a later optional agent framework.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P00-audit.md"
-          ]
+          "evidence": ["docs/evidence/P00-audit.md"]
         },
         {
           "id": "P00-G4",
           "requirement": "Existing changes are preserved and the audit explains any conflicts requiring owner input.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P00-audit.md"
-          ]
+          "evidence": ["docs/evidence/P00-audit.md"]
         },
         {
           "id": "P00-G5",
           "requirement": "A clean-room reader can identify how to start, where private configuration belongs, and how progress is recorded.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P00-audit.md"
-          ]
+          "evidence": ["docs/evidence/P00-audit.md"]
         }
       ],
       "externalPrerequisites": [],
@@ -85,9 +75,7 @@
       "id": "P01",
       "title": "Runnable skeleton, developer experience, and CI",
       "status": "code_complete_verification_pending",
-      "dependsOn": [
-        "P00"
-      ],
+      "dependsOn": ["P00"],
       "tickets": [
         [
           "P01-01",
@@ -115,64 +103,48 @@
           "id": "P01-G1",
           "requirement": "A clean clone installs and starts using the documented process.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
           "id": "P01-G2",
           "requirement": "The API, worker, and UI show consistent version and environment information.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
           "id": "P01-G3",
           "requirement": "Invalid or missing configuration causes an actionable startup error.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
           "id": "P01-G4",
           "requirement": "Secret-like fixture values are synthetic and a repository scan finds no real candidate data.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
           "id": "P01-G5",
           "requirement": "CI passes without external paid services or candidate accounts.",
           "status": "code_complete_verification_pending",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         },
         {
           "id": "P01-G6",
           "requirement": "The UI never labels sample data as real submitted applications.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P01-verification.md"
-          ]
+          "evidence": ["docs/evidence/P01-verification.md"]
         }
       ],
       "externalPrerequisites": [],
       "lastVerifiedCommit": null,
-      "evidence": [
-        "docs/evidence/P01-verification.md"
-      ]
+      "evidence": ["docs/evidence/P01-verification.md"]
     },
     {
       "id": "P02",
       "title": "Persistence, durable work, and audit events",
       "status": "in_progress",
-      "dependsOn": [
-        "P01"
-      ],
+      "dependsOn": ["P01"],
       "tickets": [
         [
           "P02-01",
@@ -246,9 +218,7 @@
       "id": "P03",
       "title": "Candidate evidence and standing authorization",
       "status": "not_started",
-      "dependsOn": [
-        "P02"
-      ],
+      "dependsOn": ["P02"],
       "tickets": [
         [
           "P03-01",
@@ -322,9 +292,7 @@
       "id": "P04",
       "title": "Discovery, job identity, and historical imports",
       "status": "not_started",
-      "dependsOn": [
-        "P03"
-      ],
+      "dependsOn": ["P03"],
       "tickets": [
         [
           "P04-01",
@@ -398,9 +366,7 @@
       "id": "P05",
       "title": "Free-only inference and evaluated matching",
       "status": "not_started",
-      "dependsOn": [
-        "P04"
-      ],
+      "dependsOn": ["P04"],
       "tickets": [
         [
           "P05-01",
@@ -474,9 +440,7 @@
       "id": "P06",
       "title": "Tailored CVs, letters, and answer packets",
       "status": "not_started",
-      "dependsOn": [
-        "P05"
-      ],
+      "dependsOn": ["P05"],
       "tickets": [
         [
           "P06-01",
@@ -550,9 +514,7 @@
       "id": "P07",
       "title": "Mock ATS and browser filling contract",
       "status": "not_started",
-      "dependsOn": [
-        "P06"
-      ],
+      "dependsOn": ["P06"],
       "tickets": [
         [
           "P07-01",
@@ -626,9 +588,7 @@
       "id": "P08",
       "title": "Actual submission vertical slice",
       "status": "not_started",
-      "dependsOn": [
-        "P07"
-      ],
+      "dependsOn": ["P07"],
       "tickets": [
         [
           "P08-01",
@@ -702,9 +662,7 @@
       "id": "P09",
       "title": "High-yield portal coverage",
       "status": "not_started",
-      "dependsOn": [
-        "P08"
-      ],
+      "dependsOn": ["P08"],
       "tickets": [
         [
           "P09-01",
@@ -772,9 +730,7 @@
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
       "status": "not_started",
-      "dependsOn": [
-        "P09"
-      ],
+      "dependsOn": ["P09"],
       "tickets": [
         [
           "P10-01",
@@ -848,9 +804,7 @@
       "id": "P11",
       "title": "Email integration and receipt reconciliation",
       "status": "not_started",
-      "dependsOn": [
-        "P10"
-      ],
+      "dependsOn": ["P10"],
       "tickets": [
         [
           "P11-01",
@@ -924,9 +878,7 @@
       "id": "P12",
       "title": "Bounded multi-agent orchestration and cost optimization",
       "status": "not_started",
-      "dependsOn": [
-        "P11"
-      ],
+      "dependsOn": ["P11"],
       "tickets": [
         [
           "P12-01",
@@ -994,9 +946,7 @@
       "id": "P13",
       "title": "Unattended Windows autopilot and throughput",
       "status": "not_started",
-      "dependsOn": [
-        "P12"
-      ],
+      "dependsOn": ["P12"],
       "tickets": [
         [
           "P13-01",
@@ -1070,9 +1020,7 @@
       "id": "P14",
       "title": "Fully deployable server and hybrid profiles",
       "status": "not_started",
-      "dependsOn": [
-        "P13"
-      ],
+      "dependsOn": ["P13"],
       "tickets": [
         [
           "P14-01",
@@ -1146,9 +1094,7 @@
       "id": "P15",
       "title": "Security, fault injection, restore, and release gates",
       "status": "not_started",
-      "dependsOn": [
-        "P14"
-      ],
+      "dependsOn": ["P14"],
       "tickets": [
         [
           "P15-01",
@@ -1222,9 +1168,7 @@
       "id": "P16",
       "title": "Outcomes, calibration, and continuous improvement",
       "status": "not_started",
-      "dependsOn": [
-        "P15"
-      ],
+      "dependsOn": ["P15"],
       "tickets": [
         [
           "P16-01",
@@ -1298,9 +1242,7 @@
       "id": "P17",
       "title": "Release, portfolio, and autonomous maintenance handoff",
       "status": "not_started",
-      "dependsOn": [
-        "P16"
-      ],
+      "dependsOn": ["P16"],
       "tickets": [
         [
           "P17-01",
