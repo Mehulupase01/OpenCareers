@@ -1,5 +1,37 @@
 # Persistence Contract
 
+## Schema Ownership
+
+```mermaid
+erDiagram
+  owners ||--|| controls : configures
+  owners ||--o{ profile_versions : versions
+  owners ||--o{ sources : polls
+  owners ||--o{ authorizations : grants
+  owners ||--o{ jobs : discovers
+  jobs ||--o{ applications : identifies
+  applications ||--o{ tasks : schedules
+  applications ||--o{ packets : snapshots
+  packets ||--o{ intents : binds
+  authorizations ||--o{ intents : permits
+  intents ||--o{ attempts : records
+  attempts ||--o{ receipts : proves
+  applications ||--o{ exceptions : isolates
+  owners ||--o{ artifacts : stores
+  owners ||--o{ audit_events : audits
+  audit_events ||--|| outbox : publishes
+  audit_events ||--o{ event_deliveries : deduplicates
+  owners ||--o{ workers : observes
+```
+
+Application identity is unique by owner, candidate and canonical job. Domain tables
+use composite owner-scoped foreign keys; a reference cannot cross tenant ownership.
+Migration definitions are immutable after application and checksum-verified at startup.
+The diagram shows relationships currently enforced by SQL. Packet artifact manifests
+and candidate fact links gain their typed validation in P03/P06.
+
+## Runtime Guarantees
+
 SQLite uses the installed better-sqlite3 embedded engine, checked at startup for
 the WAL-reset fix. File databases require WAL, foreign keys, FULL synchronous and
 a busy timeout. A process-local operation queue prevents unrelated async calls

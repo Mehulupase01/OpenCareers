@@ -1,7 +1,7 @@
 # P02 Persistence And Recovery Verification
 
-2026-09-16. Local implementation and acceptance checks pass. Remote verification of
-the phase candidate is pending. All test data and endpoints are synthetic.
+2026-09-16. Local implementation, acceptance checks and remote verification pass.
+All test data and endpoints are synthetic.
 
 ## Acceptance Evidence
 
@@ -20,6 +20,11 @@ the phase candidate is pending. All test data and endpoints are synthetic.
 - Node 24.21.0; better-sqlite3 12.11.1 with SQLite 3.53.2; PostgreSQL 17.9.
 - Unit/integration suite: 51 passed, zero skipped, zero unhandled errors.
 - TypeScript strict check and Biome recommended lint/format: passed.
+- Production build, public-source scan and refreshed desktop/mobile browser tests:
+  passed (2 browser tests).
+- GitHub run [35062361432](https://github.com/Mehulupase01/OpenCareers/actions/runs/35062361432)
+  passed Windows, Linux and PostgreSQL jobs at
+  `9084eb9baa25f87e53c4f54691795e514d203db2`.
 - Tests exposed and fixed SQLite auto-rollback error masking and an unhandled
   PostgreSQL checked-out connection error. Neither failure is treated as success.
 - Owner control changes retain their initiating actor and monotonically increasing

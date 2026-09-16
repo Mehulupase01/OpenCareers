@@ -143,7 +143,7 @@
     {
       "id": "P02",
       "title": "Persistence, durable work, and audit events",
-      "status": "code_complete_verification_pending",
+      "status": "complete",
       "dependsOn": ["P01"],
       "tickets": [
         [
@@ -212,7 +212,8 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": "9084eb9baa25f87e53c4f54691795e514d203db2",
+      "evidence": ["docs/evidence/P02-verification.md", "docs/persistence.md"]
     },
     {
       "id": "P03",
