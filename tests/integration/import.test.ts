@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
@@ -48,6 +48,36 @@ it("retains PDF page coordinates and explicitly identifies unreadable pages", as
   const blank = await parseIsolated(await syntheticPdf(true), "pdf");
   expect(blank.quality).toBe("unreadable");
   expect(blank.warnings.length).toBeGreaterThan(0);
+}, 30000);
+it("canonicalizes the trusted root but rejects redirected source subdirectories", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "opencareers-path-"));
+  const db = await openSqlite(":memory:");
+  try {
+    await migrate(db);
+    const repo = new CandidateRepository(db, "synthetic-owner");
+    await repo.initialize();
+    const physical = join(dir, "physical-root");
+    const alias = join(dir, "root-alias");
+    const redirected = join(dir, "redirected-root");
+    await mkdir(physical);
+    await mkdir(redirected);
+    await symlink(physical, alias, process.platform === "win32" ? "junction" : "dir");
+    const bytes = await syntheticDocx();
+    expect(
+      (await new CandidateImporter(repo, alias).import(bytes, "synthetic.docx")).sha256,
+    ).toHaveLength(64);
+    await symlink(
+      join(physical, "candidate-sources"),
+      join(redirected, "candidate-sources"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    await expect(
+      new CandidateImporter(repo, redirected).import(bytes, "synthetic.docx"),
+    ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+  } finally {
+    await db.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 }, 30000);
 it("rejects malformed, oversized, entity-bearing and timed-out parser inputs", async () => {
   await expect(extractDocument(Buffer.from("not a PDF"), "pdf")).rejects.toThrow();

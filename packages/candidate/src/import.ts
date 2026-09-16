@@ -96,7 +96,10 @@ export class CandidateImporter {
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const ownerKey = createHash("sha256").update(this.repository.ownerId).digest("hex");
       const storageKey = join("candidate-sources", ownerKey, sha256);
-      const target = resolve(this.dataDir, storageKey);
+      // Resolve the trusted root first: Windows short-name aliases are not redirects.
+      await mkdir(this.dataDir, { recursive: true });
+      const root = await realpath(this.dataDir);
+      const target = resolve(root, storageKey);
       await mkdir(dirname(target), { recursive: true });
       const physical = await realpath(dirname(target));
       if (
