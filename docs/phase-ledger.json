@@ -72,7 +72,7 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null,
+      "lastVerifiedCommit": "0f9c4dad47b494e1cb214c39b07792e3e36bd5cc",
       "evidence": [
         "docs/evidence/P00-audit.md",
         "docs/architecture.md",
@@ -84,7 +84,7 @@
     {
       "id": "P01",
       "title": "Runnable skeleton, developer experience, and CI",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": [
         "P00"
       ],
@@ -114,42 +114,57 @@
         {
           "id": "P01-G1",
           "requirement": "A clean clone installs and starts using the documented process.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         },
         {
           "id": "P01-G2",
           "requirement": "The API, worker, and UI show consistent version and environment information.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         },
         {
           "id": "P01-G3",
           "requirement": "Invalid or missing configuration causes an actionable startup error.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         },
         {
           "id": "P01-G4",
           "requirement": "Secret-like fixture values are synthetic and a repository scan finds no real candidate data.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         },
         {
           "id": "P01-G5",
           "requirement": "CI passes without external paid services or candidate accounts.",
-          "status": "not_started",
-          "evidence": []
+          "status": "code_complete_verification_pending",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         },
         {
           "id": "P01-G6",
           "requirement": "The UI never labels sample data as real submitted applications.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P01-verification.md"
+          ]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": null,
+      "evidence": [
+        "docs/evidence/P01-verification.md"
+      ]
     },
     {
       "id": "P02",
