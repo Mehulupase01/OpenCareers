@@ -10,8 +10,10 @@ under a standing owner policy. There are no live-verified adapters yet.
 P00 architecture, P01 runnable foundation and P02 persistence are complete. The dashboard reads real
 database state for synthetic jobs, tasks, controls and worker health. P02 provides durable
 queue ownership, cancellation, audit events and crash recovery on SQLite/PostgreSQL.
-Candidate onboarding, discovery, document generation and final submission are still
-ahead; the current application does not apply to employers.
+P03 candidate onboarding is implemented and locally verified, with remote CI pending:
+PDF/DOCX source import, reviewed facts, immutable profiles, scoped answer memory and
+revocable standing authorization. Discovery, document generation and final submission
+are still ahead; the current application does not apply to employers.
 
 ## Development
 
@@ -33,10 +35,11 @@ reported as verified; see the handoff for actual results.
 
 ## Validation
 
-The P02 local suite passes 51 tests with both databases configured. This includes
+The current local suite passes 78 tests with both databases configured. This includes
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
 connection loss and populated-schema upgrades. Desktop/mobile browser workflows
-are tested separately (2 passed). Windows, Linux and PostgreSQL CI passed for P02.
+are tested separately (4 passed). Windows, Linux and PostgreSQL CI passed for P02;
+P03 CI is pending. See [candidate verification](docs/evidence/P03-verification.md).
 
 ```powershell
 npx --yes pnpm@12.4.2 check

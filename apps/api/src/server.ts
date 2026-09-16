@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { candidateRoutes } from "./candidate.js";
 
 export async function buildServer(config: Config, repository: Repository) {
   const app = Fastify({
@@ -56,6 +57,22 @@ export async function buildServer(config: Config, repository: Repository) {
   });
 
   app.setErrorHandler((error, _request, reply) => {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      [
+        "FST_REQ_FILE_TOO_LARGE",
+        "FST_FILES_LIMIT",
+        "FST_PARTS_LIMIT",
+        "FST_FIELDS_LIMIT",
+        "FST_ERR_CTP_BODY_TOO_LARGE",
+      ].includes(String(error.code))
+    )
+      return reply.code(413).send({
+        code: "CONFIG_INVALID",
+        message: "Upload exceeds the allowed size or part count.",
+        correlationId: _request.id,
+      });
     if (error instanceof z.ZodError)
       return reply.code(400).send({
         code: "CONFIG_INVALID",
@@ -155,6 +172,8 @@ export async function buildServer(config: Config, repository: Repository) {
       dedupeKey: `probe:${randomBytes(12).toString("hex")}`,
     });
   });
+
+  await candidateRoutes(app, config, repository);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

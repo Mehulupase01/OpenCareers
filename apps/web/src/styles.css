@@ -13,7 +13,9 @@ body {
   margin: 0;
 }
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 button {
@@ -629,7 +631,7 @@ td:last-child {
   }
   nav {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     margin-top: 17px;
     gap: 2px;
   }
@@ -758,5 +760,335 @@ td:last-child {
 @media (prefers-reduced-motion: reduce) {
   .spin {
     animation: none;
+  }
+}
+
+.candidate-workspace {
+  min-width: 0;
+}
+.candidate-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border-bottom: 1px solid #d6ded9;
+  margin: 10px 0 24px;
+}
+.candidate-tabs button {
+  padding: 12px 16px;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  font-size: 12px;
+}
+.candidate-tabs button[aria-selected="true"] {
+  border-bottom-color: #21775a;
+  color: #176449;
+}
+.candidate-section {
+  max-width: 1050px;
+  min-width: 0;
+}
+.candidate-section h2 {
+  margin: 0 0 10px;
+}
+.candidate-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 18px 0;
+}
+.candidate-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #526359;
+  font-size: 12px;
+  min-width: 0;
+}
+.candidate-form input:not([type="checkbox"]):not([type="radio"]),
+.candidate-form select,
+.candidate-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfdad3;
+  border-radius: 4px;
+  padding: 10px;
+  background: white;
+  color: #26392e;
+}
+.candidate-form textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.candidate-form input:focus-visible,
+.candidate-form select:focus-visible,
+.candidate-form textarea:focus-visible {
+  outline: 2px solid #49a889;
+  outline-offset: 2px;
+}
+.candidate-form .wide {
+  grid-column: 1 / -1;
+}
+.candidate-form .checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.checkbox-field input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+  accent-color: #21775a;
+}
+.mode-options,
+.evidence-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  border: 0;
+  padding: 15px 0;
+  min-width: 0;
+  margin: 0;
+  border-bottom: 1px solid #e0e6e2;
+}
+.mode-options legend,
+.evidence-options legend {
+  font-size: 12px;
+  color: #526359;
+  padding: 0;
+}
+.mode-options label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-transform: capitalize;
+  font-size: 12px;
+}
+.evidence-options {
+  flex-direction: column;
+  font-size: 12px;
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e6e2;
+}
+.consent {
+  padding: 16px 0;
+  border-top: 1px solid #dfdad0;
+  color: #705818;
+}
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #dce3df;
+}
+.candidate-dialog {
+  width: min(740px, calc(100% - 28px));
+  max-height: 90dvh;
+  overflow: auto;
+  border: 1px solid #ccd8ce;
+  border-radius: 6px;
+  padding: 24px;
+  background: white;
+}
+.candidate-dialog::backdrop {
+  background: #15281d55;
+}
+.candidate-dialog h2 {
+  margin: 0;
+}
+.candidate-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  border-block: 1px solid #dce3df;
+  padding: 18px 0;
+}
+.candidate-totals dt {
+  font-size: 11px;
+  color: #79887f;
+}
+.candidate-totals dd {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 8px 0 0;
+}
+.fact-list article {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e0e6e2;
+}
+.fact-main {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fact-main strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 9px 0;
+  line-height: 1.6;
+}
+.fact-main small,
+.answer-list small {
+  color: #75877b;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.fact-main blockquote {
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid #bbcabf;
+  color: #78857c;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.fact-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.state-notice {
+  border-left: 3px solid #b59b50;
+  padding: 10px 14px;
+  background: #f6f3e9;
+  color: #7b6a35;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 12px;
+  color: #687c6f;
+}
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid #dce3df;
+  overflow: hidden;
+}
+.upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.upload-button:focus-within {
+  outline: 2px solid #49a889;
+  outline-offset: 2px;
+}
+.source-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 16px 0;
+  width: 100%;
+  text-align: left;
+  border-bottom: 1px solid #dce3df;
+}
+.source-list .source-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.source-row strong {
+  display: block;
+  font-size: 13px;
+}
+.source-row small {
+  display: block;
+  font-size: 11px;
+  color: #7a897f;
+  margin-top: 7px;
+}
+.source-detail {
+  margin-top: 30px;
+}
+.source-passages {
+  max-height: 520px;
+  overflow: auto;
+  border-block: 1px solid #dce3df;
+  background: #fff;
+}
+.source-passages > div {
+  padding: 16px;
+  border-bottom: 1px solid #e4eae6;
+  overflow-wrap: anywhere;
+}
+.source-passages code {
+  display: block;
+  font-size: 10px;
+  color: #76897d;
+}
+.source-passages p {
+  font-size: 13px;
+  white-space: pre-wrap;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+.source-passages a {
+  font-size: 11px;
+  color: #26765b;
+  text-decoration: underline;
+}
+.answer-list article {
+  padding: 16px 0;
+  border-bottom: 1px solid #dce3df;
+}
+.answer-list strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.answer-list p {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 740px) {
+  .candidate-tabs button {
+    padding: 10px 9px;
+    font-size: 11px;
+  }
+  .candidate-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .candidate-dialog {
+    padding: 18px;
+  }
+  .candidate-totals {
+    gap: 12px;
+  }
+  .candidate-totals dd {
+    font-size: 14px;
+  }
+  .candidate-section > .section-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .candidate-section .heading-actions {
+    flex-wrap: wrap;
+  }
+  .fact-list article {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mode-options {
+    gap: 12px;
   }
 }

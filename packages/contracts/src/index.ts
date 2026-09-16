@@ -94,6 +94,10 @@ export const jobInputSchema = z
     title: z.string().min(1).max(240),
     company: z.string().min(1).max(240),
     location: z.string().min(1).max(240),
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/)
+      .optional(),
     url: z.url().max(2000),
     description: z.string().max(100000),
     source: z.string().min(1).max(100),

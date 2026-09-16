@@ -4,6 +4,7 @@ import { loadConfig } from "../../packages/config/src/index.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
+import { identity } from "../helpers/candidate-fixtures.js";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -23,6 +24,69 @@ async function setup() {
 }
 
 describe("API trust boundary", () => {
+  it("protects candidate reads, writes and uploads and rejects oversized input", async () => {
+    const { app, headers } = await setup();
+    for (const url of [
+      "/v1/candidate",
+      "/v1/candidate/sources/unknown",
+      "/v1/candidate/authorization/export",
+    ])
+      expect((await app.inject({ url, headers })).statusCode).toBe(401);
+    expect(
+      (await app.inject({ method: "POST", url: "/v1/candidate/facts", headers, payload: identity }))
+        .statusCode,
+    ).toBe(401);
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/candidate/facts",
+          headers: { ...authenticated, origin: "https://attacker.example" },
+          payload: identity,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/candidate/facts",
+          headers: authenticated,
+          payload: { ...identity, unexpected: true },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/candidate/facts",
+          headers: authenticated,
+          payload: identity,
+        })
+      ).statusCode,
+    ).toBe(200);
+    const payload = Buffer.concat([
+      Buffer.from(
+        '--synthetic-boundary\r\nContent-Disposition: form-data; name="file"; filename="synthetic.pdf"\r\nContent-Type: application/pdf\r\n\r\n',
+      ),
+      Buffer.alloc(10 * 1024 * 1024 + 1, 65),
+      Buffer.from("\r\n--synthetic-boundary--\r\n"),
+    ]);
+    const oversized = await app.inject({
+      method: "POST",
+      url: "/v1/candidate/sources",
+      headers: {
+        ...authenticated,
+        "content-type": "multipart/form-data; boundary=synthetic-boundary",
+      },
+      payload,
+    });
+    expect(oversized.statusCode).toBe(413);
+    expect(oversized.json().code).toBe("CONFIG_INVALID");
+  });
   it("rejects foreign hosts, foreign origins and unauthenticated data requests", async () => {
     const { app, headers } = await setup();
     expect(

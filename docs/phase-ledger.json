@@ -218,7 +218,7 @@
     {
       "id": "P03",
       "title": "Candidate evidence and standing authorization",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P02"],
       "tickets": [
         [

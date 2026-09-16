@@ -1,6 +1,6 @@
 # Handoff
 
-2026-09-16: P00, P01 and P02 complete. Existing OpenCareers repository,
+2026-09-17: P00, P01 and P02 complete. P03 locally verified, CI pending. Existing OpenCareers repository,
 branch main. Owner requests commits and pushes at each completed phase.
 Read docs/amendments.md for repository, automatic final-click and portal-access scope.
 
@@ -9,7 +9,7 @@ at commit 74b45165fe26dce1c63a02fee761f05cdcf550bc. It includes
 configuration, contracts, SQLite/PostgreSQL repositories, queue leasing/recovery,
 audit/outbox, a session-protected API, worker and React operations dashboard.
 No real candidate data imported and no real applications sent. Final submission,
-candidate onboarding, discovery, inference and packet generation are still pending.
+discovery, inference and packet generation are still pending.
 
 Verified P01 baseline: 37 unit/integration tests across SQLite/PostgreSQL, including
 four-process claim races; desktop/mobile browser workflow; typecheck; production
@@ -26,10 +26,20 @@ See docs/evidence/P02-verification.md for scope and known verification boundarie
 Development services: API 127.0.0.1:4317, UI 127.0.0.1:4318, scheduler. Output is in
 ignored .cache/dev.stdout.log and .cache/dev.stderr.log. PostgreSQL test container:
 opencareers-postgres-test, loopback port 15437, synthetic disposable data only.
-Services were refreshed to P02 on Node 24.21.0; development manager PID 19480,
-API PID 29880 and worker PID 31660. Revalidate process identities before stopping.
+Services were refreshed to P03 on Node 24.21.0; development manager PID 29536.
+Revalidate process identities before stopping. API/worker do not hot reload.
 Superseded bootstrap files remain in ignored .cache/initial-scaffold.
 
-Next: implement P03 candidate provenance and standing authorization using
-docs/plans/P03-candidate-authorization.md. No P03 code is implemented yet. Do not label
-live support or production readiness complete. The full 18-phase objective remains.
+P03 now implements migration v3, bounded PDF/DOCX import, reviewed fact revisions,
+immutable profiles, packet invalidation, scoped/expiring answer memory, standing
+authorization/export/revocation, protected API and desktop/mobile candidate UI.
+Latest local checks: 78 unit/integration tests passed across both engines with zero
+skips; four browser tests passed; typecheck, lint, build, public scan and dependency
+audit passed. See docs/evidence/P03-verification.md for gates and limitations.
+
+Next: commit/push P03 verification candidate, inspect remote CI, fix any failures,
+close its ledger, then continue directly into P04 discovery and historical imports.
+The owner explicitly requests autonomous continuation; phase checkpoints are updates,
+not stopping points. Private documents, real account access and live standing policy
+are not configured. Do not label live support or production readiness complete.
+The full 18-phase objective remains.

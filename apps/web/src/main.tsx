@@ -16,34 +16,23 @@ import {
   Settings2,
   ShieldCheck,
   Square,
+  UserRound,
   Workflow,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { authorizationStatus } from "../../../packages/candidate/src/domain.js";
+import type { CandidateSnapshot } from "../../../packages/contracts/src/candidate.js";
 import type { OperationsSummary } from "../../../packages/contracts/src/index.js";
+import { request } from "./api.js";
+import { CandidateWorkspace } from "./candidate.js";
 import "./styles.css";
 
-type View = "applications" | "queue" | "workers" | "settings";
-
-async function request<T>(
-  path: string,
-  body?: unknown,
-  method = body === undefined ? "GET" : "POST",
-): Promise<T> {
-  const response = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    ...(body === undefined
-      ? {}
-      : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
-  });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value.message ?? "The service is unavailable.");
-  return value as T;
-}
+type View = "applications" | "queue" | "workers" | "settings" | "candidate";
 
 function App() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
+  const [candidate, setCandidate] = useState<CandidateSnapshot | null>(null);
   const [view, setView] = useState<View>("applications");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -61,6 +50,7 @@ function App() {
   const refresh = useCallback(async () => {
     try {
       setSummary(await request<OperationsSummary>("/v1/operations/summary"));
+      setCandidate(await request<CandidateSnapshot>("/v1/candidate"));
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed.");
@@ -128,9 +118,11 @@ function App() {
     queue: "Work queue",
     workers: "Workers",
     settings: "Controls",
+    candidate: "Candidate",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
+    { id: "candidate" as const, label: "Candidate", icon: UserRound },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -175,7 +167,8 @@ function App() {
         <div className="sidebar-bottom">
           <ShieldCheck size={17} />
           <div>
-            Submission policy<strong>Not configured</strong>
+            Submission policy
+            <strong>{authorizationStatus(candidate?.authorization ?? null, new Date())}</strong>
           </div>
           <span className="small-dot" />
         </div>
@@ -280,40 +273,45 @@ function App() {
                   <span>No real applications submitted</span>
                 </div>
               )}
-              <section className="metrics" aria-label="Application counts">
-                <div className="metric">
-                  <span>Confirmed</span>
-                  <strong>
-                    {summary.counts.confirmed}
-                    <CheckCircle2 size={20} />
-                  </strong>
-                  <small>Receipt verified</small>
-                </div>
-                <div className="metric">
-                  <span>Prepared</span>
-                  <strong>
-                    {summary.counts.prepared}
-                    <ClipboardList size={20} />
-                  </strong>
-                  <small>Documents ready</small>
-                </div>
-                <div className="metric">
-                  <span>Uncertain</span>
-                  <strong>
-                    {summary.counts.unknown}
-                    <CircleAlert size={20} />
-                  </strong>
-                  <small>Awaiting reconciliation</small>
-                </div>
-                <div className="metric">
-                  <span>Needs attention</span>
-                  <strong>
-                    {summary.counts.exceptions}
-                    <Pause size={20} />
-                  </strong>
-                  <small>Open exceptions</small>
-                </div>
-              </section>
+              {view !== "candidate" && (
+                <section className="metrics" aria-label="Application counts">
+                  <div className="metric">
+                    <span>Confirmed</span>
+                    <strong>
+                      {summary.counts.confirmed}
+                      <CheckCircle2 size={20} />
+                    </strong>
+                    <small>Receipt verified</small>
+                  </div>
+                  <div className="metric">
+                    <span>Prepared</span>
+                    <strong>
+                      {summary.counts.prepared}
+                      <ClipboardList size={20} />
+                    </strong>
+                    <small>Documents ready</small>
+                  </div>
+                  <div className="metric">
+                    <span>Uncertain</span>
+                    <strong>
+                      {summary.counts.unknown}
+                      <CircleAlert size={20} />
+                    </strong>
+                    <small>Awaiting reconciliation</small>
+                  </div>
+                  <div className="metric">
+                    <span>Needs attention</span>
+                    <strong>
+                      {summary.counts.exceptions}
+                      <Pause size={20} />
+                    </strong>
+                    <small>Open exceptions</small>
+                  </div>
+                </section>
+              )}
+              {view === "candidate" && candidate && (
+                <CandidateWorkspace snapshot={candidate} refresh={refresh} />
+              )}
               {view === "applications" && (
                 <section className="data-section">
                   <div className="section-toolbar">
@@ -511,7 +509,7 @@ function App() {
                         </strong>
                         <span>
                           {stage === "submissions"
-                            ? "Awaiting verified profile and authorization"
+                            ? "Submission engine unavailable"
                             : summary.control[`${stage}Paused`]
                               ? "Paused"
                               : "Enabled"}

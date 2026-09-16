@@ -32,6 +32,15 @@ const migrations = [
     "CREATE INDEX application_states ON applications(owner_id,state,updated_at)",
     "CREATE INDEX audit_owner_time ON audit_events(owner_id,occurred_at,id)",
   ],
+  [
+    "CREATE TABLE candidates (owner_id TEXT PRIMARY KEY REFERENCES owners(id), id TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, active_profile_id TEXT, active_authorization_id TEXT, UNIQUE(owner_id,id), FOREIGN KEY(owner_id,active_profile_id) REFERENCES profile_versions(owner_id,id), FOREIGN KEY(owner_id,active_authorization_id) REFERENCES authorizations(owner_id,id))",
+    "CREATE TABLE candidate_sources (owner_id TEXT NOT NULL, id TEXT NOT NULL, candidate_id TEXT NOT NULL, name TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, storage_key TEXT NOT NULL, extraction TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,candidate_id,sha256), FOREIGN KEY(owner_id,candidate_id) REFERENCES candidates(owner_id,id))",
+    "CREATE TABLE fact_versions (owner_id TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, candidate_id TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id,revision), FOREIGN KEY(owner_id,candidate_id) REFERENCES candidates(owner_id,id))",
+    "CREATE TABLE fact_heads (owner_id TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,id,revision) REFERENCES fact_versions(owner_id,id,revision))",
+    "CREATE TABLE approved_answers (owner_id TEXT NOT NULL, id TEXT NOT NULL, candidate_id TEXT NOT NULL, semantic_key TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, approved_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,candidate_id) REFERENCES candidates(owner_id,id), UNIQUE(owner_id,semantic_key,revision))",
+    "CREATE TABLE packet_validity (owner_id TEXT NOT NULL, packet_id TEXT NOT NULL, invalidated_at TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(owner_id,packet_id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
+    "CREATE TABLE question_blocks (owner_id TEXT NOT NULL, application_id TEXT NOT NULL, semantic_key TEXT NOT NULL, meaning TEXT NOT NULL, country TEXT NOT NULL, exception_id TEXT NOT NULL, resolved_answer_id TEXT, PRIMARY KEY(owner_id,application_id,semantic_key), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,exception_id) REFERENCES exceptions(owner_id,id), FOREIGN KEY(owner_id,resolved_answer_id) REFERENCES approved_answers(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

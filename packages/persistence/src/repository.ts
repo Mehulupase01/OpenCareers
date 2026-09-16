@@ -18,7 +18,8 @@ import {
   VERSION,
 } from "../../contracts/src/index.js";
 import { assertTransition, retryDelay } from "../../domain/src/state.js";
-import type { Database, Row, SqlExecutor } from "./database.js";
+import type { Row, SqlExecutor } from "./database.js";
+import { OwnerScope } from "./owner-scope.js";
 
 const initialControl: Control = {
   discoveryPaused: false,
@@ -27,7 +28,7 @@ const initialControl: Control = {
   stopped: false,
   restoreBlocked: false,
 };
-const taskFromRow = (row: Row): Task => ({
+export const taskFromRow = (row: Row): Task => ({
   id: String(row.id),
   ownerId: String(row.owner_id),
   applicationId: row.application_id as string | null,
@@ -65,24 +66,7 @@ export interface EnqueueInput {
   runAfter?: string;
 }
 
-export class Repository {
-  constructor(
-    public readonly db: Database,
-    public readonly ownerId: string,
-    private readonly clock: () => Date = () => new Date(),
-  ) {}
-  private now() {
-    return this.clock().toISOString();
-  }
-
-  private async lockOwner(tx: SqlExecutor) {
-    const rows = await tx.query(
-      `SELECT id FROM owners WHERE id=$1${tx.dialect === "postgres" ? " FOR UPDATE" : ""}`,
-      [this.ownerId],
-    );
-    if (!rows.length) throw new DomainError("NOT_FOUND", "Owner not initialized.");
-  }
-
+export class Repository extends OwnerScope {
   async initialize(): Promise<void> {
     await this.db.transaction(async (tx) => {
       await tx.query("INSERT INTO owners(id,created_at) VALUES($1,$2) ON CONFLICT(id) DO NOTHING", [
@@ -96,37 +80,7 @@ export class Repository {
     });
   }
 
-  private async audit(
-    tx: SqlExecutor,
-    objectId: string,
-    action: string,
-    revision: number,
-    payload: Record<string, string | number | null> = {},
-    actor = "system",
-  ) {
-    const id = randomUUID();
-    await tx.query(
-      "INSERT INTO audit_events(id,owner_id,aggregate_id,action,revision,actor,correlation_id,payload,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-      [
-        id,
-        this.ownerId,
-        objectId,
-        action,
-        revision,
-        actor,
-        objectId,
-        JSON.stringify(payload),
-        this.now(),
-      ],
-    );
-    await tx.query("INSERT INTO outbox(id,owner_id,available_at) VALUES($1,$2,$3)", [
-      id,
-      this.ownerId,
-      this.now(),
-    ]);
-  }
-
-  private async readControl(tx: SqlExecutor): Promise<Control> {
+  protected async readControl(tx: SqlExecutor): Promise<Control> {
     const row = (await tx.query("SELECT data FROM controls WHERE owner_id=$1", [this.ownerId]))[0];
     if (!row) throw new DomainError("NOT_FOUND", "Owner controls missing.");
     return controlSchema.parse(JSON.parse(String(row.data)));
@@ -285,7 +239,7 @@ export class Repository {
     return this.db.transaction((tx) => this.enqueueIn(tx, input));
   }
 
-  private async recoverTask(tx: SqlExecutor, task: Task, cancelled = false): Promise<void> {
+  protected async recoverTask(tx: SqlExecutor, task: Task, cancelled = false): Promise<void> {
     const app = task.applicationId
       ? (
           await tx.query("SELECT * FROM applications WHERE owner_id=$1 AND id=$2", [

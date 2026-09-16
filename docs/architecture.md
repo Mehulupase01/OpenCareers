@@ -54,6 +54,18 @@ repository SQL with separately owned engine migration/claim behavior. Temporal,
 Redis, Kubernetes, vector storage and open-ended agent graphs are deferred until
 measured requirements justify them. Bounded graph orchestration is evaluated in P12.
 
+## ADR-007: Candidate Evidence And Policy
+
+Implemented in P03. One candidate per owner has immutable fact versions and current
+head pointers. Source imports are owner-scoped and content-addressed. Child-process
+parsers produce bounded, untrusted extraction blocks; only explicit owner assertions
+or reviewed source claims enter published profiles. Publication invalidates
+uncommitted packets, preserving historical snapshots. Approved answers bind exact
+semantics, scope, time and fact revisions. A versioned standing grant controls future
+commit eligibility and has an immediate database revocation gate. The P08 submission
+engine must perform this check in its own commit-authority transaction. UI mode
+selection alone cannot execute a submission.
+
 ## Milestones
 
 P00-P02 foundation; P03-P05 evidence/discovery/ranking; P06-P07 packets and dry run;
