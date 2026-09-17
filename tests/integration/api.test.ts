@@ -90,8 +90,17 @@ describe("API trust boundary", () => {
   it("protects discovery configuration, URL recognition and history previews", async () => {
     const { app, headers } = await setup();
     expect((await app.inject({ url: "/v1/discovery", headers })).statusCode).toBe(401);
+    expect((await app.inject({ url: "/v1/matching", headers })).statusCode).toBe(401);
     const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
     const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    const matching = await app.inject({ url: "/v1/matching", headers: authenticated });
+    expect(matching.statusCode).toBe(200);
+    expect(matching.json()).toMatchObject({
+      route: { status: "unconfigured", modelId: null, provider: null },
+      budget: { limit: 40, used: 0, reserved: 0 },
+      assessments: [],
+    });
+    expect(matching.body).not.toContain("API_KEY");
     const source = {
       expectedRevision: 0,
       connector: "greenhouse",

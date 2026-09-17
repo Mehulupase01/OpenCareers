@@ -43,4 +43,27 @@ describe("configuration fails closed", () => {
     for (const v of ["3.51.3", "3.53.0", "3.50.7", "3.44.6"])
       expect(sqliteVersionSafe(v)).toBe(true);
   });
+  it("rejects paid, ambiguous and demo inference configuration", () => {
+    const privateEnv = {
+      AUTOPILOT_PROFILE: "local",
+      AUTOPILOT_DATA_DIR: "D:/private-opencareers-test",
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+      AUTOPILOT_OPENROUTER_API_KEY: "synthetic-key-not-valid-outside-tests",
+      AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: "synthetic-provider",
+    };
+    expect(() =>
+      loadConfig({
+        ...privateEnv,
+        AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: "vendor/paid-model",
+      }),
+    ).toThrow(/free model/i);
+    expect(() => loadConfig(privateEnv)).toThrow(/allowlist/i);
+    expect(() =>
+      loadConfig({
+        AUTOPILOT_OPENROUTER_API_KEY: "synthetic-key-not-valid-outside-tests",
+        AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: "vendor/model:free",
+        AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: "synthetic-provider",
+      }),
+    ).toThrow(/Demo/);
+  });
 });

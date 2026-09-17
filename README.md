@@ -15,7 +15,9 @@ PDF/DOCX source import, reviewed facts, immutable profiles, scoped answer memory
 revocable standing authorization. P04 adds fixed-origin Greenhouse/Lever discovery,
 source health and evidence, canonical job identity, reversible duplicate resolution
 and historical import. Document generation and final submission are still ahead; the
-current application does not apply to employers.
+current application does not apply to employers. P05 adds deterministic eligibility
+gates, evidence-bound semantic matching, code-owned scores, durable free-inference
+budgets and an inspectable Matching workspace.
 
 ## Development
 
@@ -30,6 +32,9 @@ npx --yes pnpm@12.4.2 dev
 The dashboard uses http://127.0.0.1:4318 and API http://127.0.0.1:4317 in development.
 Demo data is synthetic and stored in `.data/demo`. Real data belongs outside the
 repository on a non-synced disk. `.env.example` documents configuration.
+Optional OpenRouter inference requires a private key plus explicit `:free` model and
+provider allowlists. Unknown prices, fallback providers and tools fail closed. Demo
+mode uses synthetic inference and sends no data to OpenRouter.
 
 Commands: `dev`, `build`, `lint`, `typecheck`, `test:unit`, `test:integration`,
 `test:e2e`, `doctor`, `demo:reset`. Commands still under development must not be
@@ -37,12 +42,13 @@ reported as verified; see the handoff for actual results.
 
 ## Validation
 
-The current local suite passes 105 tests with both databases configured. This includes
+The current local suite passes 129 tests with both databases configured. This includes
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
 connection loss, populated-schema upgrades, connector paging/backoff, discovery
-identity and historical suppression. Desktop/mobile browser workflows are tested
-separately (6 passed). Windows, Linux and PostgreSQL CI passed for P04. See
-[P04 verification](docs/evidence/P04-verification.md).
+identity and historical suppression, concurrent inference budgets, route backoff and
+a frozen 72-case matching evaluation. Desktop/mobile browser workflows are tested
+separately (8 passed). Windows, Linux and PostgreSQL CI is pending for the P05
+candidate. See [P05 verification](docs/evidence/P05-verification.md).
 
 ```powershell
 npx --yes pnpm@12.4.2 check

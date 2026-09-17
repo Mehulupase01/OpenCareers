@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowRight,
+  BrainCircuit,
   BriefcaseBusiness,
   CheckCircle2,
   Circle,
@@ -27,9 +28,17 @@ import type { OperationsSummary } from "../../../packages/contracts/src/index.js
 import { request } from "./api.js";
 import { CandidateWorkspace } from "./candidate.js";
 import { DiscoveryWorkspace } from "./discovery.js";
+import { MatchingWorkspace } from "./matching.js";
 import "./styles.css";
 
-type View = "applications" | "queue" | "workers" | "settings" | "candidate" | "discovery";
+type View =
+  | "applications"
+  | "queue"
+  | "workers"
+  | "settings"
+  | "candidate"
+  | "discovery"
+  | "matching";
 
 function App() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
@@ -128,11 +137,13 @@ function App() {
     settings: "Controls",
     candidate: "Candidate",
     discovery: "Discovery",
+    matching: "Matching",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
     { id: "candidate" as const, label: "Candidate", icon: UserRound },
     { id: "discovery" as const, label: "Discovery", icon: Search },
+    { id: "matching" as const, label: "Matching", icon: BrainCircuit },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -283,7 +294,7 @@ function App() {
                   <span>No real applications submitted</span>
                 </div>
               )}
-              {view !== "candidate" && view !== "discovery" && (
+              {view !== "candidate" && view !== "discovery" && view !== "matching" && (
                 <section className="metrics" aria-label="Application counts">
                   <div className="metric">
                     <span>Confirmed</span>
@@ -323,6 +334,7 @@ function App() {
                 <CandidateWorkspace snapshot={candidate} refresh={refresh} />
               )}
               {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
+              {view === "matching" && <MatchingWorkspace jobs={summary.jobs} />}
               {view === "applications" && (
                 <section className="data-section">
                   <div className="section-toolbar">

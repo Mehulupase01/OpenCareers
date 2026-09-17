@@ -82,6 +82,29 @@ Historical owner assertions suppress duplicate work but remain distinct from
 receipt-confirmed submissions. Discovery freshness and identity checks are additional
 P08 policy prerequisites; they do not create commit authority.
 
+## ADR-009: Free-only Inference And Matching
+
+Implemented in P05. The sole external inference route is a fixed-origin OpenRouter
+transport. A current catalogue snapshot must prove an explicitly allowlisted
+`:free` model has zero numeric prices in every recognized dimension, no unknown or
+tiered price field, text input/output, strict structured responses and sufficient
+context. Requests pin one allowlisted provider, prohibit fallback and tools, request
+zero data retention and deny provider data collection. These request fields do not
+replace account-level privacy configuration.
+
+Quota is an owner-scoped daily database ledger with atomic reservations. Sent calls
+remain charged after crashes; only expired unsent reservations are released. Route
+health, bounded 429 backoff, redacted request/response hashes and the latest twenty
+catalogues survive restarts. Missing keys, free capacity or eligible routes pause
+inference without pausing discovery.
+
+Eight deterministic gates run before semantic work. Model output can propose only
+requirements with exact vacancy spans and approved candidate fact IDs. Validation
+rejects unknown facts and inexact spans; scoring and application transitions remain
+code-owned. An active policy must bind the active immutable profile. Only validated
+auto-eligible assessments advance an application to `ELIGIBLE`; no inference result
+can arm or execute a submission.
+
 ## Milestones
 
 P00-P02 foundation; P03 candidate evidence; P04 discovery/identity; P05 ranking;

@@ -1,6 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { assertTransition, localDay, retryDelay } from "../../packages/domain/src/state.js";
+import {
+  assertTransition,
+  localDay,
+  localDayStart,
+  retryDelay,
+} from "../../packages/domain/src/state.js";
 
 describe("application state and recovery", () => {
   it("cannot relaunch an uncertain application or reopen a confirmed one", () => {
@@ -28,5 +33,11 @@ describe("application state and recovery", () => {
     expect(localDay(new Date("2026-03-28T23:30:00Z"))).toBe("2026-03-29");
     expect(localDay(new Date("2026-10-25T00:30:00Z"))).toBe("2026-10-25");
     expect(localDay(new Date("2026-10-25T23:30:00Z"))).toBe("2026-10-26");
+    expect(localDayStart(new Date("2026-01-15T12:00:00Z")).toISOString()).toBe(
+      "2026-01-14T23:00:00.000Z",
+    );
+    expect(localDayStart(new Date("2026-07-15T12:00:00Z")).toISOString()).toBe(
+      "2026-07-14T22:00:00.000Z",
+    );
   });
 });

@@ -50,12 +50,18 @@ Adyen board on 2026-09-17; see docs/evidence/P04-verification.md. No submit occu
 P04 CI run 35204726535 passed Windows, Linux and PostgreSQL at
 fd9d3364fef509f2ebe3aacc0d67fbf072d5048d. P04 closure commit is 84bd297.
 
-P05 is in progress. The implementation plan is
-docs/plans/P05-inference-matching.md: strict zero-price route validation, no tools,
-ZDR/data-collection-denied explicit routing, durable daily reservations, bounded 429
-backoff, deterministic gates, evidence-bound semantic output, code-owned scoring and
-a frozen 50+ case evaluation with holdout reporting. Continue through implementation,
-remote CI, phase closure and the remaining phases.
+P05 implementation is a local release candidate. It includes strict zero-price route
+validation, no tools or fallbacks, ZDR/data-collection-denied provider pinning,
+durable daily reservations, bounded 429 backoff, eight deterministic gates,
+profile-bound authorization, exact-span semantic evidence, code-owned scoring and a
+responsive Matching workspace. The frozen evaluation has 72 cases and a 12-case
+holdout: 20/20 auto-eligible precision, 44/44 hard disqualifiers safely routed, zero
+unsupported claims and zero label errors. Local verification passes 129 tests across
+SQLite/PostgreSQL and 8 desktop/mobile browser workflows, plus lint, typecheck, build,
+public scan and dependency audit. See docs/evidence/P05-verification.md. Authenticated
+live free-route reliability is externally pending because no private key is present;
+the public catalogue was read only during planning. Complete candidate commit, remote
+CI and the P05 closure commit before P06.
 
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,

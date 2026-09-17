@@ -62,6 +62,14 @@ const migrations = [
     "CREATE TABLE identity_resolutions (owner_id TEXT NOT NULL, id TEXT NOT NULL, from_job_id TEXT NOT NULL, to_job_id TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL, reversed_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,from_job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,to_job_id) REFERENCES jobs(owner_id,id))",
     "CREATE UNIQUE INDEX active_job_resolution ON identity_resolutions(owner_id,from_job_id) WHERE reversed_at IS NULL",
   ],
+  [
+    "CREATE TABLE model_catalogues (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, fetched_at TEXT NOT NULL, PRIMARY KEY(owner_id,id))",
+    "CREATE TABLE inference_state (owner_id TEXT PRIMARY KEY REFERENCES owners(id), status TEXT NOT NULL, data TEXT NOT NULL, catalogue_id TEXT, backoff_until TEXT, updated_at TEXT NOT NULL, FOREIGN KEY(owner_id,catalogue_id) REFERENCES model_catalogues(owner_id,id))",
+    "CREATE TABLE inference_reservations (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, application_id TEXT, model_id TEXT NOT NULL, provider TEXT NOT NULL, request_hash TEXT, response_hash TEXT, error_code TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, completed_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id))",
+    "CREATE INDEX inference_budget ON inference_reservations(owner_id,day,state)",
+    "CREATE TABLE match_assessments (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, job_id TEXT NOT NULL, profile_id TEXT NOT NULL, application_id TEXT, revision INTEGER NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,job_id,profile_id,revision), FOREIGN KEY(owner_id,job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,profile_id) REFERENCES profile_versions(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id))",
+    "CREATE INDEX match_latest ON match_assessments(owner_id,profile_id,job_id,revision)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

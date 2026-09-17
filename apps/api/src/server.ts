@@ -10,6 +10,7 @@ import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 import { candidateRoutes } from "./candidate.js";
 import { discoveryRoutes } from "./discovery.js";
+import { matchingRoutes } from "./matching.js";
 
 export async function buildServer(config: Config, repository: Repository) {
   const app = Fastify({
@@ -176,6 +177,7 @@ export async function buildServer(config: Config, repository: Repository) {
 
   await candidateRoutes(app, config, repository);
   await discoveryRoutes(app, config, repository);
+  await matchingRoutes(app, config, repository);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

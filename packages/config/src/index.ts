@@ -14,6 +14,10 @@ const envSchema = z.object({
   AUTOPILOT_OWNER_TOKEN: z.string().min(32).optional(),
   AUTOPILOT_DATABASE_URL: z.string().optional(),
   AUTOPILOT_ALLOWED_ORIGINS: z.string().optional(),
+  AUTOPILOT_OPENROUTER_API_KEY: z.string().min(20).max(512).optional(),
+  AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: z.string().optional(),
+  AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: z.string().optional(),
+  AUTOPILOT_INFERENCE_DAILY_LIMIT: z.coerce.number().int().min(1).max(50).default(40),
 });
 
 export interface Config {
@@ -25,7 +29,21 @@ export interface Config {
   ownerToken: string | undefined;
   databaseUrl: string | undefined;
   allowedOrigins: string[];
+  inference: {
+    enabled: boolean;
+    apiKey: string | undefined;
+    dailyLimit: number;
+    modelAllowlist: string[];
+    providerAllowlist: string[];
+  };
   externalSubmissionEnabled: false;
+}
+
+function list(value: string | undefined, pattern: RegExp, label: string): string[] {
+  const values = [...new Set((value?.split(",") ?? []).map((item) => item.trim()).filter(Boolean))];
+  if (values.some((item) => !pattern.test(item)))
+    throw new DomainError("CONFIG_INVALID", `Invalid ${label} allowlist.`);
+  return values;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): Config {
@@ -94,6 +112,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   if (profile === "server" && !e.AUTOPILOT_ALLOWED_ORIGINS) {
     throw new DomainError("CONFIG_INVALID", "Server requires explicit allowed origins.");
   }
+  const modelAllowlist = list(
+    e.AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST,
+    /^[a-zA-Z0-9_./~:-]+$/,
+    "model",
+  );
+  const providerAllowlist = list(
+    e.AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST,
+    /^[a-zA-Z0-9_-]+$/,
+    "provider",
+  );
+  if (modelAllowlist.some((model) => !model.endsWith(":free")))
+    throw new DomainError(
+      "MODEL_ROUTE_INELIGIBLE",
+      "Only explicitly free model variants are allowed.",
+    );
+  if (profile === "demo" && e.AUTOPILOT_OPENROUTER_API_KEY)
+    throw new DomainError("CONFIG_INVALID", "Demo cannot use an external inference key.");
+  if (e.AUTOPILOT_OPENROUTER_API_KEY && (!modelAllowlist.length || !providerAllowlist.length))
+    throw new DomainError(
+      "MODEL_ROUTE_INELIGIBLE",
+      "Inference keys require explicit free-model and provider allowlists.",
+    );
+  if (!e.AUTOPILOT_OPENROUTER_API_KEY && (modelAllowlist.length || providerAllowlist.length))
+    throw new DomainError("CONFIG_INVALID", "Inference allowlists require an OpenRouter API key.");
   return {
     profile,
     dataDir,
@@ -103,6 +145,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     ownerToken: e.AUTOPILOT_OWNER_TOKEN,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
+    inference: {
+      enabled: Boolean(e.AUTOPILOT_OPENROUTER_API_KEY),
+      apiKey: e.AUTOPILOT_OPENROUTER_API_KEY,
+      dailyLimit: e.AUTOPILOT_INFERENCE_DAILY_LIMIT,
+      modelAllowlist,
+      providerAllowlist,
+    },
     externalSubmissionEnabled: false,
   };
 }

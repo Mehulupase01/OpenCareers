@@ -60,3 +60,39 @@ export function localDay(instant: Date): string {
     day: "2-digit",
   }).format(instant);
 }
+
+export function localDayStart(instant: Date): Date {
+  const [year, month, day] = localDay(instant).split("-").map(Number);
+  const target = Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1);
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const offsetAt = (value: number) => {
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date(value))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]),
+    );
+    return (
+      Date.UTC(
+        parts.year ?? 0,
+        (parts.month ?? 1) - 1,
+        parts.day ?? 1,
+        parts.hour ?? 0,
+        parts.minute ?? 0,
+        parts.second ?? 0,
+      ) - value
+    );
+  };
+  let start = target - offsetAt(target);
+  start = target - offsetAt(start);
+  return new Date(start);
+}

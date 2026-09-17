@@ -162,7 +162,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
         expect(
           (await db.query("SELECT MAX(version) AS version FROM schema_migrations"))[0]?.version,
-        ).toBe(4);
+        ).toBe(5);
       } finally {
         await db.close();
         if (admin) {
