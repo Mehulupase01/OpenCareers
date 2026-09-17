@@ -444,7 +444,7 @@
     {
       "id": "P06",
       "title": "Tailored CVs, letters, and answer packets",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P05"],
       "tickets": [
         [

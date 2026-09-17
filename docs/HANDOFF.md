@@ -64,6 +64,12 @@ the public catalogue was read only during planning. CI run 35235281544 passed Wi
 Ubuntu and PostgreSQL at 89cff352a9488e57af9d46116b51fbe48507fa25. Proceed with
 P06 tailored CVs, letters and answer packets after the P05 closure commit.
 
+P06 planning is decision-complete in docs/plans/P06-document-packets.md. Implement a
+single evidence-linked AST, deterministic professional-first generation, independent
+claim validation, pinned DOCX/PDF renderers, cross-format extraction equivalence,
+content-addressed private artifacts, hash-driven readiness invalidation and a
+side-by-side Documents workspace. Use only synthetic golden packets in the repo.
+
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,
 not stopping points. Private documents, real account access and live standing policy
