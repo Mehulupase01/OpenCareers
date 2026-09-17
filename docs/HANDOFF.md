@@ -1,7 +1,6 @@
 # Handoff
 
-2026-09-17: P00-P03 complete, locally and remotely verified. P04 implementation is
-locally verified and awaiting its remote CI/closure commit. Existing OpenCareers repository,
+2026-09-17: P00-P04 complete, locally and remotely verified. Existing OpenCareers repository,
 branch main. Owner requests commits and pushes at each completed phase.
 Read docs/amendments.md for repository, automatic final-click and portal-access scope.
 
@@ -48,7 +47,9 @@ desktop/mobile discovery UI. Local checks: 105 unit/integration tests passed acr
 both engines, six browser tests passed, and lint/typecheck/build/public scan/audit
 passed. A read-only live Greenhouse vacancy was normalized and displayed from the
 Adyen board on 2026-09-17; see docs/evidence/P04-verification.md. No submit occurred.
-Next: commit/push P04, require Windows/Linux/PostgreSQL CI, close P04, then continue P05.
+P04 CI run 35204726535 passed Windows, Linux and PostgreSQL at
+fd9d3364fef509f2ebe3aacc0d67fbf072d5048d. Next: begin P05 free-only inference and
+evaluated matching from the masterplan, then continue through the remaining phases.
 
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,

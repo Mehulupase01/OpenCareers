@@ -27,7 +27,10 @@ the required live, read-only gate; no application form was opened or submitted.
 - Production dependency audit reports no known vulnerabilities.
 - Migration v4 passes clean and populated upgrades on both database engines while
   retaining application identity and audit history.
-- Remote Windows, Linux and PostgreSQL CI: pending implementation commit.
+- GitHub run [35204726535](https://github.com/Mehulupase01/OpenCareers/actions/runs/35204726535)
+  passed Windows, Linux and PostgreSQL at
+  `fd9d3364fef509f2ebe3aacc0d67fbf072d5048d`, including six browser journeys on
+  both operating systems.
 
 ## Security And Correctness Boundaries
 

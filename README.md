@@ -41,8 +41,8 @@ The current local suite passes 105 tests with both databases configured. This in
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
 connection loss, populated-schema upgrades, connector paging/backoff, discovery
 identity and historical suppression. Desktop/mobile browser workflows are tested
-separately (6 passed). Windows, Linux and PostgreSQL CI passed for P03; P04 remote
-verification follows its implementation commit. See [P04 verification](docs/evidence/P04-verification.md).
+separately (6 passed). Windows, Linux and PostgreSQL CI passed for P04. See
+[P04 verification](docs/evidence/P04-verification.md).
 
 ```powershell
 npx --yes pnpm@12.4.2 check

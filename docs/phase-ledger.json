@@ -292,7 +292,7 @@
     {
       "id": "P04",
       "title": "Discovery, job identity, and historical imports",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P03"],
       "tickets": [
         [
@@ -320,48 +320,49 @@
         {
           "id": "P04-G1",
           "requirement": "Repeated polling of the same feed creates no duplicate jobs or application work.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G2",
           "requirement": "Pagination and delta cursors do not omit records across fixture boundary cases.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G3",
           "requirement": "Closed, temporarily missing, and parser-failed states remain distinguishable.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G4",
           "requirement": "Cross-postings map to one application where identity is established.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G5",
           "requirement": "Historical user-asserted submissions block accidental repeat applications without inflating new confirmed totals.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G6",
           "requirement": "Source 403/429 responses activate the configured pause/backoff behavior.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         },
         {
           "id": "P04-G7",
           "requirement": "At least one real current vacancy can be read, normalized, and displayed with source evidence, without submitting it.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P04-verification.md"]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": "fd9d3364fef509f2ebe3aacc0d67fbf072d5048d",
+      "evidence": ["docs/evidence/P04-verification.md"]
     },
     {
       "id": "P05",
