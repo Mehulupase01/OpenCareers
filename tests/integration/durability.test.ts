@@ -152,14 +152,17 @@ for (const engine of ["sqlite", "postgres"] as const) {
           source: "fixture",
           synthetic: true,
         });
-        const app = await repository.createApplication("job", "candidate");
+        await db.query(
+          "INSERT INTO applications(id,owner_id,candidate_id,job_id,state,created_at,updated_at) VALUES('legacy-app','migration-owner','candidate','job','DISCOVERED','2026-09-16T00:00:00Z','2026-09-16T00:00:00Z')",
+        );
+        const app = (await repository.summary("demo")).applications[0];
         const before = await db.query("SELECT * FROM audit_events");
         await migrate(db);
         expect((await repository.summary("demo")).applications[0]).toEqual(app);
         expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
         expect(
           (await db.query("SELECT MAX(version) AS version FROM schema_migrations"))[0]?.version,
-        ).toBe(3);
+        ).toBe(4);
       } finally {
         await db.close();
         if (admin) {

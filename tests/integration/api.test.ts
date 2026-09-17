@@ -87,6 +87,80 @@ describe("API trust boundary", () => {
     expect(oversized.statusCode).toBe(413);
     expect(oversized.json().code).toBe("CONFIG_INVALID");
   });
+  it("protects discovery configuration, URL recognition and history previews", async () => {
+    const { app, headers } = await setup();
+    expect((await app.inject({ url: "/v1/discovery", headers })).statusCode).toBe(401);
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    const source = {
+      expectedRevision: 0,
+      connector: "greenhouse",
+      board: "synthetic-api",
+      region: "global",
+      employerId: "synthetic-employer",
+      company: "Synthetic Employer",
+      intervalSeconds: 300,
+      enabled: true,
+      mode: "fixture",
+    };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/discovery/sources",
+          headers: authenticated,
+          payload: { ...source, mode: "live" },
+        })
+      ).statusCode,
+    ).toBe(409);
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/discovery/sources",
+      headers: authenticated,
+      payload: source,
+    });
+    expect(created.statusCode).toBe(200);
+    expect(created.json()).toMatchObject({ board: "synthetic-api", mode: "fixture" });
+    const recognized = await app.inject({
+      method: "POST",
+      url: "/v1/discovery/recognize",
+      headers: authenticated,
+      payload: { url: "https://boards.greenhouse.io/synthetic-api/jobs/123?tracking=test" },
+    });
+    expect(recognized.json()).toMatchObject({
+      board: "synthetic-api",
+      postingId: "123",
+      canonicalUrl: "https://job-boards.greenhouse.io/synthetic-api/jobs/123",
+    });
+    const record = {
+      externalId: "synthetic-api-history",
+      url: "https://boards.greenhouse.io/synthetic-api/jobs/123",
+      company: "Synthetic Employer",
+      title: "Software Engineer",
+      location: "Amsterdam",
+      submitted: false,
+      submittedOn: null,
+      ownerAssertion: "",
+      documents: [{ name: "synthetic-letter.pdf", sha256: null }],
+    };
+    const preview = await app.inject({
+      method: "POST",
+      url: "/v1/discovery/history",
+      headers: authenticated,
+      payload: { format: "json", content: JSON.stringify([record]), preview: true },
+    });
+    expect(preview.json()).toMatchObject({ count: 1, records: [record] });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/discovery/sources",
+          headers: { ...authenticated, origin: "https://attacker.example" },
+          payload: source,
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
   it("rejects foreign hosts, foreign origins and unauthenticated data requests", async () => {
     const { app, headers } = await setup();
     expect(

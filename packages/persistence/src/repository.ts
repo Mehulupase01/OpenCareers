@@ -19,6 +19,7 @@ import {
 } from "../../contracts/src/index.js";
 import { assertTransition, retryDelay } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
+import { jobIdentity } from "./job-identity.js";
 import { OwnerScope } from "./owner-scope.js";
 
 const initialControl: Control = {
@@ -137,6 +138,18 @@ export class Repository extends OwnerScope {
     historical = false,
   ): Promise<Application> {
     return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const identity = await jobIdentity(tx, this.ownerId, jobId);
+      jobId = identity.canonical;
+      for (const member of identity.members) {
+        const existing = (
+          await tx.query(
+            "SELECT * FROM applications WHERE owner_id=$1 AND candidate_id=$2 AND job_id=$3 AND state <> 'DUPLICATE'",
+            [this.ownerId, candidateId, member],
+          )
+        )[0];
+        if (existing) return applicationFromRow(existing);
+      }
       const id = randomUUID();
       const inserted = await tx.query(
         "INSERT INTO applications(id,owner_id,candidate_id,job_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(owner_id,candidate_id,job_id) DO NOTHING RETURNING *",

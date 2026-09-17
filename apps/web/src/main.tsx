@@ -26,9 +26,10 @@ import type { CandidateSnapshot } from "../../../packages/contracts/src/candidat
 import type { OperationsSummary } from "../../../packages/contracts/src/index.js";
 import { request } from "./api.js";
 import { CandidateWorkspace } from "./candidate.js";
+import { DiscoveryWorkspace } from "./discovery.js";
 import "./styles.css";
 
-type View = "applications" | "queue" | "workers" | "settings" | "candidate";
+type View = "applications" | "queue" | "workers" | "settings" | "candidate" | "discovery";
 
 function App() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
@@ -59,6 +60,7 @@ function App() {
 
   useEffect(() => {
     let active = true;
+    let retry: number | undefined;
     const start = async () => {
       try {
         const health = await request<{ profile: string }>("/health/live");
@@ -70,12 +72,18 @@ function App() {
         }
         await refresh();
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Connection failed.");
+        if (active) {
+          setError(err instanceof Error ? err.message : "Connection failed.");
+          retry = window.setTimeout(() => {
+            void start();
+          }, 1000);
+        }
       }
     };
     void start();
     return () => {
       active = false;
+      if (retry !== undefined) window.clearTimeout(retry);
     };
   }, [refresh]);
 
@@ -119,10 +127,12 @@ function App() {
     workers: "Workers",
     settings: "Controls",
     candidate: "Candidate",
+    discovery: "Discovery",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
     { id: "candidate" as const, label: "Candidate", icon: UserRound },
+    { id: "discovery" as const, label: "Discovery", icon: Search },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -273,7 +283,7 @@ function App() {
                   <span>No real applications submitted</span>
                 </div>
               )}
-              {view !== "candidate" && (
+              {view !== "candidate" && view !== "discovery" && (
                 <section className="metrics" aria-label="Application counts">
                   <div className="metric">
                     <span>Confirmed</span>
@@ -312,6 +322,7 @@ function App() {
               {view === "candidate" && candidate && (
                 <CandidateWorkspace snapshot={candidate} refresh={refresh} />
               )}
+              {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
               {view === "applications" && (
                 <section className="data-section">
                   <div className="section-toolbar">

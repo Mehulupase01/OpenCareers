@@ -1,4 +1,6 @@
 :root {
+  --line: #e0e6e3;
+  --muted: #75877b;
   font-family: "Segoe UI", system-ui, sans-serif;
   color: #222b28;
   background: #f6f8f7;
@@ -631,7 +633,7 @@ td:last-child {
   }
   nav {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: 17px;
     gap: 2px;
   }
@@ -765,6 +767,104 @@ td:last-child {
 
 .candidate-workspace {
   min-width: 0;
+}
+
+.discovery-workspace h2 {
+  font-size: 18px;
+}
+.source-health-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0;
+}
+.source-health-list article > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.source-health-list small {
+  display: block;
+  line-height: 1.8;
+  margin-top: 10px;
+  color: var(--muted);
+}
+.source-health-list p {
+  margin: 6px 0 10px;
+}
+:where(.source-health-list) .fact-actions {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.source-run-list details,
+.folder-import {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.source-run-list summary,
+.folder-import summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+.folder-import form {
+  margin-top: 20px;
+}
+.discovery-detail {
+  width: min(850px, calc(100vw - 32px));
+}
+.discovery-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 24px 0;
+}
+.discovery-facts div {
+  min-width: 0;
+}
+.discovery-facts dt,
+.discovery-evidence dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.discovery-facts dd,
+.discovery-evidence dd {
+  margin: 5px 0 12px;
+  overflow-wrap: anywhere;
+}
+.discovery-evidence {
+  border-block: 1px solid var(--line);
+  margin-top: 20px;
+}
+.vacancy-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.65;
+  margin-top: 24px;
+}
+.history-preview {
+  border-block: 1px solid var(--line);
+  padding: 20px 0;
+}
+.history-preview li {
+  margin-bottom: 12px;
+}
+:where(.discovery-workspace) .answer-list small {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 650px) {
+  .source-health-list article {
+    flex-direction: column;
+  }
+  .discovery-facts {
+    grid-template-columns: 1fr;
+  }
+  .discovery-workspace .section-toolbar {
+    flex-wrap: wrap;
+  }
+  .discovery-workspace .search {
+    width: 100%;
+  }
 }
 .candidate-tabs {
   display: flex;

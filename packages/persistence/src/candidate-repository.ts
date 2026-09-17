@@ -20,6 +20,7 @@ import {
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
 import { localDay } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
+import { assertDiscoveryEligibility } from "./job-identity.js";
 import { Repository, taskFromRow } from "./repository.js";
 
 const json = <T>(row: Row, field = "data"): T => JSON.parse(String(row[field])) as T;
@@ -539,6 +540,7 @@ export class CandidateRepository extends Repository {
     if (!["READY", "INTENT_RECORDED"].includes(String(app.state)))
       throw new DomainError("STATE_INVALID", "Application is not ready to commit.");
     const job = jobInputSchema.parse(json(app, "job_data"));
+    await assertDiscoveryEligibility(tx, this.ownerId, job.id, input.applicationId, this.now());
     if (
       !job.countryCode ||
       !policy.countries.includes(job.countryCode) ||

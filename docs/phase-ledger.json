@@ -292,7 +292,7 @@
     {
       "id": "P04",
       "title": "Discovery, job identity, and historical imports",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P03"],
       "tickets": [
         [

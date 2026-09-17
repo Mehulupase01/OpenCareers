@@ -41,6 +41,27 @@ const migrations = [
     "CREATE TABLE packet_validity (owner_id TEXT NOT NULL, packet_id TEXT NOT NULL, invalidated_at TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(owner_id,packet_id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
     "CREATE TABLE question_blocks (owner_id TEXT NOT NULL, application_id TEXT NOT NULL, semantic_key TEXT NOT NULL, meaning TEXT NOT NULL, country TEXT NOT NULL, exception_id TEXT NOT NULL, resolved_answer_id TEXT, PRIMARY KEY(owner_id,application_id,semantic_key), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,exception_id) REFERENCES exceptions(owner_id,id), FOREIGN KEY(owner_id,resolved_answer_id) REFERENCES approved_answers(owner_id,id))",
   ],
+  [
+    "ALTER TABLE sources ADD COLUMN revision INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sources ADD COLUMN source_key TEXT",
+    "ALTER TABLE sources ADD COLUMN next_poll_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'",
+    "ALTER TABLE sources ADD COLUMN last_attempt_at TEXT",
+    "ALTER TABLE sources ADD COLUMN job_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sources ADD COLUMN pending_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sources ADD COLUMN failures INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sources ADD COLUMN etag TEXT",
+    "ALTER TABLE sources ADD COLUMN lease_token TEXT",
+    "ALTER TABLE sources ADD COLUMN lease_until TEXT",
+    "CREATE UNIQUE INDEX source_identity ON sources(owner_id,source_key)",
+    "CREATE INDEX source_poll ON sources(owner_id,next_poll_at,lease_until)",
+    "CREATE TABLE source_runs (owner_id TEXT NOT NULL, id TEXT NOT NULL, source_id TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT NOT NULL, health TEXT NOT NULL, job_count INTEGER NOT NULL, duration_ms INTEGER NOT NULL, warnings TEXT NOT NULL, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,source_id) REFERENCES sources(owner_id,id))",
+    "CREATE TABLE source_pages (owner_id TEXT NOT NULL, run_id TEXT NOT NULL, page_number INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(owner_id,run_id,page_number), FOREIGN KEY(owner_id,run_id) REFERENCES source_runs(owner_id,id))",
+    "CREATE TABLE discovery_listings (owner_id TEXT NOT NULL, id TEXT NOT NULL, source_id TEXT NOT NULL, posting_id TEXT NOT NULL, job_id TEXT NOT NULL, original_job_id TEXT NOT NULL, canonical_url TEXT NOT NULL, data TEXT NOT NULL, state TEXT NOT NULL, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, missing_since TEXT, missing_count INTEGER NOT NULL DEFAULT 0, last_run_id TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,source_id,posting_id), FOREIGN KEY(owner_id,source_id) REFERENCES sources(owner_id,id), FOREIGN KEY(owner_id,job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,original_job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,last_run_id) REFERENCES source_runs(owner_id,id))",
+    "CREATE INDEX discovery_url ON discovery_listings(owner_id,canonical_url)",
+    "CREATE TABLE historical_records (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, external_id TEXT NOT NULL, canonical_url TEXT NOT NULL, job_id TEXT, data TEXT NOT NULL, sha256 TEXT NOT NULL, imported_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,external_id), FOREIGN KEY(owner_id,job_id) REFERENCES jobs(owner_id,id))",
+    "CREATE TABLE identity_resolutions (owner_id TEXT NOT NULL, id TEXT NOT NULL, from_job_id TEXT NOT NULL, to_job_id TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL, reversed_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,from_job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,to_job_id) REFERENCES jobs(owner_id,id))",
+    "CREATE UNIQUE INDEX active_job_resolution ON identity_resolutions(owner_id,from_job_id) WHERE reversed_at IS NULL",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

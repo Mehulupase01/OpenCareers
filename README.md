@@ -12,8 +12,10 @@ database state for synthetic jobs, tasks, controls and worker health. P02 provid
 queue ownership, cancellation, audit events and crash recovery on SQLite/PostgreSQL.
 P03 candidate onboarding is complete and verified locally and on GitHub:
 PDF/DOCX source import, reviewed facts, immutable profiles, scoped answer memory and
-revocable standing authorization. Discovery, document generation and final submission
-are still ahead; the current application does not apply to employers.
+revocable standing authorization. P04 adds fixed-origin Greenhouse/Lever discovery,
+source health and evidence, canonical job identity, reversible duplicate resolution
+and historical import. Document generation and final submission are still ahead; the
+current application does not apply to employers.
 
 ## Development
 
@@ -35,11 +37,12 @@ reported as verified; see the handoff for actual results.
 
 ## Validation
 
-The current local suite passes 79 tests with both databases configured. This includes
+The current local suite passes 105 tests with both databases configured. This includes
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
-connection loss and populated-schema upgrades. Desktop/mobile browser workflows
-are tested separately (4 passed). Windows, Linux and PostgreSQL CI passed for P03.
-See [candidate verification](docs/evidence/P03-verification.md).
+connection loss, populated-schema upgrades, connector paging/backoff, discovery
+identity and historical suppression. Desktop/mobile browser workflows are tested
+separately (6 passed). Windows, Linux and PostgreSQL CI passed for P03; P04 remote
+verification follows its implementation commit. See [P04 verification](docs/evidence/P04-verification.md).
 
 ```powershell
 npx --yes pnpm@12.4.2 check

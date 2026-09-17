@@ -2,7 +2,10 @@ import "../../../packages/config/src/env.js";
 import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { loadConfig } from "../../../packages/config/src/index.js";
+import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { createLogger } from "../../../packages/observability/src/index.js";
+import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
+import { DiscoveryRepository } from "../../../packages/persistence/src/discovery-repository.js";
 import { connect } from "../../../packages/persistence/src/index.js";
 
 const logger = createLogger();
@@ -11,6 +14,8 @@ process.on("SIGINT", () => controller.abort());
 process.on("SIGTERM", () => controller.abort());
 const config = loadConfig();
 const repository = await connect(config);
+await new CandidateRepository(repository.db, repository.ownerId).initialize();
+const discovery = new DiscoveryRepository(repository.db, repository.ownerId);
 const workerId = `scheduler-${randomUUID().slice(0, 8)}`;
 try {
   while (!controller.signal.aborted) {
@@ -21,6 +26,7 @@ try {
       await repository.complete(task);
       logger.info({ taskId: task.id, fence: task.fence }, "Synthetic queue probe completed");
     }
+    await runDiscovery(discovery, config.profile);
     await setTimeout(2000, undefined, { signal: controller.signal }).catch(() => undefined);
   }
 } catch (error) {

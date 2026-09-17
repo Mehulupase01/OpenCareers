@@ -66,9 +66,26 @@ commit eligibility and has an immediate database revocation gate. The P08 submis
 engine must perform this check in its own commit-authority transaction. UI mode
 selection alone cannot execute a submission.
 
+## ADR-008: Discovery Evidence And Job Identity
+
+Implemented in P04. Public ATS discovery is a read-only, fixed-origin subsystem with
+no browser session, credentials, redirects or write methods. A source lease fences a
+complete connector scan; only a validated full result can update listing truth. Raw
+pages are owner-scoped, hashed evidence. Source health is separate from listing state,
+so failed parsing cannot imply closure. Missing listings need two complete scans and a
+24-hour grace period; dramatic count drops require owner acknowledgement.
+
+Canonical jobs preserve provider postings as aliases. Provider requisition identity
+is preferred over title similarity. Owner-resolved ambiguous merges are explained,
+audited and reversible, while uncertain/in-flight submissions block changes.
+Historical owner assertions suppress duplicate work but remain distinct from
+receipt-confirmed submissions. Discovery freshness and identity checks are additional
+P08 policy prerequisites; they do not create commit authority.
+
 ## Milestones
 
-P00-P02 foundation; P03-P05 evidence/discovery/ranking; P06-P07 packets and dry run;
+P00-P02 foundation; P03 candidate evidence; P04 discovery/identity; P05 ranking;
+P06-P07 packets and dry run;
 P08 verified submission; P09-P11 coverage/accounts/email; P12-P14 unattended and
 deployment; P15-P17 security, outcomes and release. P08 retains a required live
 receipt gate even when missing credentials allow independent engineering to proceed.
