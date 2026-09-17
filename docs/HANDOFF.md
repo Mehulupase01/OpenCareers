@@ -48,8 +48,14 @@ both engines, six browser tests passed, and lint/typecheck/build/public scan/aud
 passed. A read-only live Greenhouse vacancy was normalized and displayed from the
 Adyen board on 2026-09-17; see docs/evidence/P04-verification.md. No submit occurred.
 P04 CI run 35204726535 passed Windows, Linux and PostgreSQL at
-fd9d3364fef509f2ebe3aacc0d67fbf072d5048d. Next: begin P05 free-only inference and
-evaluated matching from the masterplan, then continue through the remaining phases.
+fd9d3364fef509f2ebe3aacc0d67fbf072d5048d. P04 closure commit is 84bd297.
+
+P05 is in progress. The implementation plan is
+docs/plans/P05-inference-matching.md: strict zero-price route validation, no tools,
+ZDR/data-collection-denied explicit routing, durable daily reservations, bounded 429
+backoff, deterministic gates, evidence-bound semantic output, code-owned scoring and
+a frozen 50+ case evaluation with holdout reporting. Continue through implementation,
+remote CI, phase closure and the remaining phases.
 
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,

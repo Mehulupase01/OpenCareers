@@ -367,7 +367,7 @@
     {
       "id": "P05",
       "title": "Free-only inference and evaluated matching",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P04"],
       "tickets": [
         [
