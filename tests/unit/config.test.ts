@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../packages/config/src/index.js";
 import { sqliteVersionSafe } from "../../packages/persistence/src/database.js";
@@ -46,7 +47,7 @@ describe("configuration fails closed", () => {
   it("rejects paid, ambiguous and demo inference configuration", () => {
     const privateEnv = {
       AUTOPILOT_PROFILE: "local",
-      AUTOPILOT_DATA_DIR: "D:/private-opencareers-test",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-test"),
       AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
       AUTOPILOT_OPENROUTER_API_KEY: "synthetic-key-not-valid-outside-tests",
       AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: "synthetic-provider",
