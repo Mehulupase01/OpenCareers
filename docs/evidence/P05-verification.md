@@ -81,6 +81,9 @@ and 0 for hard failures.
   exact evidence rendering and viewport overflow checks.
 - Browser screenshots: `docs/evidence/screenshots/P05-matching-desktop.png` and
   `docs/evidence/screenshots/P05-matching-mobile.png`.
+- GitHub Actions run `35235281544`: pass at
+  `89cff352a9488e57af9d46116b51fbe48507fa25` across Windows, Ubuntu and the
+  PostgreSQL contract lane, including all browser workflows.
 
 ## External Boundary
 

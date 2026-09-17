@@ -47,8 +47,8 @@ four-process claim races, forced worker termination, disk-full rollback, Postgre
 connection loss, populated-schema upgrades, connector paging/backoff, discovery
 identity and historical suppression, concurrent inference budgets, route backoff and
 a frozen 72-case matching evaluation. Desktop/mobile browser workflows are tested
-separately (8 passed). Windows, Linux and PostgreSQL CI is pending for the P05
-candidate. See [P05 verification](docs/evidence/P05-verification.md).
+separately (8 passed). GitHub Actions run `35235281544` passed the Windows, Linux
+and PostgreSQL lanes for P05. See [P05 verification](docs/evidence/P05-verification.md).
 
 ```powershell
 npx --yes pnpm@12.4.2 check

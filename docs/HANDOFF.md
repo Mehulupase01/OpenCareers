@@ -50,7 +50,7 @@ Adyen board on 2026-09-17; see docs/evidence/P04-verification.md. No submit occu
 P04 CI run 35204726535 passed Windows, Linux and PostgreSQL at
 fd9d3364fef509f2ebe3aacc0d67fbf072d5048d. P04 closure commit is 84bd297.
 
-P05 implementation is a local release candidate. It includes strict zero-price route
+P05 is complete. It includes strict zero-price route
 validation, no tools or fallbacks, ZDR/data-collection-denied provider pinning,
 durable daily reservations, bounded 429 backoff, eight deterministic gates,
 profile-bound authorization, exact-span semantic evidence, code-owned scoring and a
@@ -60,8 +60,9 @@ unsupported claims and zero label errors. Local verification passes 129 tests ac
 SQLite/PostgreSQL and 8 desktop/mobile browser workflows, plus lint, typecheck, build,
 public scan and dependency audit. See docs/evidence/P05-verification.md. Authenticated
 live free-route reliability is externally pending because no private key is present;
-the public catalogue was read only during planning. Complete candidate commit, remote
-CI and the P05 closure commit before P06.
+the public catalogue was read only during planning. CI run 35235281544 passed Windows,
+Ubuntu and PostgreSQL at 89cff352a9488e57af9d46116b51fbe48507fa25. Proceed with
+P06 tailored CVs, letters and answer packets after the P05 closure commit.
 
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,

@@ -367,7 +367,7 @@
     {
       "id": "P05",
       "title": "Free-only inference and evaluated matching",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P04"],
       "tickets": [
         [
@@ -395,48 +395,51 @@
         {
           "id": "P05-G1",
           "requirement": "A manually pinned paid model is rejected in free-only mode.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G2",
           "requirement": "An unknown price field or paid tool configuration is rejected before inference.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G3",
           "requirement": "Quota reservations remain consistent under concurrent requests and restarts.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G4",
           "requirement": "A 429 does not trigger account/key rotation or unbounded retry.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G5",
           "requirement": "A schema-valid but unsupported candidate claim is rejected.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G6",
           "requirement": "The ranking evaluation report includes held-out errors and score-component explanations.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         },
         {
           "id": "P05-G7",
           "requirement": "Lack of an eligible free route pauses inference but leaves discovery and deterministic work operational.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P05-verification.md"]
         }
       ],
-      "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalPrerequisites": [
+        "Owner-provided private OpenRouter key and explicit free model/provider allowlists are required for an authenticated live inference probe."
+      ],
+      "lastVerifiedCommit": "89cff352a9488e57af9d46116b51fbe48507fa25",
+      "evidence": ["docs/evidence/P05-verification.md"]
     },
     {
       "id": "P06",
