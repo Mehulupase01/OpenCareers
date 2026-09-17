@@ -65,9 +65,12 @@ test("free-only matching health, scores and evidence remain inspectable", async 
     const discovery = await json("/v1/discovery");
     const jobId = discovery.listings[0]?.jobId;
     if (!jobId) throw new Error("Expected a discovered synthetic vacancy.");
-    return (await json(`/v1/matching/jobs/${jobId}/assess`, {})).outcome as string;
+    const assessment = await json(`/v1/matching/jobs/${jobId}/assess`, {});
+    const listing = discovery.listings.find((item: { jobId: string }) => item.jobId === jobId);
+    if (!listing) throw new Error("Expected assessed listing evidence.");
+    return { outcome: assessment.outcome as string, title: listing.job.title as string };
   }, info.project.name);
-  expect(assessmentOutcome).toBe("auto_eligible");
+  expect(assessmentOutcome.outcome).toBe("auto_eligible");
   await page.reload();
   await page.getByRole("button", { name: "Matching", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matching", exact: true })).toBeVisible();
@@ -75,7 +78,11 @@ test("free-only matching health, scores and evidence remain inspectable", async 
     timeout: 25000,
   });
   await expect(page.getByText("Synthetic fixture inference only.", { exact: true })).toBeVisible();
-  const assessment = page.locator(".matching-table tbody tr").first();
+  const assessment = page
+    .locator(".matching-table tbody tr")
+    .filter({ hasText: assessmentOutcome.title })
+    .filter({ hasText: "auto eligible" })
+    .first();
   await expect(assessment).toBeVisible({ timeout: 25000 });
   await assessment.getByRole("button").click();
   await expect(page.getByRole("heading", { name: "Policy gates", exact: true })).toBeVisible();
