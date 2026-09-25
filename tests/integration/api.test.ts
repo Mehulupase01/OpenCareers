@@ -1,3 +1,6 @@
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
 import { loadConfig } from "../../packages/config/src/index.js";
@@ -12,12 +15,14 @@ afterEach(async () => {
 });
 
 async function setup() {
+  const dataDir = await realpath(await mkdtemp(join(tmpdir(), "opencareers-api-")));
+  cleanup.push(() => rm(dataDir, { recursive: true, force: true }));
   const db = await openSqlite(":memory:");
   cleanup.push(() => db.close());
   await migrate(db);
   const repository = new Repository(db, "synthetic-owner");
   await repository.initialize();
-  const app = await buildServer(loadConfig({}), repository);
+  const app = await buildServer({ ...loadConfig({}), dataDir }, repository);
   cleanup.push(() => app.close());
   const headers = { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4318" };
   return { db, app, headers, repository };
