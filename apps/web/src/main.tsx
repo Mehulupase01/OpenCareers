@@ -340,7 +340,9 @@ function App() {
               )}
               {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
               {view === "matching" && <MatchingWorkspace jobs={summary.jobs} />}
-              {view === "documents" && <DocumentsWorkspace jobs={summary.jobs} />}
+              {view === "documents" && (
+                <DocumentsWorkspace jobs={summary.jobs} demo={summary.profile === "demo"} />
+              )}
               {view === "applications" && (
                 <section className="data-section">
                   <div className="section-toolbar">

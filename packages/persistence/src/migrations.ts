@@ -76,6 +76,10 @@ const migrations = [
     "CREATE INDEX packet_application_time ON packets(owner_id,application_id,created_at,id)",
     "CREATE TABLE intent_validity (owner_id TEXT NOT NULL, intent_id TEXT NOT NULL, invalidated_at TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(owner_id,intent_id), FOREIGN KEY(owner_id,intent_id) REFERENCES intents(owner_id,id))",
   ],
+  [
+    "CREATE TABLE browser_preparations (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, application_id TEXT NOT NULL, packet_id TEXT NOT NULL, status TEXT NOT NULL, form_fingerprint TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT, resolved_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
+    "CREATE INDEX browser_preparation_history ON browser_preparations(owner_id,application_id,created_at,id)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

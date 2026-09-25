@@ -15,6 +15,7 @@ describe("application state and recovery", () => {
     }
     expect(() => assertTransition("IN_FLIGHT", "UNKNOWN")).not.toThrow();
     expect(() => assertTransition("UNKNOWN", "RECONCILING")).not.toThrow();
+    expect(() => assertTransition("READY", "INSPECTING")).not.toThrow();
   });
   it("bounds backoff regardless of attempt count and jitter", () => {
     fc.assert(

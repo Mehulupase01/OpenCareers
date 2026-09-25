@@ -3,8 +3,11 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { DryRunResult } from "../../packages/contracts/src/browser.js";
+import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
+import { BrowserRepository } from "../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import {
   type Database,
@@ -20,6 +23,105 @@ import {
   documentJob,
   documentProfile,
 } from "../fixtures/document-packets.js";
+
+function readyBrowserResult(packet: PacketSnapshot): DryRunResult {
+  const cv = packet.manifest.artifacts.find((item) => item.kind === "cv_pdf");
+  if (!cv) throw new Error("Expected CV PDF.");
+  const base = {
+    url: "http://127.0.0.1:4320/jobs/standard",
+    origin: "http://127.0.0.1:4320",
+    jobId: packet.manifest.jobId,
+    blocker: "none" as const,
+  };
+  const first = {
+    ...base,
+    step: 1,
+    fingerprint: "a".repeat(64),
+    fields: [
+      {
+        name: "full_name",
+        semanticKey: "full_name",
+        label: "Full name",
+        kind: "text" as const,
+        required: true,
+        maxLength: null,
+        options: [],
+      },
+      {
+        name: "cv",
+        semanticKey: "cv",
+        label: "CV",
+        kind: "file" as const,
+        required: true,
+        maxLength: null,
+        options: [],
+      },
+    ],
+  };
+  const second = {
+    ...base,
+    step: 2,
+    fingerprint: "b".repeat(64),
+    fields: [
+      {
+        name: "sponsorship",
+        semanticKey: "sponsorship_required",
+        label: "Sponsorship",
+        kind: "select" as const,
+        required: true,
+        maxLength: null,
+        options: [{ label: "No", value: "no" }],
+      },
+    ],
+  };
+  const firstEntries = [
+    {
+      name: "full_name",
+      semanticKey: "full_name",
+      expected: packet.content.cv.identity.fullName,
+      evidence: ["fact-identity"],
+    },
+    { name: "cv", semanticKey: "cv", expected: cv.filename, evidence: [cv.sha256] },
+  ];
+  const secondEntries = [
+    { name: "sponsorship", semanticKey: "sponsorship_required", expected: "no", evidence: [] },
+  ];
+  return {
+    packetId: packet.manifest.id,
+    applicationId: packet.manifest.applicationId,
+    status: "ready",
+    snapshots: [first, second],
+    plans: [
+      { fingerprint: first.fingerprint, entries: firstEntries, unresolved: [] },
+      { fingerprint: second.fingerprint, entries: secondEntries, unresolved: [] },
+    ],
+    reports: [
+      {
+        snapshot: first,
+        status: "ready",
+        readBack: firstEntries.map((entry) => ({
+          name: entry.name,
+          expected: entry.expected,
+          actual: entry.expected,
+          matches: true,
+        })),
+        uploadStatus: "accepted",
+        issues: [],
+      },
+      {
+        snapshot: second,
+        status: "ready",
+        readBack: [{ name: "sponsorship", expected: "no", actual: "no", matches: true }],
+        uploadStatus: "idle",
+        issues: [],
+      },
+    ],
+    issues: [],
+    blockedFinalActions: 0,
+    serverApplicationCount: 0,
+    preparedAt: "2026-09-17T09:00:00.000Z",
+  };
+}
 
 for (const engine of ["sqlite", "postgres"] as const) {
   describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
@@ -190,6 +292,38 @@ for (const engine of ["sqlite", "postgres"] as const) {
           valid: false,
           invalidReason: "ARTIFACT_HASH_MISMATCH",
         });
+      });
+
+      it("stores a packet-bound browser dry run and reaches READY only with exact read-back", async () => {
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const browser = new BrowserRepository(
+          db,
+          owner,
+          () => new Date("2026-09-17T09:00:00.000Z"),
+        );
+        const result = readyBrowserResult(packet);
+        const saved = await browser.save(result);
+        expect(saved.status).toBe("ready");
+        expect((await browser.snapshot())[0]?.result.packetId).toBe(packet.manifest.id);
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "READY" }]);
+        const falseReadBack = structuredClone(result);
+        const field = falseReadBack.reports[1]?.readBack[0];
+        if (!field) throw new Error("Expected a second-step read-back.");
+        field.actual = "yes";
+        await expect(browser.save(falseReadBack)).rejects.toThrow("read-back evidence");
+        expect(await browser.snapshot()).toHaveLength(1);
+        const repeated = await browser.save(result);
+        expect(repeated.status).toBe("ready");
+        expect(await browser.snapshot()).toHaveLength(2);
       });
     },
   );

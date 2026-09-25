@@ -13,11 +13,12 @@ import type { PacketSnapshot } from "../../../packages/contracts/src/documents.j
 import type { Job } from "../../../packages/contracts/src/index.js";
 import type { MatchingSnapshot } from "../../../packages/contracts/src/matching.js";
 import { request } from "./api.js";
+import { BrowserPreparationPanel } from "./browser-preparation.js";
 import { PdfPreview } from "./pdf-preview.js";
 
 const words = (value: string) => value.replaceAll("_", " ");
 
-export function DocumentsWorkspace({ jobs }: { jobs: Job[] }) {
+export function DocumentsWorkspace({ jobs, demo }: { jobs: Job[]; demo: boolean }) {
   const [packets, setPackets] = useState<PacketSnapshot[] | null>(null);
   const [matching, setMatching] = useState<MatchingSnapshot | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -186,6 +187,8 @@ export function DocumentsWorkspace({ jobs }: { jobs: Job[] }) {
                   </a>
                 ))}
               </nav>
+
+              {demo && <BrowserPreparationPanel key={packet.manifest.id} packet={packet} />}
 
               <details className="pdf-preview-panel">
                 <summary>

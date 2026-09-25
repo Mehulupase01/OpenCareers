@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("immutable document packet review and downloads remain inspectable", async ({
   page,
 }, info) => {
+  test.setTimeout(60000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
@@ -131,6 +132,25 @@ test("immutable document packet review and downloads remain inspectable", async 
   expect(pixels.length).toBeGreaterThan(10000);
   await page.screenshot({
     path: `test-results/documents-${info.project.name}.png`,
+    fullPage: true,
+  });
+  const dryRun = page.getByRole("region", { name: "Mock ATS dry run" });
+  await dryRun.getByLabel("Phone", { exact: true }).fill("+31 20 000 0000");
+  await dryRun
+    .getByLabel("Portfolio", { exact: true })
+    .fill("https://portfolio.synthetic.example/a-very-long-but-valid-profile-path");
+  await dryRun.getByRole("combobox", { name: "Country" }).selectOption("NL");
+  await dryRun.getByRole("combobox", { name: "Future sponsorship" }).selectOption("no");
+  await dryRun.getByLabel("Available from", { exact: true }).fill("2026-11-01");
+  await dryRun.getByRole("combobox", { name: "Remote preference" }).selectOption("yes");
+  await dryRun.getByLabel("I confirm these details are accurate").check();
+  await dryRun.getByRole("button", { name: "Run dry run" }).click();
+  await expect(dryRun.locator(".browser-result .packet-state")).toHaveText("ready", {
+    timeout: 30000,
+  });
+  await expect(dryRun.getByText("0 submissions")).toBeVisible();
+  await page.screenshot({
+    path: `test-results/P07-browser-ready-${info.project.name}.png`,
     fullPage: true,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

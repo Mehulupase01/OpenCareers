@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { browserRoutes } from "./browser.js";
 import { candidateRoutes } from "./candidate.js";
 import { discoveryRoutes } from "./discovery.js";
 import { documentRoutes } from "./documents.js";
@@ -185,6 +186,7 @@ export async function buildServer(config: Config, repository: Repository) {
   await discoveryRoutes(app, config, repository);
   await matchingRoutes(app, config, repository);
   await documentRoutes(app, config, repository);
+  await browserRoutes(app, config, repository);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {
