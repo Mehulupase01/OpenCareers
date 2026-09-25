@@ -41,8 +41,8 @@ produced byte-identical artifacts.
 Local lint, typecheck, production build, public scan and production dependency audit
 pass. A fresh synthetic workspace passed all 10 desktop/mobile browser workflows.
 The final local PostgreSQL rerun awaits its stopped Docker engine; the earlier P06
-dual-database run passed 144 tests before one additional unit regression test.
-Cross-platform CI run and final 145-test result will be recorded at closure.
+dual-database run passed 144 tests before three additional regression tests.
+Cross-platform CI run and final 147-test result will be recorded at closure.
 
 ## Boundary
 

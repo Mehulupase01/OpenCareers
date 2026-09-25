@@ -77,7 +77,7 @@ typecheck, production build, public scan and audit pass. Ten desktop/mobile brow
 flows pass against a fresh synthetic workspace, including real PDF.js preview.
 The local Docker engine was stopped during the final PostgreSQL rerun; the prior
 dual-database P06 run passed 144 tests before the last summary-evidence regression
-test was added. Re-run all 145 tests with PostgreSQL or use the required CI lane,
+test was added. Re-run all 147 tests with PostgreSQL or use the required CI lane,
 then close the ledger and start P07. See docs/evidence/P06-verification.md.
 
 Continue directly after each closure commit.

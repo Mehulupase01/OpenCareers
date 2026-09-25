@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -46,7 +46,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         );
         await candidates.initialize();
         documents = new DocumentRepository(db, owner, () => new Date("2026-09-17T09:00:00.000Z"));
-        artifacts = new ArtifactStore(dir);
+        artifacts = new ArtifactStore(await realpath(dir));
         await artifacts.initialize();
         await db.query(
           "INSERT INTO profile_versions(id,owner_id,candidate_id,revision,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",

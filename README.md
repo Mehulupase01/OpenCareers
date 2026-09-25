@@ -44,7 +44,7 @@ reported as verified; see the handoff for actual results.
 
 ## Validation
 
-The current local suite has 145 tests, including 48 PostgreSQL cases. This includes
+The current local suite has 147 tests, including 48 PostgreSQL cases. This includes
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
 connection loss, populated-schema upgrades, connector paging/backoff, discovery
 identity and historical suppression, concurrent inference budgets, route backoff and
