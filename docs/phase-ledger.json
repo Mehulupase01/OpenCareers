@@ -519,7 +519,7 @@
     {
       "id": "P07",
       "title": "Mock ATS and browser filling contract",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P06"],
       "tickets": [
         [
