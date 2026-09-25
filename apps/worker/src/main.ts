@@ -32,66 +32,68 @@ const matching = new MatchingRunner(
 const workerId = `scheduler-${randomUUID().slice(0, 8)}`;
 try {
   while (!controller.signal.aborted) {
-    await repository.heartbeat(workerId, "scheduler");
-    const task = await repository.claim(
-      workerId,
-      config.profile === "demo" ? ["demo_probe", "prepare"] : ["prepare"],
-    );
-    if (task) {
-      try {
-        if (task.type === "prepare") {
-          if (!task.applicationId || typeof task.payload.assessmentId !== "string")
-            throw new DomainError("CONFIG_INVALID", "Prepare task payload is incomplete.");
-          if (await documents.hasValidPacket(task.payload.assessmentId)) {
-            logger.info(
-              { taskId: task.id, applicationId: task.applicationId },
-              "Existing valid packet retained",
-            );
-            await repository.complete(task);
-            continue;
-          }
-          const application = (
-            await repository.db.query(
-              "SELECT revision,state FROM applications WHERE owner_id=$1 AND id=$2",
-              [repository.ownerId, task.applicationId],
-            )
-          )[0];
-          if (application?.state === "ELIGIBLE")
-            await repository.transition(
+    try {
+      await repository.heartbeat(workerId, "scheduler");
+      const task = await repository.claim(
+        workerId,
+        config.profile === "demo" ? ["demo_probe", "prepare"] : ["prepare"],
+      );
+      if (task) {
+        try {
+          if (task.type === "prepare") {
+            if (!task.applicationId || typeof task.payload.assessmentId !== "string")
+              throw new DomainError("CONFIG_INVALID", "Prepare task payload is incomplete.");
+            if (await documents.hasValidPacket(task.payload.assessmentId)) {
+              logger.info(
+                { taskId: task.id, applicationId: task.applicationId },
+                "Existing valid packet retained",
+              );
+              await repository.complete(task);
+              continue;
+            }
+            const application = (
+              await repository.db.query(
+                "SELECT revision,state FROM applications WHERE owner_id=$1 AND id=$2",
+                [repository.ownerId, task.applicationId],
+              )
+            )[0];
+            if (application?.state === "ELIGIBLE")
+              await repository.transition(
+                task.applicationId,
+                Number(application.revision),
+                "PREPARING",
+              );
+            const input = await documents.generationInput(
               task.applicationId,
-              Number(application.revision),
-              "PREPARING",
+              task.payload.assessmentId,
+              [],
+              new Date().toISOString().slice(0, 10),
             );
-          const input = await documents.generationInput(
-            task.applicationId,
-            task.payload.assessmentId,
-            [],
-            new Date().toISOString().slice(0, 10),
-          );
-          await documents.savePacket(await buildPacket(artifacts, input), {
-            preserveValidAssessment: true,
-          });
-          logger.info({ taskId: task.id, applicationId: task.applicationId }, "Packet prepared");
+            await documents.savePacket(await buildPacket(artifacts, input), {
+              preserveValidAssessment: true,
+            });
+            logger.info({ taskId: task.id, applicationId: task.applicationId }, "Packet prepared");
+          }
+          await repository.complete(task);
+          if (task.type === "demo_probe")
+            logger.info({ taskId: task.id, fence: task.fence }, "Synthetic queue probe completed");
+        } catch (error) {
+          const domain =
+            error instanceof DomainError
+              ? error
+              : new DomainError("STORAGE_UNAVAILABLE", "Packet preparation failed.", true);
+          await repository.fail(task, domain);
+          logger.warn({ err: error, taskId: task.id }, "Worker task failed");
         }
-        await repository.complete(task);
-        if (task.type === "demo_probe")
-          logger.info({ taskId: task.id, fence: task.fence }, "Synthetic queue probe completed");
-      } catch (error) {
-        const domain =
-          error instanceof DomainError
-            ? error
-            : new DomainError("STORAGE_UNAVAILABLE", "Packet preparation failed.", true);
-        await repository.fail(task, domain);
-        logger.warn({ err: error, taskId: task.id }, "Worker task failed");
       }
+      await runDiscovery(discovery, config.profile);
+      await matching.run();
+      await setTimeout(2000, undefined, { signal: controller.signal }).catch(() => undefined);
+    } catch (error) {
+      logger.error({ err: error }, "Worker iteration failed; retrying after backoff");
+      await setTimeout(5000, undefined, { signal: controller.signal }).catch(() => undefined);
     }
-    await runDiscovery(discovery, config.profile);
-    await matching.run();
-    await setTimeout(2000, undefined, { signal: controller.signal }).catch(() => undefined);
   }
-} catch (error) {
-  logger.error({ err: error }, "Worker stopped after storage failure");
-  process.exitCode = 1;
 } finally {
   await repository.db.close();
 }

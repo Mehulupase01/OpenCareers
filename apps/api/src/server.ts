@@ -127,13 +127,18 @@ export async function buildServer(config: Config, repository: Repository) {
     const now = Date.now();
     for (const [key, expiration] of sessions) if (expiration <= now) sessions.delete(key);
     for (const [key, attempt] of loginAttempts) if (attempt.until <= now) loginAttempts.delete(key);
-    const attempts = loginAttempts.get(request.ip) ?? { count: 0, until: now + 60000 };
-    if (attempts.count >= 10 || sessions.size >= 100 || loginAttempts.size >= 1000)
+    if (request.cookies.opencareers && (sessions.get(request.cookies.opencareers) ?? 0) > now)
+      return { profile: config.profile, version: VERSION };
+    if (sessions.size >= 100)
       throw new DomainError("RATE_LIMITED", "Too many sign-in attempts. Try again later.");
-    attempts.count += 1;
-    loginAttempts.set(request.ip, attempts);
-    if (config.profile !== "demo" && !validToken(body.token ?? ""))
+    if (config.profile !== "demo" && !validToken(body.token ?? "")) {
+      const attempts = loginAttempts.get(request.ip) ?? { count: 0, until: now + 60000 };
+      if (attempts.count >= 10 || loginAttempts.size >= 1000)
+        throw new DomainError("RATE_LIMITED", "Too many sign-in attempts. Try again later.");
+      attempts.count += 1;
+      loginAttempts.set(request.ip, attempts);
       throw new DomainError("UNAUTHORIZED", "Invalid owner token.");
+    }
     const token = randomBytes(32).toString("hex");
     sessions.set(token, now + 8 * 60 * 60 * 1000);
     reply.setCookie("opencareers", token, {

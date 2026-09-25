@@ -13,10 +13,17 @@ function stop(code: number) {
   process.exitCode = code;
   for (const child of children) child.kill("SIGTERM");
 }
-for (const child of children) {
-  child.on("error", () => stop(1));
-  child.on("exit", (code) => {
-    if (!stopping) stop(code ?? 1);
+for (const [index, child] of children.entries()) {
+  const name = ["api", "worker", "vite"][index];
+  child.on("error", (error) => {
+    console.error(`${name} failed to start:`, error);
+    stop(1);
+  });
+  child.on("exit", (code, signal) => {
+    if (!stopping) {
+      console.error(`${name} exited unexpectedly (${signal ?? code}).`);
+      stop(code ?? 1);
+    }
   });
 }
 process.on("SIGINT", () => stop(0));

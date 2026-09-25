@@ -14,7 +14,7 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
 
-async function setup() {
+async function setup(profile: "demo" | "local" = "demo") {
   const dataDir = await realpath(await mkdtemp(join(tmpdir(), "opencareers-api-")));
   cleanup.push(() => rm(dataDir, { recursive: true, force: true }));
   const db = await openSqlite(":memory:");
@@ -22,7 +22,15 @@ async function setup() {
   await migrate(db);
   const repository = new Repository(db, "synthetic-owner");
   await repository.initialize();
-  const app = await buildServer({ ...loadConfig({}), dataDir }, repository);
+  const app = await buildServer(
+    {
+      ...loadConfig({}),
+      profile,
+      dataDir,
+      ownerToken: profile === "local" ? "a".repeat(32) : undefined,
+    },
+    repository,
+  );
   cleanup.push(() => app.close());
   const headers = { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4318" };
   return { db, app, headers, repository };
@@ -229,6 +237,37 @@ describe("API trust boundary", () => {
       (await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } }))
         .statusCode,
     ).toBe(401);
+  });
+  it("permits repeated automatic demo sessions without exhausting private login limits", async () => {
+    const { app, headers } = await setup();
+    for (let index = 0; index < 12; index++) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/session",
+        headers,
+        payload: {},
+      });
+      expect(response.statusCode).toBe(200);
+    }
+  });
+  it("limits failed private token checks from one address", async () => {
+    const { app, headers } = await setup("local");
+    for (let index = 0; index < 10; index++) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/session",
+        headers,
+        payload: { token: "invalid" },
+      });
+      expect(response.statusCode).toBe(401);
+    }
+    const blocked = await app.inject({
+      method: "POST",
+      url: "/v1/session",
+      headers,
+      payload: { token: "invalid" },
+    });
+    expect(blocked.statusCode).toBe(429);
   });
   it("readiness fails when required persistence is unavailable", async () => {
     const { app, headers, db } = await setup();
