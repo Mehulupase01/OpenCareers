@@ -43,11 +43,30 @@ test("mock ATS read-back and upload reach dry-run readiness without a submission
   const owned = await launchDryRunBrowser(mock.url);
   try {
     await owned.page.goto(`${mock.url}/jobs/standard`);
+    await owned.page.evaluate(() => {
+      const status = document.querySelector("[data-upload-status]");
+      if (!status) throw new Error("Upload status missing.");
+      const observed = [status.getAttribute("data-upload-status")];
+      (
+        window as typeof window & { observedUploadStates: Array<string | null> }
+      ).observedUploadStates = observed;
+      new MutationObserver(() => observed.push(status.getAttribute("data-upload-status"))).observe(
+        status,
+        { attributes: true, attributeFilter: ["data-upload-status"] },
+      );
+    });
     const first = inspectForm(owned.page);
     const plan = planFields(await first, packet, { country: "NL" });
     const filled = await fillStep(owned.page, plan, cvPdf);
     expect(filled.status).toBe("ready");
     expect(filled.uploadStatus).toBe("accepted");
+    expect(
+      await owned.page.evaluate(
+        () =>
+          (window as typeof window & { observedUploadStates: Array<string | null> })
+            .observedUploadStates,
+      ),
+    ).toEqual(["idle", "selected", "uploading", "accepted"]);
     expect(filled.readBack.every((item) => item.matches)).toBe(true);
     await owned.page.getByRole("button", { name: "Next" }).click();
     const second = await inspectForm(owned.page);
@@ -65,6 +84,11 @@ test("mock ATS read-back and upload reach dry-run readiness without a submission
       actual: "yes",
       matches: true,
     });
+    await owned.page
+      .locator('[name="portfolio"]')
+      .press("Enter")
+      .catch(() => undefined);
+    expect(owned.blockedCommitCount).toBeGreaterThan(0);
     await owned.page
       .getByRole("button", { name: "Submit application" })
       .click()

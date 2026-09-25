@@ -121,6 +121,18 @@ tampering with artifact bytes invalidates readiness and uncommitted intent.
 The Documents workspace exposes the bound source, tailored content, findings and
 immutable downloads. External submission remains the responsibility of P08.
 
+## ADR-011: Owned Browser Preparation Before Commit
+
+Implemented in P07. The mock ATS is a first-party loopback server with separate
+upload, account, application and receipt records. An isolated browser context
+allows only that origin and blocks all non-GET application requests during dry
+runs. The adapter inspects a typed, fingerprinted form, plans answers against
+an immutable P06 packet, fills supported controls and reads actual values back.
+Dynamic question changes, rejected uploads, parser overwrites and challenges
+cannot produce READY. Migration v7 persists the evidence and state transition.
+This is preparation only; P08 must introduce an independently authorized commit
+path and correlate receipts with server records before CONFIRMED.
+
 ## Milestones
 
 P00-P02 foundation; P03 candidate evidence; P04 discovery/identity; P05 ranking;

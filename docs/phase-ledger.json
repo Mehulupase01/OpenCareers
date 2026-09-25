@@ -519,7 +519,7 @@
     {
       "id": "P07",
       "title": "Mock ATS and browser filling contract",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P06"],
       "tickets": [
         [
@@ -547,48 +547,49 @@
         {
           "id": "P07-G1",
           "requirement": "Filled values read back exactly, including underlying option values where relevant.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G2",
           "requirement": "Upload validation distinguishes selected, uploading, accepted, and failed states.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G3",
           "requirement": "Conditional fields are reinspected and required answers cannot be missed.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G4",
           "requirement": "A changed question invalidates an old answer plan.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G5",
           "requirement": "Challenge detection creates a resumable exception without stopping other queue items.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G6",
           "requirement": "A generic banner or HTTP 200 cannot create confirmed-submission state.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         },
         {
           "id": "P07-G7",
           "requirement": "The dry-run mode cannot accidentally invoke a final external commit, including implicit submission through Enter or a field-change event.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P07-verification.md"]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": "025eaea33b3c37bbd9540faa40ccbd42478dc5ef",
+      "evidence": ["docs/evidence/P07-verification.md"]
     },
     {
       "id": "P08",

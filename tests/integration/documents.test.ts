@@ -324,6 +324,23 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const repeated = await browser.save(result);
         expect(repeated.status).toBe("ready");
         expect(await browser.snapshot()).toHaveLength(2);
+        const challenge = structuredClone(result);
+        challenge.status = "challenge";
+        const firstReport = challenge.reports[0];
+        if (!firstReport) throw new Error("Expected a first-step report.");
+        firstReport.status = "challenge";
+        firstReport.issues = ["Verification challenge requires owner action."];
+        challenge.issues = ["Verification challenge requires owner action."];
+        const paused = await browser.save(challenge);
+        expect(paused.status).toBe("challenge");
+        expect(paused.expiresAt).toBe("2026-09-17T09:15:00.000Z");
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "CHALLENGE_REQUIRED" }]);
+        expect((await browser.save(result)).status).toBe("ready");
       });
     },
   );
