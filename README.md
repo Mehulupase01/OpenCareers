@@ -44,13 +44,13 @@ reported as verified; see the handoff for actual results.
 
 ## Validation
 
-The current local suite has 149 tests, including 48 PostgreSQL cases. This includes
+The current matrix has 149 tests, including 48 PostgreSQL cases. This includes
 four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
 connection loss, populated-schema upgrades, connector paging/backoff, discovery
 identity and historical suppression, concurrent inference budgets, route backoff and
 a frozen 72-case matching evaluation. Desktop/mobile browser workflows are tested
-separately (10 passed on a fresh synthetic workspace). GitHub Actions run `35235281544`
-passed the Windows, Linux and PostgreSQL lanes for P05. See
+separately (10 passed on a fresh synthetic workspace). GitHub Actions run `36191355705`
+passed the Windows, Linux and PostgreSQL lanes for P06. See
 [P06 verification](docs/evidence/P06-verification.md) for current P06 gates.
 
 ```powershell

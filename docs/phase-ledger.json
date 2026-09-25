@@ -444,7 +444,7 @@
     {
       "id": "P06",
       "title": "Tailored CVs, letters, and answer packets",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P05"],
       "tickets": [
         [
@@ -472,48 +472,49 @@
         {
           "id": "P06-G1",
           "requirement": "Every material generated claim links to approved evidence and passes independent validation.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G2",
           "requirement": "A prototype cannot be described as deployed in the test set.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G3",
           "requirement": "Hands-on and professional experience totals remain distinct.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G4",
           "requirement": "All representative PDFs render without clipping, unreadable text, or missing sections.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G5",
           "requirement": "DOCX and PDF contain equivalent candidate facts and company/role references.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G6",
           "requirement": "A changed artifact hash invalidates an existing readiness/intent record.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         },
         {
           "id": "P06-G7",
           "requirement": "A model outage still permits approved deterministic packets, while unresolved substantive questions are deferred.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P06-verification.md"]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "lastVerifiedCommit": "d1deed7361ae75433065fd125739ab7621dac607",
+      "evidence": ["docs/evidence/P06-verification.md"]
     },
     {
       "id": "P07",

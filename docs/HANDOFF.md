@@ -70,15 +70,16 @@ claim validation, pinned DOCX/PDF renderers, cross-format extraction equivalence
 content-addressed private artifacts, hash-driven readiness invalidation and a
 side-by-side Documents workspace. Use only synthetic golden packets in the repo.
 
-P06 implementation is ready for phase closure. The exact profile/assessment/policy
+P06 is complete. The exact profile/assessment/policy
 packet factory, independent validator, DOCX/PDF extraction and QA, content-addressed
 store, migration v6, worker/API and Documents UI are implemented. Local lint,
 typecheck, production build, public scan and audit pass. Ten desktop/mobile browser
 flows pass against a fresh synthetic workspace, including real PDF.js preview.
-The local Docker engine was stopped during the final PostgreSQL rerun; the prior
-dual-database P06 run passed 144 tests before the last summary-evidence regression
-test was added. Re-run all 149 tests with PostgreSQL or use the required CI lane,
-then close the ledger and start P07. See docs/evidence/P06-verification.md.
+GitHub Actions run 36191355705 passed Windows, Ubuntu and PostgreSQL at d1deed7.
+The local Docker engine was unavailable, so its 48 tests were verified in CI.
+See docs/evidence/P06-verification.md. P07 planning is in
+docs/plans/P07-mock-ats-browser-contract.md; implement the owned mock ATS, typed
+adapter fill contract, upload/conditional checks and submission-proof dry run.
 
 Continue directly after each closure commit.
 The owner explicitly requests autonomous continuation; phase checkpoints are updates,

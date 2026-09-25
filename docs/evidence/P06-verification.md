@@ -40,9 +40,11 @@ produced byte-identical artifacts.
 
 Local lint, typecheck, production build, public scan and production dependency audit
 pass. A fresh synthetic workspace passed all 10 desktop/mobile browser workflows.
-The final local PostgreSQL rerun awaits its stopped Docker engine; the earlier P06
-dual-database run passed 144 tests before five additional regression tests.
-Cross-platform CI run and final 149-test result will be recorded at closure.
+The local suite passed 101 tests; 48 PostgreSQL cases were skipped because the local
+Docker service could not start without administrator privileges. GitHub Actions run
+`36191355705` passed Windows, Ubuntu and the required PostgreSQL contract lane at
+`d1deed7361ae75433065fd125739ab7621dac607`. The complete matrix contains 149
+tests and 10 browser workflows on each operating-system lane.
 
 ## Boundary
 
