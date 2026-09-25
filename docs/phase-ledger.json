@@ -594,7 +594,7 @@
     {
       "id": "P08",
       "title": "Actual submission vertical slice",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P07"],
       "tickets": [
         [
