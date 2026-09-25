@@ -70,6 +70,12 @@ const migrations = [
     "CREATE TABLE match_assessments (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, job_id TEXT NOT NULL, profile_id TEXT NOT NULL, application_id TEXT, revision INTEGER NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,job_id,profile_id,revision), FOREIGN KEY(owner_id,job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,profile_id) REFERENCES profile_versions(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id))",
     "CREATE INDEX match_latest ON match_assessments(owner_id,profile_id,job_id,revision)",
   ],
+  [
+    "CREATE TABLE packet_contents (owner_id TEXT NOT NULL, packet_id TEXT NOT NULL, profile_id TEXT NOT NULL, assessment_id TEXT NOT NULL, content TEXT NOT NULL, validation TEXT NOT NULL, PRIMARY KEY(owner_id,packet_id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id), FOREIGN KEY(owner_id,profile_id) REFERENCES profile_versions(owner_id,id), FOREIGN KEY(owner_id,assessment_id) REFERENCES match_assessments(owner_id,id))",
+    "CREATE TABLE packet_artifacts (owner_id TEXT NOT NULL, packet_id TEXT NOT NULL, artifact_id TEXT NOT NULL, kind TEXT NOT NULL, filename TEXT NOT NULL, ordinal INTEGER NOT NULL, PRIMARY KEY(owner_id,packet_id,kind), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id), FOREIGN KEY(owner_id,artifact_id) REFERENCES artifacts(owner_id,id))",
+    "CREATE INDEX packet_application_time ON packets(owner_id,application_id,created_at,id)",
+    "CREATE TABLE intent_validity (owner_id TEXT NOT NULL, intent_id TEXT NOT NULL, invalidated_at TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(owner_id,intent_id), FOREIGN KEY(owner_id,intent_id) REFERENCES intents(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

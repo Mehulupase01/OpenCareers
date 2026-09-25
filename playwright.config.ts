@@ -8,7 +8,7 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:4318", trace: "retain-on-failure" },
   webServer: {
     command: "node --import tsx scripts/dev.ts",
-    url: "http://127.0.0.1:4318",
+    url: "http://127.0.0.1:4318/health/ready",
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
   },

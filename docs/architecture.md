@@ -105,6 +105,22 @@ code-owned. An active policy must bind the active immutable profile. Only valida
 auto-eligible assessments advance an application to `ELIGIBLE`; no inference result
 can arm or execute a submission.
 
+## ADR-010: Evidence-Bound Document Packets
+
+Implemented in P06. A typed packet AST binds each material claim to current,
+approved profile fact revisions. Deterministic generation prefers professional
+employment evidence; an independent validator reconstructs permitted wording,
+checks delivery status and experience totals, and blocks unsupported claims.
+Unanswered substantive questions remain deferred.
+
+DOCX and PDF consume the same AST. Both formats are extracted and checked for
+equivalent content, safe document structure and bounded PDF layout. A manifest
+binds the exact profile, assessment, authorization, validation report and SHA-256
+artifact hashes. Migration v6 stores immutable packet versions; replacing or
+tampering with artifact bytes invalidates readiness and uncommitted intent.
+The Documents workspace exposes the bound source, tailored content, findings and
+immutable downloads. External submission remains the responsibility of P08.
+
 ## Milestones
 
 P00-P02 foundation; P03 candidate evidence; P04 discovery/identity; P05 ranking;

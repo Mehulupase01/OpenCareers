@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Command,
   Database,
+  Files,
   LoaderCircle,
   Pause,
   Play,
@@ -28,6 +29,7 @@ import type { OperationsSummary } from "../../../packages/contracts/src/index.js
 import { request } from "./api.js";
 import { CandidateWorkspace } from "./candidate.js";
 import { DiscoveryWorkspace } from "./discovery.js";
+import { DocumentsWorkspace } from "./documents.js";
 import { MatchingWorkspace } from "./matching.js";
 import "./styles.css";
 
@@ -38,7 +40,8 @@ type View =
   | "settings"
   | "candidate"
   | "discovery"
-  | "matching";
+  | "matching"
+  | "documents";
 
 function App() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
@@ -138,12 +141,14 @@ function App() {
     candidate: "Candidate",
     discovery: "Discovery",
     matching: "Matching",
+    documents: "Documents",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
     { id: "candidate" as const, label: "Candidate", icon: UserRound },
     { id: "discovery" as const, label: "Discovery", icon: Search },
     { id: "matching" as const, label: "Matching", icon: BrainCircuit },
+    { id: "documents" as const, label: "Documents", icon: Files },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -335,6 +340,7 @@ function App() {
               )}
               {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
               {view === "matching" && <MatchingWorkspace jobs={summary.jobs} />}
+              {view === "documents" && <DocumentsWorkspace jobs={summary.jobs} />}
               {view === "applications" && (
                 <section className="data-section">
                   <div className="section-toolbar">

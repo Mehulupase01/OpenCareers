@@ -214,7 +214,7 @@ export class Repository extends OwnerScope {
     });
   }
 
-  private async enqueueIn(tx: SqlExecutor, input: EnqueueInput): Promise<Task> {
+  protected async enqueueIn(tx: SqlExecutor, input: EnqueueInput): Promise<Task> {
     const type = taskTypeSchema.parse(input.type);
     const payload = taskPayloadSchema.parse(input.payload ?? { schemaVersion: 1 });
     const max = input.maxAttempts ?? 4;

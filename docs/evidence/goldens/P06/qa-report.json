@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-09-17T09:00:00.000Z",
+  "syntheticOnly": true,
+  "validation": {
+    "validatorVersion": "packet-validator-v1",
+    "status": "valid",
+    "issues": [],
+    "checkedClaimIds": [
+      "summary:a4ab4a566eb0e255d706",
+      "experience_total:519b248df5e1abf6be94",
+      "experience_total:9d017928b5ed0c1d5a6f",
+      "employment:6d9a5daf497ab92f9593",
+      "skill:8469a54cbdd1c6406126",
+      "skill:639ffa6a2c9610477e46",
+      "language:6675fc2bc9647a400745",
+      "project:555623810721995e88fa",
+      "employment:6d9a5daf497ab92f9593",
+      "availability:d658800f5c6f63538c1b"
+    ],
+    "checkedAt": "2026-09-17T09:00:00.000Z"
+  },
+  "formatIssues": [],
+  "documents": {
+    "cv": {
+      "docxCharacters": 797,
+      "pdfCharacters": 802,
+      "pages": 1
+    },
+    "letter": {
+      "docxCharacters": 355,
+      "pdfCharacters": 355,
+      "pages": 1
+    }
+  },
+  "artifacts": {
+    "synthetic-cv.docx": {
+      "bytes": 9447,
+      "sha256": "1b3d19bd839dccac67401e4ea52510028f7a6898700261c94871c2adf7c48805"
+    },
+    "synthetic-cv.pdf": {
+      "bytes": 12348,
+      "sha256": "e2a1957845873a333315b819b89e39653ea7541d69dd744cc36c013a0c70b6e8"
+    },
+    "synthetic-letter.docx": {
+      "bytes": 9079,
+      "sha256": "92952249b2e0a8919a79d8318ef8d03163d05cf67ee661fea6aecb3c98035364"
+    },
+    "synthetic-letter.pdf": {
+      "bytes": 9390,
+      "sha256": "aa04ef340321a505df025557bcf205e6843e71f6dd4b47df63d3e50bf4cb4a70"
+    },
+    "synthetic-answers.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    }
+  }
+}

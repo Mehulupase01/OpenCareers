@@ -323,6 +323,15 @@ export class MatchingRepository extends Repository {
         outcome: saved.outcome,
         score: saved.score.total,
       });
+      if (saved.outcome === "auto_eligible" && saved.applicationId)
+        await this.enqueueIn(tx, {
+          type: "prepare",
+          domain: "documents",
+          applicationId: saved.applicationId,
+          dedupeKey: `prepare:${saved.id}`,
+          payload: { schemaVersion: 1, assessmentId: saved.id },
+          priority: 20,
+        });
       return assessmentSchema.parse(saved);
     });
   }
