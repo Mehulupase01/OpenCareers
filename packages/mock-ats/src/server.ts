@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import Fastify from "fastify";
 
@@ -12,6 +14,7 @@ const fixtures = new Set([
   "misleading-banner",
   "disabled-submit",
   "implicit-submit",
+  "response-loss",
 ]);
 
 export interface MockApplication {
@@ -70,7 +73,7 @@ form.addEventListener('submit',e=>{if(!document.getElementById('upload-id').valu
 </script></body></html>`;
 }
 
-export async function buildMockAts() {
+export async function buildMockAts(recordDir?: string) {
   const app = Fastify({ logger: false, bodyLimit: 6 * 1024 * 1024, trustProxy: false });
   await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
   app.addContentTypeParser(
@@ -81,6 +84,15 @@ export async function buildMockAts() {
     },
   );
   const submissions: MockApplication[] = [];
+  if (recordDir) {
+    await mkdir(recordDir, { recursive: true });
+    for (const filename of await readdir(recordDir)) {
+      if (!/^[0-9a-f-]{36}\.json$/.test(filename)) continue;
+      submissions.push(
+        JSON.parse(await readFile(join(recordDir, filename), "utf8")) as MockApplication,
+      );
+    }
+  }
   const accounts: Array<{ id: string; email: string }> = [];
   const uploads = new Map<string, { accepted: boolean; filename: string }>();
   app.get("/jobs/:fixture", async (request, reply) => {
@@ -132,7 +144,15 @@ export async function buildMockAts() {
       jobId: body.job_id ?? "synthetic-engineer-1",
       receivedAt: new Date().toISOString(),
     };
+    if (recordDir)
+      await writeFile(join(recordDir, `${record.id}.json`), JSON.stringify(record), {
+        flag: "wx",
+        mode: 0o600,
+        flush: true,
+      });
     submissions.push(record);
+    if (body.fixture === "response-loss")
+      return reply.code(503).send({ error: "Synthetic response lost after acceptance" });
     return reply.redirect(`/receipts/${record.id}`);
   });
   app.post("/accounts", async (request, reply) => {
@@ -161,8 +181,8 @@ export async function buildMockAts() {
   return app;
 }
 
-export async function startMockAts() {
-  const app = await buildMockAts();
+export async function startMockAts(recordDir?: string) {
+  const app = await buildMockAts(recordDir);
   const url = await app.listen({ host: "127.0.0.1", port: 0 });
   return { app, url };
 }

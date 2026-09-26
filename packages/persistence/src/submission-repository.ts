@@ -23,11 +23,11 @@ export interface CommitHandle {
 }
 
 export class SubmissionRepository extends Repository {
-  private async assertLease(tx: SqlExecutor, task: Task) {
+  private async assertLease(tx: SqlExecutor, task: Task, type: "submit" | "reconcile" = "submit") {
     const row = (
       await tx.query(
-        "SELECT id FROM tasks WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND type='submit' AND state='leased' AND fence=$4 AND lease_owner=$5 AND lease_until>$6",
-        [this.ownerId, task.id, task.applicationId, task.fence, task.leaseOwner, this.now()],
+        "SELECT id FROM tasks WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND type=$4 AND state='leased' AND fence=$5 AND lease_owner=$6 AND lease_until>$7",
+        [this.ownerId, task.id, task.applicationId, type, task.fence, task.leaseOwner, this.now()],
       )
     )[0];
     if (!row) throw new DomainError("LEASE_STALE", "Submit task lease is no longer current.");
@@ -229,7 +229,7 @@ export class SubmissionRepository extends Repository {
       await this.assertLease(tx, task);
       const row = (
         await tx.query(
-          "SELECT a.state,a.revision,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256,c.content FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id LEFT JOIN intent_validity v ON v.owner_id=i.owner_id AND v.intent_id=i.id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4 AND v.intent_id IS NULL",
+          "SELECT a.state,a.revision,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256,c.content FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4",
           [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
         )
       )[0];
@@ -290,6 +290,72 @@ export class SubmissionRepository extends Repository {
         { receiptId },
       );
       return receiptId;
+    });
+  }
+
+  async reconcileMockReceipt(
+    task: Task,
+    evidenceInput: MockReceiptEvidence | null,
+  ): Promise<"confirmed" | "needs_review"> {
+    const applicationId = task.applicationId;
+    if (!applicationId)
+      throw new DomainError("STATE_INVALID", "Reconciliation task has no application.");
+    const evidence = evidenceInput ? mockReceiptEvidenceSchema.parse(evidenceInput) : null;
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task, "reconcile");
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.revision,t.id AS attempt_id,t.state AS attempt_state,i.snapshot,i.sha256,c.content FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE a.owner_id=$1 AND a.id=$2 ORDER BY t.started_at DESC,t.id DESC LIMIT 1",
+          [this.ownerId, applicationId],
+        )
+      )[0];
+      if (row?.state !== "UNKNOWN" || row.attempt_state !== "UNKNOWN")
+        throw new DomainError("STATE_INVALID", "Only an unknown attempt may be reconciled.");
+      assertTransition("UNKNOWN", "RECONCILING");
+      const next = evidence ? "CONFIRMED" : "NEEDS_REVIEW";
+      assertTransition("RECONCILING", next);
+      if (evidence) {
+        const snapshot = JSON.parse(String(row.snapshot)) as { jobId: string };
+        const content = packetContentSchema.parse(JSON.parse(String(row.content)));
+        const receiptUrl = new URL(evidence.receiptUrl);
+        if (
+          digest(snapshot) !== row.sha256 ||
+          evidence.jobId !== snapshot.jobId ||
+          evidence.jobId !== content.job.id ||
+          evidence.emailHash !== digestEmail(content.cv.identity.email) ||
+          receiptUrl.protocol !== "http:" ||
+          receiptUrl.hostname !== "127.0.0.1" ||
+          receiptUrl.pathname !== `/receipts/${evidence.recordId}`
+        )
+          throw new DomainError("RECEIPT_UNCORRELATED", "Recovered receipt differs from intent.");
+        await tx.query(
+          "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+          [
+            randomUUID(),
+            this.ownerId,
+            applicationId,
+            String(row.attempt_id),
+            JSON.stringify(evidence),
+            digest(evidence),
+            this.now(),
+          ],
+        );
+        await tx.query(
+          "UPDATE attempts SET state='CONFIRMED',ended_at=$1 WHERE owner_id=$2 AND id=$3",
+          [this.now(), this.ownerId, String(row.attempt_id)],
+        );
+      }
+      const updated = await tx.query(
+        "UPDATE applications SET state=$1,revision=revision+2,updated_at=$2 WHERE owner_id=$3 AND id=$4 AND state='UNKNOWN' AND revision=$5 RETURNING revision",
+        [next, this.now(), this.ownerId, applicationId, Number(row.revision)],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed during reconciliation.");
+      await this.audit(tx, applicationId, "submission.reconciled", Number(updated[0].revision), {
+        outcome: evidence ? "confirmed" : "needs_review",
+      });
+      return evidence ? "confirmed" : "needs_review";
     });
   }
 }

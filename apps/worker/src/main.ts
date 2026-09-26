@@ -1,7 +1,9 @@
 import "../../../packages/config/src/env.js";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { commitPreparedMockPacket } from "../../../packages/browser/src/commit-mock.js";
+import { observeMockReceipt } from "../../../packages/browser/src/observe-mock.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
 import { DomainError } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
@@ -42,7 +44,7 @@ try {
       await repository.heartbeat(workerId, "scheduler");
       const task = await repository.claim(
         workerId,
-        config.profile === "demo" ? ["demo_probe", "prepare", "submit"] : ["prepare"],
+        config.profile === "demo" ? ["demo_probe", "prepare", "submit", "reconcile"] : ["prepare"],
       );
       if (task) {
         try {
@@ -103,7 +105,7 @@ try {
                 plan.entries.map((entry) => [entry.semanticKey, entry.expected]),
               ),
             );
-            const mock = await startMockAts();
+            const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
             try {
               const app = (
                 await repository.db.query(
@@ -129,6 +131,28 @@ try {
                 { taskId: task.id, applicationId: task.applicationId, receiptId },
                 "Mock application receipt confirmed",
               );
+            } finally {
+              await mock.app.close();
+            }
+          }
+          if (task.type === "reconcile") {
+            if (!task.applicationId)
+              throw new DomainError("CONFIG_INVALID", "Reconcile task has no application.");
+            const row = (
+              await repository.db.query(
+                "SELECT i.packet_id FROM attempts a JOIN intents i ON i.owner_id=a.owner_id AND i.id=a.intent_id WHERE a.owner_id=$1 AND a.application_id=$2 ORDER BY a.started_at DESC,a.id DESC LIMIT 1",
+                [repository.ownerId, task.applicationId],
+              )
+            )[0];
+            const packet = (await documents.snapshot()).find(
+              (item) => item.manifest.id === row?.packet_id,
+            );
+            if (!packet) throw new DomainError("NOT_FOUND", "Reconciliation packet is missing.");
+            const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
+            try {
+              const evidence = await observeMockReceipt(mock, packet);
+              const outcome = await submissions.reconcileMockReceipt(task, evidence);
+              logger.info({ taskId: task.id, outcome }, "Mock submission reconciled");
             } finally {
               await mock.app.close();
             }

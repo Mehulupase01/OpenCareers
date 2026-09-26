@@ -24,6 +24,7 @@ export async function commitPreparedMockPacket(
   approvedValues: Record<string, string | boolean>,
   preparation: BrowserPreparation,
   authorizeDispatch: () => Promise<{ expiresAt: string }>,
+  fixture = "standard",
 ): Promise<MockReceiptEvidence> {
   if (
     preparation.status !== "ready" ||
@@ -38,7 +39,7 @@ export async function commitPreparedMockPacket(
   const owned = await launchMockCommitBrowser(mock.url);
   try {
     await owned.page.goto(
-      `${mock.url}/jobs/standard?jobId=${encodeURIComponent(packet.manifest.jobId)}`,
+      `${mock.url}/jobs/${fixture}?jobId=${encodeURIComponent(packet.manifest.jobId)}`,
     );
     for (let index = 0; index < 2; index++) {
       const snapshot = await inspectForm(owned.page);

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
+import { DomainError } from "../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
 import { BrowserRepository } from "../../packages/persistence/src/browser-repository.js";
@@ -412,6 +413,10 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await expect(submissions.authorizeDispatch(task, handle)).rejects.toMatchObject({
           code: "LEASE_STALE",
         });
+        await db.query(
+          "INSERT INTO intent_validity(owner_id,intent_id,invalidated_at,reason) VALUES($1,$2,$3,$4)",
+          [owner, handle.intentId, clock().toISOString(), "PROFILE_CHANGED_AFTER_DISPATCH"],
+        );
         const recordId = randomUUID();
         const receipt = {
           kind: "mock_ats" as const,
@@ -509,6 +514,107 @@ for (const engine of ["sqlite", "postgres"] as const) {
             handle.attemptId,
           ]),
         ).toEqual([{ dispatch_started_at: null }]);
+        const reconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
+        if (!reconcile) throw new Error("Expected a reconciliation task.");
+        expect(await submissions.reconcileMockReceipt(reconcile, null)).toBe("needs_review");
+        await queue.complete(reconcile);
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "NEEDS_REVIEW" }]);
+        expect(
+          await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([]);
+      });
+
+      it("reconciles an accepted but ambiguous attempt without a second final action", async () => {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const preparation = await new BrowserRepository(db, owner, clock).save(
+          readyBrowserResult(packet),
+        );
+        await queue.enqueue({
+          type: "submit",
+          dedupeKey: `submit:${packet.manifest.applicationId}`,
+          applicationId: packet.manifest.applicationId,
+          domain: "mock-ats",
+        });
+        const task = await queue.claim("synthetic-worker", ["submit"]);
+        if (!task) throw new Error("Expected a leased submit task.");
+        const app = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ])
+        )[0];
+        const submissions = new SubmissionRepository(db, owner, clock);
+        const handle = await submissions.begin(task, {
+          packetId: packet.manifest.id,
+          preparationId: preparation.id,
+          expectedRevision: Number(app?.revision),
+        });
+        await submissions.authorizeDispatch(task, handle);
+        await queue.fail(task, new DomainError("COMMIT_UNKNOWN", "Response was lost."));
+        const reconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
+        if (!reconcile) throw new Error("Expected a reconciliation task.");
+        const recordId = randomUUID();
+        const evidence = {
+          kind: "mock_ats" as const,
+          recordId,
+          jobId: packet.manifest.jobId,
+          receiptUrl: `http://127.0.0.1:4320/receipts/${recordId}`,
+          receivedAt: clock().toISOString(),
+          emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+        };
+        expect(await submissions.reconcileMockReceipt(reconcile, evidence)).toBe("confirmed");
+        await queue.complete(reconcile);
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "CONFIRMED" }]);
+        expect(
+          await db.query("SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toHaveLength(1);
+        expect(
+          await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toHaveLength(1);
       });
     },
   );

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
 import { commitPreparedMockPacket } from "../../packages/browser/src/commit-mock.js";
+import { observeMockReceipt } from "../../packages/browser/src/observe-mock.js";
 import { prepareMockPacket } from "../../packages/browser/src/prepare.js";
 import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
@@ -330,5 +331,52 @@ test("expired dispatch permit cannot click the mock final submit", async () => {
     expect((await mock.app.inject({ url: "/__test/records" })).json().count).toBe(0);
   } finally {
     await mock.app.close();
+  }
+});
+
+test("response loss after acceptance is reconciled read-only after mock server restart", async () => {
+  const recordDir = await mkdtemp(join(tmpdir(), "opencareers-mock-records-"));
+  const approved = {
+    country: "NL",
+    sponsorship_required: "no",
+    available_from: "2026-11-01",
+    remote_preference: "yes",
+    terms: true,
+  };
+  const result = await prepareMockPacket(packet, cvPdf, approved);
+  const preparation = {
+    id: randomUUID(),
+    status: result.status,
+    result,
+    createdAt: new Date().toISOString(),
+    expiresAt: null,
+    resolvedAt: null,
+  };
+  const first = await startMockAts(recordDir);
+  try {
+    await expect(
+      commitPreparedMockPacket(
+        first,
+        packet,
+        cvPdf,
+        approved,
+        preparation,
+        async () => ({ expiresAt: new Date(Date.now() + 10000).toISOString() }),
+        "response-loss",
+      ),
+    ).rejects.toThrow("503");
+    expect((await first.app.inject({ url: "/__test/records" })).json().count).toBe(1);
+  } finally {
+    await first.app.close();
+  }
+  const restarted = await startMockAts(recordDir);
+  try {
+    const evidence = await observeMockReceipt(restarted, packet);
+    expect(evidence?.jobId).toBe(packet.manifest.jobId);
+    expect(evidence?.recordId).toBeTruthy();
+    expect((await restarted.app.inject({ url: "/__test/records" })).json().count).toBe(1);
+  } finally {
+    await restarted.app.close();
+    await rm(recordDir, { recursive: true, force: true });
   }
 });
