@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -412,12 +412,33 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await expect(submissions.authorizeDispatch(task, handle)).rejects.toMatchObject({
           code: "LEASE_STALE",
         });
+        const recordId = randomUUID();
+        const receipt = {
+          kind: "mock_ats" as const,
+          recordId,
+          jobId: packet.manifest.jobId,
+          receiptUrl: `http://127.0.0.1:4320/receipts/${recordId}`,
+          receivedAt: clock().toISOString(),
+          emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+        };
+        await expect(
+          submissions.confirmMockReceipt(task, handle, { ...receipt, jobId: "wrong-job" }),
+        ).rejects.toMatchObject({ code: "RECEIPT_UNCORRELATED" });
+        const receiptId = await submissions.confirmMockReceipt(task, handle, receipt);
+        expect(receiptId).toBeTruthy();
         expect(
           await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
             owner,
             packet.manifest.applicationId,
           ]),
-        ).toEqual([{ state: "IN_FLIGHT" }]);
+        ).toEqual([{ state: "CONFIRMED" }]);
+        expect(
+          await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ id: receiptId }]);
+        await queue.complete(task);
       });
 
       it("revocation after intent prevents dispatch and preserves an uncertain attempt", async () => {

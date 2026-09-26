@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
+import { commitPreparedMockPacket } from "../../packages/browser/src/commit-mock.js";
 import { prepareMockPacket } from "../../packages/browser/src/prepare.js";
 import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
@@ -256,6 +258,76 @@ test("mock server counts applications only after accepted form submission", asyn
     expect(records).toMatchObject({ count: 1, accountCount: 1 });
     const receipt = await fetch(new URL(accepted.headers.get("location") ?? "", mock.url));
     expect(await receipt.text()).toContain(records.records[0].id);
+  } finally {
+    await mock.app.close();
+  }
+});
+
+test("mock final click requires a fresh permit and correlates a server receipt", async () => {
+  const approved = {
+    country: "NL",
+    sponsorship_required: "no",
+    available_from: "2026-11-01",
+    remote_preference: "yes",
+    terms: true,
+  };
+  const result = await prepareMockPacket(packet, cvPdf, approved);
+  expect(result.status).toBe("ready");
+  const preparation = {
+    id: randomUUID(),
+    status: result.status,
+    result,
+    createdAt: new Date().toISOString(),
+    expiresAt: null,
+    resolvedAt: null,
+  };
+  const mock = await startMockAts();
+  try {
+    const receipt = await commitPreparedMockPacket(
+      mock,
+      packet,
+      cvPdf,
+      approved,
+      preparation,
+      async () => ({ expiresAt: new Date(Date.now() + 10000).toISOString() }),
+    );
+    expect(receipt.jobId).toBe(packet.manifest.jobId);
+    expect(receipt.receiptUrl).toContain(receipt.recordId);
+    expect((await mock.app.inject({ url: "/__test/records" })).json().count).toBe(1);
+  } finally {
+    await mock.app.close();
+  }
+});
+
+test("expired dispatch permit cannot click the mock final submit", async () => {
+  const approved = {
+    country: "NL",
+    sponsorship_required: "no",
+    available_from: "2026-11-01",
+    remote_preference: "yes",
+    terms: true,
+  };
+  const result = await prepareMockPacket(packet, cvPdf, approved);
+  const mock = await startMockAts();
+  try {
+    await expect(
+      commitPreparedMockPacket(
+        mock,
+        packet,
+        cvPdf,
+        approved,
+        {
+          id: randomUUID(),
+          status: result.status,
+          result,
+          createdAt: new Date().toISOString(),
+          expiresAt: null,
+          resolvedAt: null,
+        },
+        async () => ({ expiresAt: new Date(Date.now() - 1000).toISOString() }),
+      ),
+    ).rejects.toThrow("expired");
+    expect((await mock.app.inject({ url: "/__test/records" })).json().count).toBe(0);
   } finally {
     await mock.app.close();
   }

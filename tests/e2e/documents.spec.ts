@@ -90,8 +90,17 @@ test("immutable document packet review and downloads remain inspectable", async 
       autoSubmitAcknowledged: true,
     });
     const discovery = await json("/v1/discovery");
-    const listing = discovery.listings.find((item: { job: { title: string } }) =>
-      item.job.title.includes("Engineer"),
+    const operations = await json("/v1/operations/summary");
+    const unavailable = new Set(
+      operations.applications
+        .filter((application: { state: string }) =>
+          ["CONFIRMED", "HISTORICAL_SUBMITTED", "IN_FLIGHT", "UNKNOWN"].includes(application.state),
+        )
+        .map((application: { jobId: string }) => application.jobId),
+    );
+    const listing = discovery.listings.find(
+      (item: { jobId: string; job: { title: string } }) =>
+        item.job.title.includes("Engineer") && !unavailable.has(item.jobId),
     );
     if (!listing) throw new Error("Expected a synthetic engineering vacancy.");
     const assessment = await json(`/v1/matching/jobs/${listing.jobId}/assess`, {});
@@ -104,6 +113,7 @@ test("immutable document packet review and downloads remain inspectable", async 
     });
     return {
       id: packet.manifest.id as string,
+      applicationId: assessment.applicationId as string,
       title: listing.job.title as string,
       authorization: authorization.id as string,
     };
@@ -153,6 +163,18 @@ test("immutable document packet review and downloads remain inspectable", async 
     path: `test-results/P07-browser-ready-${info.project.name}.png`,
     fullPage: true,
   });
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get("/v1/operations/summary");
+        const summary = await response.json();
+        return summary.applications.find(
+          (application: { id: string }) => application.id === result.applicationId,
+        )?.state as string | undefined;
+      },
+      { timeout: 30000 },
+    )
+    .toBe("CONFIRMED");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

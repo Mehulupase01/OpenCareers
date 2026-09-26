@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { dryRunResultSchema } from "../../contracts/src/browser.js";
-import { packetManifestSchema } from "../../contracts/src/documents.js";
+import { packetContentSchema, packetManifestSchema } from "../../contracts/src/documents.js";
 import { DomainError, type Task } from "../../contracts/src/index.js";
+import {
+  type MockReceiptEvidence,
+  mockReceiptEvidenceSchema,
+} from "../../contracts/src/submission.js";
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { SqlExecutor } from "./database.js";
@@ -211,4 +215,83 @@ export class SubmissionRepository extends Repository {
       return { expiresAt: new Date(this.clock().getTime() + 10000).toISOString() };
     });
   }
+
+  async confirmMockReceipt(
+    task: Task,
+    handle: CommitHandle,
+    evidenceInput: MockReceiptEvidence,
+  ): Promise<string> {
+    const evidence = mockReceiptEvidenceSchema.parse(evidenceInput);
+    if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
+      throw new DomainError("LEASE_STALE", "Receipt handle does not match the leased task.");
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task);
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.revision,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256,c.content FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id LEFT JOIN intent_validity v ON v.owner_id=i.owner_id AND v.intent_id=i.id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4 AND v.intent_id IS NULL",
+          [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.attempt_state !== "IN_FLIGHT" ||
+        !row.dispatch_started_at
+      )
+        throw new DomainError("STATE_INVALID", "A dispatched in-flight attempt is required.");
+      if (Number(row.commit_fence) !== handle.fence)
+        throw new DomainError("LEASE_STALE", "Commit fence changed before receipt confirmation.");
+      const snapshot = JSON.parse(String(row.snapshot)) as { jobId: string };
+      const content = packetContentSchema.parse(JSON.parse(String(row.content)));
+      const receiptUrl = new URL(evidence.receiptUrl);
+      if (
+        digest(snapshot) !== row.sha256 ||
+        evidence.jobId !== snapshot.jobId ||
+        content.job.id !== evidence.jobId ||
+        evidence.emailHash !== digestEmail(content.cv.identity.email) ||
+        receiptUrl.protocol !== "http:" ||
+        receiptUrl.hostname !== "127.0.0.1" ||
+        receiptUrl.pathname !== `/receipts/${evidence.recordId}`
+      )
+        throw new DomainError(
+          "RECEIPT_UNCORRELATED",
+          "Receipt does not match the intent and packet.",
+        );
+      assertTransition("IN_FLIGHT", "CONFIRMED");
+      const receiptId = randomUUID();
+      const hash = digest(evidence);
+      await tx.query(
+        "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          receiptId,
+          this.ownerId,
+          handle.applicationId,
+          handle.attemptId,
+          JSON.stringify(evidence),
+          hash,
+          this.now(),
+        ],
+      );
+      await tx.query(
+        "UPDATE attempts SET state='CONFIRMED',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT'",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      const updated = await tx.query(
+        "UPDATE applications SET state='CONFIRMED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND commit_fence=$4 RETURNING revision",
+        [this.now(), this.ownerId, handle.applicationId, handle.fence],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed before confirmation.");
+      await this.audit(
+        tx,
+        handle.applicationId,
+        "submission.confirmed",
+        Number(updated[0].revision),
+        { receiptId },
+      );
+      return receiptId;
+    });
+  }
 }
+
+const digestEmail = (email: string) => createHash("sha256").update(email).digest("hex");

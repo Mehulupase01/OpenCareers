@@ -8,7 +8,11 @@ export interface OwnedBrowser {
   close(): Promise<void>;
 }
 
-export async function launchDryRunBrowser(origin: string, visible = false): Promise<OwnedBrowser> {
+async function launchOwnedBrowser(
+  origin: string,
+  allowMockCommit: boolean,
+  visible = false,
+): Promise<OwnedBrowser> {
   const allowed = new URL(origin);
   if (allowed.protocol !== "http:" || allowed.hostname !== "127.0.0.1")
     throw new Error("Dry-run browser requires a loopback mock ATS origin.");
@@ -28,7 +32,7 @@ export async function launchDryRunBrowser(origin: string, visible = false): Prom
       const destination = new URL(request.url());
       if (
         destination.origin !== allowed.origin ||
-        (destination.pathname === "/applications" && request.method() !== "GET")
+        (!allowMockCommit && destination.pathname === "/applications" && request.method() !== "GET")
       ) {
         if (destination.pathname === "/applications") blockedCommitCount++;
         return route.abort("blockedbyclient");
@@ -49,4 +53,12 @@ export async function launchDryRunBrowser(origin: string, visible = false): Prom
     await browser.close();
     throw error;
   }
+}
+
+export function launchDryRunBrowser(origin: string, visible = false): Promise<OwnedBrowser> {
+  return launchOwnedBrowser(origin, false, visible);
+}
+
+export function launchMockCommitBrowser(origin: string): Promise<OwnedBrowser> {
+  return launchOwnedBrowser(origin, true);
 }

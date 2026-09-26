@@ -45,6 +45,6 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const result = await prepareMockPacket(packet, cv.buffer, input.approvedValues, input.fixture);
-    return browser.save(result);
+    return browser.save(result, { queueMockSubmit: true });
   });
 }

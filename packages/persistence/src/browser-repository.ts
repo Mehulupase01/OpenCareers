@@ -13,7 +13,10 @@ import { Repository } from "./repository.js";
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 export class BrowserRepository extends Repository {
-  async save(resultInput: DryRunResult): Promise<BrowserPreparation> {
+  async save(
+    resultInput: DryRunResult,
+    options: { queueMockSubmit?: boolean } = {},
+  ): Promise<BrowserPreparation> {
     const result = dryRunResultSchema.parse(resultInput);
     const ready = result.status === "ready";
     const completeReadBack = result.snapshots.every((snapshot, index) => {
@@ -128,6 +131,16 @@ export class BrowserRepository extends Repository {
         ],
       );
       await this.audit(tx, id, "browser.prepared", 1, { status: result.status });
+      if (ready && options.queueMockSubmit)
+        await this.enqueueIn(tx, {
+          type: "submit",
+          dedupeKey: `mock-submit:${id}`,
+          domain: "mock-ats",
+          applicationId: result.applicationId,
+          payload: { schemaVersion: 1, packetId: result.packetId, preparationId: id },
+          priority: 50,
+          maxAttempts: 1,
+        });
       return browserPreparationSchema.parse({
         id,
         status: result.status,

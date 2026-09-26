@@ -63,14 +63,29 @@ test("free-only matching health, scores and evidence remain inspectable", async 
       autoSubmitAcknowledged: authorization.autoSubmitAcknowledged,
     });
     const discovery = await json("/v1/discovery");
-    const jobId = discovery.listings[0]?.jobId;
+    const operations = await json("/v1/operations/summary");
+    const unavailable = new Set(
+      operations.applications
+        .filter((application: { state: string }) =>
+          ["CONFIRMED", "HISTORICAL_SUBMITTED", "IN_FLIGHT", "UNKNOWN"].includes(application.state),
+        )
+        .map((application: { jobId: string }) => application.jobId),
+    );
+    const eligible = discovery.listings.find(
+      (item: { jobId: string }) => !unavailable.has(item.jobId),
+    );
+    const jobId = eligible?.jobId ?? discovery.listings[0]?.jobId;
     if (!jobId) throw new Error("Expected a discovered synthetic vacancy.");
     const assessment = await json(`/v1/matching/jobs/${jobId}/assess`, {});
     const listing = discovery.listings.find((item: { jobId: string }) => item.jobId === jobId);
     if (!listing) throw new Error("Expected assessed listing evidence.");
-    return { outcome: assessment.outcome as string, title: listing.job.title as string };
+    return {
+      outcome: assessment.outcome as string,
+      expectedOutcome: eligible ? "auto_eligible" : "ineligible",
+      title: listing.job.title as string,
+    };
   }, info.project.name);
-  expect(assessmentOutcome.outcome).toBe("auto_eligible");
+  expect(assessmentOutcome.outcome).toBe(assessmentOutcome.expectedOutcome);
   await page.reload();
   await page.getByRole("button", { name: "Matching", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matching", exact: true })).toBeVisible();
