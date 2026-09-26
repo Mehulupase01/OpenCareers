@@ -8,6 +8,13 @@ import { launchMockCommitBrowser } from "./runtime.js";
 
 type MockAts = Awaited<ReturnType<typeof startMockAts>>;
 
+export class DefinitiveMockRejection extends Error {
+  constructor() {
+    super("Mock ATS rejected the application without creating a server record.");
+    this.name = "DefinitiveMockRejection";
+  }
+}
+
 function sameForm(actual: FormSnapshot, expected: FormSnapshot): boolean {
   return (
     actual.jobId === expected.jobId &&
@@ -65,6 +72,16 @@ export async function commitPreparedMockPacket(
     );
     await owned.page.getByRole("button", { name: "Submit application" }).click();
     const response = await responsePromise;
+    if (response.status() === 422) {
+      const after = (await mock.app.inject({ url: "/__test/records" })).json() as {
+        records: Array<{ id: string }>;
+      };
+      if (
+        after.records.length === before.records.length &&
+        after.records.every((record) => before.records.some((item) => item.id === record.id))
+      )
+        throw new DefinitiveMockRejection();
+    }
     if (response.status() !== 302)
       throw new Error(`Mock ATS rejected the final application: ${response.status()}`);
     await owned.page.waitForURL("**/receipts/*");

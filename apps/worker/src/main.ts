@@ -2,7 +2,10 @@ import "../../../packages/config/src/env.js";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { commitPreparedMockPacket } from "../../../packages/browser/src/commit-mock.js";
+import {
+  commitPreparedMockPacket,
+  DefinitiveMockRejection,
+} from "../../../packages/browser/src/commit-mock.js";
 import { observeMockReceipt } from "../../../packages/browser/src/observe-mock.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
 import { DomainError } from "../../../packages/contracts/src/index.js";
@@ -118,19 +121,25 @@ try {
                 preparationId,
                 expectedRevision: Number(app?.revision),
               });
-              const evidence = await commitPreparedMockPacket(
-                mock,
-                packet,
-                cv.buffer,
-                approvedValues,
-                preparation,
-                () => submissions.authorizeDispatch(task, handle),
-              );
-              const receiptId = await submissions.confirmMockReceipt(task, handle, evidence);
-              logger.info(
-                { taskId: task.id, applicationId: task.applicationId, receiptId },
-                "Mock application receipt confirmed",
-              );
+              try {
+                const evidence = await commitPreparedMockPacket(
+                  mock,
+                  packet,
+                  cv.buffer,
+                  approvedValues,
+                  preparation,
+                  () => submissions.authorizeDispatch(task, handle),
+                );
+                const receiptId = await submissions.confirmMockReceipt(task, handle, evidence);
+                logger.info(
+                  { taskId: task.id, applicationId: task.applicationId, receiptId },
+                  "Mock application receipt confirmed",
+                );
+              } catch (error) {
+                if (!(error instanceof DefinitiveMockRejection)) throw error;
+                await submissions.recordDefinitiveMockRejection(task, handle);
+                logger.info({ taskId: task.id }, "Mock ATS definitively rejected application");
+              }
             } finally {
               await mock.app.close();
             }

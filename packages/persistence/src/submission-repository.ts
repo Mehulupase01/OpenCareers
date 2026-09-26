@@ -293,6 +293,48 @@ export class SubmissionRepository extends Repository {
     });
   }
 
+  async recordDefinitiveMockRejection(task: Task, handle: CommitHandle): Promise<void> {
+    if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
+      throw new DomainError("LEASE_STALE", "Rejection handle does not match the leased task.");
+    await this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task);
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4",
+          [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.attempt_state !== "IN_FLIGHT" ||
+        !row.dispatch_started_at ||
+        Number(row.commit_fence) !== handle.fence
+      )
+        throw new DomainError("STATE_INVALID", "A dispatched in-flight attempt is required.");
+      assertTransition("IN_FLIGHT", "DEFINITIVE_FAILURE");
+      await tx.query(
+        "UPDATE attempts SET state='DEFINITIVE_FAILURE',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT'",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      const updated = await tx.query(
+        "UPDATE applications SET state='DEFINITIVE_FAILURE',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND commit_fence=$4 RETURNING revision",
+        [this.now(), this.ownerId, handle.applicationId, handle.fence],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed after rejection.");
+      await this.audit(
+        tx,
+        handle.applicationId,
+        "submission.definitive_failure",
+        Number(updated[0].revision),
+        {
+          reason: "MOCK_VALIDATION_REJECTED",
+        },
+      );
+    });
+  }
+
   async reconcileMockReceipt(
     task: Task,
     evidenceInput: MockReceiptEvidence | null,

@@ -15,6 +15,7 @@ const fixtures = new Set([
   "disabled-submit",
   "implicit-submit",
   "response-loss",
+  "validation-reject",
 ]);
 
 export interface MockApplication {
@@ -136,6 +137,8 @@ export async function buildMockAts(recordDir?: string) {
       !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(body.job_id ?? "")
     )
       return reply.code(422).send({ error: "Application fields or upload missing" });
+    if (body.fixture === "validation-reject")
+      return reply.code(422).send({ error: "Synthetic definitive validation rejection" });
     const record: MockApplication = {
       id: randomUUID(),
       fixture: body.fixture ?? "standard",

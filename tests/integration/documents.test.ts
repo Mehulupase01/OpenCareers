@@ -616,6 +616,79 @@ for (const engine of ["sqlite", "postgres"] as const) {
           ]),
         ).toHaveLength(1);
       });
+
+      it("records a definitive mock validation rejection without a receipt", async () => {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const preparation = await new BrowserRepository(db, owner, clock).save(
+          readyBrowserResult(packet),
+        );
+        await queue.enqueue({
+          type: "submit",
+          dedupeKey: `submit:${packet.manifest.applicationId}`,
+          applicationId: packet.manifest.applicationId,
+          domain: "mock-ats",
+        });
+        const task = await queue.claim("synthetic-worker", ["submit"]);
+        if (!task) throw new Error("Expected a leased submit task.");
+        const app = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ])
+        )[0];
+        const submissions = new SubmissionRepository(db, owner, clock);
+        const handle = await submissions.begin(task, {
+          packetId: packet.manifest.id,
+          preparationId: preparation.id,
+          expectedRevision: Number(app?.revision),
+        });
+        await submissions.authorizeDispatch(task, handle);
+        await submissions.recordDefinitiveMockRejection(task, handle);
+        await queue.complete(task);
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "DEFINITIVE_FAILURE" }]);
+        expect(
+          await db.query("SELECT state FROM attempts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "DEFINITIVE_FAILURE" }]);
+        expect(
+          await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([]);
+      });
     },
   );
 }

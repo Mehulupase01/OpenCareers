@@ -4,6 +4,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Owned mock ATS | Fixture-tested P07 | Dry-run-tested P07 | Planned P08 | Planned P08 | Synthetic only |
 | Recruitee | Planned | Candidate first adapter | Planned | Planned | None |
+| Lever hosted Protolabs variant | Public form inspected read-only | Unsupported: substantive answers and challenge | None | None | Public read-only 2026-09-27 |
 | Greenhouse public Job Board GET | Live-read P04 | Planned | Planned | Planned | Adyen board, 2026-09-17 |
 | Lever public postings GET | Fixture-tested P04 | Planned | Planned | Planned | No live read |
 | Ashby | Planned P04 | Planned | Planned | Planned | None |

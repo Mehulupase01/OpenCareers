@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
-import { commitPreparedMockPacket } from "../../packages/browser/src/commit-mock.js";
+import {
+  commitPreparedMockPacket,
+  DefinitiveMockRejection,
+} from "../../packages/browser/src/commit-mock.js";
 import { observeMockReceipt } from "../../packages/browser/src/observe-mock.js";
 import { prepareMockPacket } from "../../packages/browser/src/prepare.js";
 import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
@@ -378,5 +381,40 @@ test("response loss after acceptance is reconciled read-only after mock server r
   } finally {
     await restarted.app.close();
     await rm(recordDir, { recursive: true, force: true });
+  }
+});
+
+test("validation rejection is definitive only when no server record was created", async () => {
+  const approved = {
+    country: "NL",
+    sponsorship_required: "no",
+    available_from: "2026-11-01",
+    remote_preference: "yes",
+    terms: true,
+  };
+  const result = await prepareMockPacket(packet, cvPdf, approved);
+  const mock = await startMockAts();
+  try {
+    await expect(
+      commitPreparedMockPacket(
+        mock,
+        packet,
+        cvPdf,
+        approved,
+        {
+          id: randomUUID(),
+          status: result.status,
+          result,
+          createdAt: new Date().toISOString(),
+          expiresAt: null,
+          resolvedAt: null,
+        },
+        async () => ({ expiresAt: new Date(Date.now() + 10000).toISOString() }),
+        "validation-reject",
+      ),
+    ).rejects.toBeInstanceOf(DefinitiveMockRejection);
+    expect((await mock.app.inject({ url: "/__test/records" })).json().count).toBe(0);
+  } finally {
+    await mock.app.close();
   }
 });

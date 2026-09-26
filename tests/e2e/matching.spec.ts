@@ -96,13 +96,17 @@ test("free-only matching health, scores and evidence remain inspectable", async 
   const assessment = page
     .locator(".matching-table tbody tr")
     .filter({ hasText: assessmentOutcome.title })
-    .filter({ hasText: "auto eligible" })
+    .filter({ hasText: assessmentOutcome.expectedOutcome.replaceAll("_", " ") })
     .first();
   await expect(assessment).toBeVisible({ timeout: 25000 });
   await assessment.getByRole("button").click();
   await expect(page.getByRole("heading", { name: "Policy gates", exact: true })).toBeVisible();
   await expect(page.getByText("Scores are deterministic, not hiring probabilities")).toBeVisible();
-  await expect(page.locator(".assessment-panel")).toContainText("Python");
+  await expect(page.locator(".assessment-panel")).toContainText(
+    assessmentOutcome.expectedOutcome === "auto_eligible"
+      ? "Python"
+      : "An existing application or history record matches.",
+  );
   await page.screenshot({
     path: `test-results/matching-${info.project.name}.png`,
     fullPage: true,
