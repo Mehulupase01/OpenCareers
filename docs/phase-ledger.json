@@ -622,32 +622,32 @@
         {
           "id": "P08-G1",
           "requirement": "Auto-submit mode completes the mock workflow without a per-application owner click.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         },
         {
           "id": "P08-G2",
           "requirement": "Each confirmed state has independently correlated receipt evidence.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         },
         {
           "id": "P08-G3",
           "requirement": "Every crash case avoids blind duplicate submission; ambiguous cases remain explicit.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         },
         {
           "id": "P08-G4",
           "requirement": "Revocation immediately before commit prevents the final action.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         },
         {
           "id": "P08-G5",
           "requirement": "A stale worker cannot acquire a new valid commit capability.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         },
         {
           "id": "P08-G6",
@@ -658,12 +658,15 @@
         {
           "id": "P08-G7",
           "requirement": "If a live prerequisite is unavailable, code completion and live verification are reported separately, and unrelated engineering continues.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P08-engineering-verification.md"]
         }
       ],
-      "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalPrerequisites": [
+        "P08-G6 requires an explicitly reviewed private candidate profile, active matching standing authorization, appropriate live vacancy, and private correlated receipt."
+      ],
+      "lastVerifiedCommit": "9c29659f8f06bc2aa8a66d5cfd7569ab8d318fd6",
+      "evidence": ["docs/evidence/P08-engineering-verification.md"]
     },
     {
       "id": "P09",

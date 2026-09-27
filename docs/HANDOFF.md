@@ -95,3 +95,20 @@ Documents UI. Local checks: 102 tests passed, 49 PostgreSQL skipped locally;
 typecheck, build, public scan and production audit passed. P07 CI run
 `36194183542` passed Windows, Ubuntu and PostgreSQL. See
 `docs/evidence/P07-verification.md`. No employer submission has been made.
+
+P08 engineering gates G1-G5 and G7 are complete. The durable intent, single-use
+fenced permit, unattended mock final click, correlated receipts, definitive
+rejection, unknown-outcome recovery and read-only reconciliation are implemented.
+The provisional Recruitee Careers Site API v1 adapter performs exact-origin GET
+preparation and a permit-gated multipart POST with candidate-ID receipt correlation.
+No live POST has been made. P08-G6 remains externally pending until a reviewed
+private profile, matching standing authorization, appropriate vacancy and private
+receipt are available. See `docs/evidence/P08-engineering-verification.md`.
+
+P09 is in progress. Commit `b7f190e` introduces the versioned adapter SDK and
+registry, adapter target fingerprint binding, generic API queueing and a worker
+with no portal-specific submit/reconcile branches. Commit `9c29659` moves the
+existing Chromium install before browser-backed conformance tests. GitHub Actions
+run `36307529528` passed Ubuntu, Windows and PostgreSQL. Next: add Recruitee
+discovery/coverage reporting and a second compliant real portal family with
+sanitized drift fixtures; do not count the owned mock ATS as that second family.
