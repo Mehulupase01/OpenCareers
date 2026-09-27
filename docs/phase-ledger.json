@@ -711,14 +711,14 @@
         {
           "id": "P09-G3",
           "requirement": "A new unknown mandatory field stops that application before commitment.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P09-pre-dispatch-drift.md"]
         },
         {
           "id": "P09-G4",
           "requirement": "A drifted adapter cannot degrade into unrestricted generic clicking.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P09-pre-dispatch-drift.md"]
         },
         {
           "id": "P09-G5",
@@ -734,7 +734,7 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": "b2de20cd9ec8296d29ec2f9e344f7423b8cc44e6"
+      "lastVerifiedCommit": "a2f755df5f354fe09e61a9cc997f2da3b8b7a35a"
     },
     {
       "id": "P10",

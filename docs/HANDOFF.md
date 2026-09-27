@@ -161,4 +161,6 @@ use this path and remains subject to unknown-outcome reconciliation. The mock
 desktop/mobile and Recruitee injected-question tests pass; SQLite integration
 tests cover task acknowledgement, lease recovery, intent tampering and the
 post-permit refusal. Local `pnpm check` passed (122 tests, 56 skipped). Full CI
-is pending. Exact drift details are not yet surfaced in the operations UI.
+`36329334882` passed Windows, Ubuntu and PostgreSQL at `a2f755d`. P09-G3/G4
+are complete for the registered adapters. Exact drift details are not yet
+surfaced in the operations UI.
