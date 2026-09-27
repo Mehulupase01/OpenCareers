@@ -191,3 +191,12 @@ negative tests reject invalid and wrong-posting packets before filling. Local
 `pnpm check` passed with 131 tests and 56 PostgreSQL-dependent tests skipped.
 Greenhouse remains provisional: accepted upload, final dispatch and receipt
 correlation are still unimplemented; P09-G1/G2/G6 remain open.
+
+The owner's DOCX and PDF resumes were imported into the private local source
+store on 2026-09-27. They remain `review_required`: no facts, active profile or
+standing authorization were created by import. The local UI/API are running
+on ports 4318/4317 with external submission disabled. A current free ZDR
+ModelRun/Qwen endpoint advertises `structured_outputs`; the policy accepts
+that documented capability without requiring an additional catalogue label.
+Synthetic-only probes returned 429, so no real candidate inference was sent.
+See `docs/evidence/P05-openrouter-live-route.md` for the route limits.

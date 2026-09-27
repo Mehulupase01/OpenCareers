@@ -28,3 +28,15 @@ Therefore no real candidate-data route has been enabled. The exposed key
 previously pasted into chat should be rotated; the local `.env` is ignored by
 Git and the key is not committed. P05 authenticated private-inference
 reliability remains open.
+
+Follow-up on 2026-09-27: the live zero-retention endpoint catalogue listed
+`qwen/qwen3.8-27b:free` at ModelRun with zero prompt/completion prices and
+`structured_outputs`. OpenRouter's structured-output documentation uses
+`response_format: { type: "json_schema" }` for that capability; the model
+catalogue need not also list a separate `response_format` parameter. The
+policy now recognizes this documented capability while retaining strict
+request requirements. Two synthetic-only pinned, ZDR, data-collection-denied
+probes returned HTTP 429. No private input was sent, and this endpoint is not
+yet demonstrated as reliable for production use. ModelRun's terms prohibit
+special-category and other sensitive data requiring heightened terms; any
+future input must remain minimized and exclude such fields.

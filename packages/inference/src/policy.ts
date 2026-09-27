@@ -42,10 +42,7 @@ export function modelReasons(model: CatalogueModel, policy: RoutePolicy): string
     reasons.push("Text input is unsupported.");
   if (!(model.architecture.output_modalities ?? []).includes("text"))
     reasons.push("Text output is unsupported.");
-  if (
-    !model.supported_parameters.includes("structured_outputs") ||
-    !model.supported_parameters.includes("response_format")
-  )
+  if (!model.supported_parameters.includes("structured_outputs"))
     reasons.push("Strict structured output is unsupported.");
   if ((model.context_length ?? 0) < policy.minimumContext)
     reasons.push("Context capacity is below policy.");

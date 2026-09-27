@@ -102,6 +102,22 @@ describe("free-only inference policy", () => {
         now,
       ).eligible,
     ).toBe(true);
+    expect(
+      selectRoute(
+        { data: [{ ...free, supported_parameters: ["structured_outputs"] }] },
+        routePolicy,
+        "2026-09-16T11:00:00.000Z",
+        now,
+      ).eligible,
+    ).toBe(true);
+    expect(
+      selectRoute(
+        { data: [{ ...free, supported_parameters: ["response_format"] }] },
+        routePolicy,
+        "2026-09-16T11:00:00.000Z",
+        now,
+      ).eligible,
+    ).toBe(false);
   });
   it("rejects paid, unknown, tiered and tool-enabled routes before inference", () => {
     expect(
