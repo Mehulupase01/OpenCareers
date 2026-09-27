@@ -19,14 +19,16 @@ const json = <T>(row: Row, key = "data") => JSON.parse(String(row[key])) as T;
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export class DocumentRepository extends Repository {
-  async hasValidPacket(assessmentId: string): Promise<boolean> {
-    const row = (
-      await this.db.query(
-        "SELECT 1 AS present FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL LIMIT 1",
-        [this.ownerId, assessmentId],
-      )
-    )[0];
-    return Boolean(row);
+  async hasValidPacket(assessmentId: string, requireLlm = false): Promise<boolean> {
+    const rows = await this.db.query(
+      "SELECT p.manifest FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 100",
+      [this.ownerId, assessmentId],
+    );
+    return rows.some(
+      (row) =>
+        !requireLlm ||
+        packetManifestSchema.parse(json(row, "manifest")).letterGeneration?.method === "llm",
+    );
   }
 
   async generationInput(
@@ -137,7 +139,9 @@ export class DocumentRepository extends Repository {
           if (
             preservedManifest.profileId === manifest.profileId &&
             preservedManifest.authorizationId === manifest.authorizationId &&
-            preservedManifest.authorizationRevision === manifest.authorizationRevision
+            preservedManifest.authorizationRevision === manifest.authorizationRevision &&
+            (preservedManifest.letterGeneration?.method ?? "deterministic") ===
+              (manifest.letterGeneration?.method ?? "deterministic")
           )
             return {
               manifest: preservedManifest,

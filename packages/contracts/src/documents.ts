@@ -229,6 +229,19 @@ export const packetManifestSchema = z
     authorizationRevision: z.number().int().positive(),
     contentSha256: sha256Schema,
     templateVersions: z.object({ cv: z.literal("cv-v1"), letter: z.literal("letter-v1") }).strict(),
+    letterGeneration: z
+      .discriminatedUnion("method", [
+        z.object({ method: z.literal("deterministic") }).strict(),
+        z
+          .object({
+            method: z.literal("llm"),
+            modelId: z.string().min(1).max(240),
+            provider: z.string().min(1).max(120),
+            responseHash: sha256Schema,
+          })
+          .strict(),
+      ])
+      .optional(),
     artifacts: z.array(artifactSchema).length(5),
     validation: validationReportSchema,
     createdAt: z.iso.datetime(),

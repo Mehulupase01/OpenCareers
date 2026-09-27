@@ -24,3 +24,9 @@ override conflicting source scope; future tickets must reference this file.
 4. Commit and push to the existing GitHub origin after each completed phase. Every
    commit includes a descriptive title and body with delivered behavior, checks and
    remaining verification. Continue work autonomously between those checkpoints.
+
+5. Real applications require LLM-drafted cover letters using the approved profile,
+   resume evidence and specific job description. The earlier deterministic P06
+   letter is insufficient for unattended external submissions; keep it for
+   synthetic demo and non-committing review paths only. Model downtime must not
+   silently substitute a deterministic letter for a real auto-submit packet.

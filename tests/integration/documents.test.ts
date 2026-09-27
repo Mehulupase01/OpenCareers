@@ -7,7 +7,9 @@ import type { DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { DomainError } from "../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
+import { generatePacketContent } from "../../packages/documents/src/domain.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
+import { compileLetterProposal } from "../../packages/documents/src/letter-draft.js";
 import { BrowserRepository } from "../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import {
@@ -224,6 +226,29 @@ for (const engine of ["sqlite", "postgres"] as const) {
       afterEach(async () => {
         await db?.close();
         if (dir) await rm(dir, { recursive: true, force: true });
+      });
+
+      it("requires an LLM packet when checking readiness for private preparation", async () => {
+        const input = { ...documentGenerationInput(), requestedAnswers: [] };
+        const deterministic = await buildPacket(artifacts, input);
+        await documents.savePacket(deterministic);
+        expect(await documents.hasValidPacket(input.assessment.id)).toBe(true);
+        expect(await documents.hasValidPacket(input.assessment.id, true)).toBe(false);
+        const content = generatePacketContent(input);
+        const letter = compileLetterProposal(input, content, {
+          opening: content.letter.opening,
+          motivation: "The role's focus on Python makes this opportunity compelling.",
+          contributionIds: [content.letter.contributions[0]?.id],
+        });
+        const llm = await buildPacket(artifacts, input, {
+          letter,
+          modelId: "synthetic/model:free",
+          provider: "synthetic",
+          responseHash: "a".repeat(64),
+        });
+        const saved = await documents.savePacket(llm, { preserveValidAssessment: true });
+        expect(saved.manifest.letterGeneration?.method).toBe("llm");
+        expect(await documents.hasValidPacket(input.assessment.id, true)).toBe(true);
       });
 
       it("stores immutable artifacts and invalidates prior packet and intent hashes", async () => {

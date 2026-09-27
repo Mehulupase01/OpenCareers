@@ -207,3 +207,20 @@ employment workload, composite identity and visa terms were not inferred.
 Matching now withholds work-authorization as well as identity from OpenRouter
 and validates proposals against the reduced fact set. Local deterministic
 authorization gates remain active. No live candidate request has been sent.
+
+P06 owner amendment is now implemented as an LLM-letter code path, not yet a
+live-verified model route. `docs/plans/P06-llm-letter-amendment.md` defines the
+contract. A typed proposal selects approved contribution IDs and authors
+bounded role-specific prose. The independent packet validator checks the
+result, and manifests store model/provider/response hashes. Private worker
+preparation waits for a ready free route and uses the shared durable daily
+quota; it cannot silently fall back to deterministic letters. The central
+submission repository rejects deterministic packets for real external
+adapters in private profiles. Synthetic demo packets remain deterministic.
+The current `.env` still pins NVIDIA, whose strict ZDR route was unavailable;
+the alternative Qwen/ModelRun probe was rate-limited. No real cover letter has
+been generated and no external application submitted. Quality evaluation and
+live free-route verification remain before this amendment can be called done.
+Local verification for this amendment passed 139 tests (57 PostgreSQL-only
+skipped), lint, typecheck, build, source scan and dependency audit. See
+`docs/evidence/P06-llm-letter-checkpoint.md`; cross-platform CI is pending.

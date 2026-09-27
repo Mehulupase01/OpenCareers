@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { dryRunResultSchema } from "../../contracts/src/browser.js";
-import { packetContentSchema, packetManifestSchema } from "../../contracts/src/documents.js";
+import {
+  type PacketManifest,
+  packetContentSchema,
+  packetManifestSchema,
+} from "../../contracts/src/documents.js";
 import { DomainError, type Task } from "../../contracts/src/index.js";
 import {
   type MockReceiptEvidence,
@@ -12,10 +16,22 @@ import {
 } from "../../contracts/src/submission.js";
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
-import type { SqlExecutor } from "./database.js";
+import type { Database, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+export function assertExternalLetter(
+  manifest: PacketManifest,
+  adapterId: string,
+  requireLlmExternal: boolean,
+) {
+  if (requireLlmExternal && adapterId !== "mock-ats" && manifest.letterGeneration?.method !== "llm")
+    throw new DomainError(
+      "CLAIM_UNSUPPORTED",
+      "A validated LLM letter is required before external submission.",
+    );
+}
 
 export interface CommitHandle {
   intentId: string;
@@ -27,6 +43,15 @@ export interface CommitHandle {
 }
 
 export class SubmissionRepository extends Repository {
+  constructor(
+    db: Database,
+    ownerId: string,
+    clock?: () => Date,
+    private readonly requireLlmExternal = false,
+  ) {
+    super(db, ownerId, clock);
+  }
+
   private async assertLease(tx: SqlExecutor, task: Task, type: "submit" | "reconcile" = "submit") {
     const row = (
       await tx.query(
@@ -68,6 +93,7 @@ export class SubmissionRepository extends Repository {
       const manifest = packetManifestSchema.parse(JSON.parse(String(packet.manifest)));
       if (manifest.validation.status !== "valid" || manifest.jobId !== app.job_id)
         throw new DomainError("PROFILE_STALE", "Packet does not match the ready job.");
+      assertExternalLetter(manifest, task.domain, this.requireLlmExternal);
       const preparation = (
         await tx.query(
           "SELECT status,result,created_at FROM browser_preparations WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND packet_id=$4",

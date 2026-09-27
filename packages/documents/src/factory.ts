@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import type {
+  LetterDocument,
   PacketArtifact,
   PacketContent,
   ValidationReport,
 } from "../../contracts/src/documents.js";
-import { type PacketManifest, packetManifestSchema } from "../../contracts/src/documents.js";
+import {
+  letterDocumentSchema,
+  type PacketManifest,
+  packetManifestSchema,
+} from "../../contracts/src/documents.js";
 import type { ArtifactStore } from "./artifact-store.js";
 import type { PacketGenerationInput } from "./domain.js";
 import { generatePacketContent } from "./domain.js";
@@ -29,8 +34,15 @@ export interface BuiltPacket {
 export async function buildPacket(
   store: ArtifactStore,
   input: PacketGenerationInput,
+  letterDraft?: {
+    letter: LetterDocument;
+    modelId: string;
+    provider: string;
+    responseHash: string;
+  },
 ): Promise<BuiltPacket> {
   const content = generatePacketContent(input);
+  if (letterDraft) content.letter = letterDocumentSchema.parse(letterDraft.letter);
   const baseValidation = validatePacketContent({
     content,
     profile: input.profile,
@@ -144,6 +156,14 @@ export async function buildPacket(
       authorizationRevision: input.authorization.revision,
       contentSha256,
       templateVersions: { cv: "cv-v1", letter: "letter-v1" },
+      letterGeneration: letterDraft
+        ? {
+            method: "llm",
+            modelId: letterDraft.modelId,
+            provider: letterDraft.provider,
+            responseHash: letterDraft.responseHash,
+          }
+        : { method: "deterministic" },
       artifacts,
       validation,
       createdAt: input.generatedAt,

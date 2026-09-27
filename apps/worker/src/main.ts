@@ -3,11 +3,14 @@ import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
-import { DomainError } from "../../../packages/contracts/src/index.js";
+import { DomainError, type TaskType } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
+import { generatePacketContent } from "../../../packages/documents/src/domain.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
+import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
 import { MatchingRunner } from "../../../packages/inference/src/gateway.js";
+import { OpenRouterTransport } from "../../../packages/inference/src/transport.js";
 import { createLogger } from "../../../packages/observability/src/index.js";
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
@@ -27,33 +30,54 @@ await new CandidateRepository(repository.db, repository.ownerId).initialize();
 const discovery = new DiscoveryRepository(repository.db, repository.ownerId);
 const documents = new DocumentRepository(repository.db, repository.ownerId);
 const browser = new BrowserRepository(repository.db, repository.ownerId);
-const submissions = new SubmissionRepository(repository.db, repository.ownerId);
+const submissions = new SubmissionRepository(
+  repository.db,
+  repository.ownerId,
+  undefined,
+  config.profile !== "demo",
+);
 const artifacts = new ArtifactStore(config.dataDir);
 await artifacts.initialize();
 const adapters = createAdapterRegistry(config.dataDir);
-const matching = new MatchingRunner(
-  new MatchingRepository(repository.db, repository.ownerId),
-  config,
-);
+const matchingRepository = new MatchingRepository(repository.db, repository.ownerId);
+const matching = new MatchingRunner(matchingRepository, config);
+const letterDraftRunner = config.inference.apiKey
+  ? new LetterDraftRunner(
+      matchingRepository,
+      config.inference.dailyLimit,
+      new OpenRouterTransport(config.inference.apiKey),
+    )
+  : null;
 const workerId = `scheduler-${randomUUID().slice(0, 8)}`;
 try {
   while (!controller.signal.aborted) {
     try {
       await repository.heartbeat(workerId, "scheduler");
-      const task = await repository.claim(
-        workerId,
+      await matching.run();
+      const canPrepare =
+        config.profile === "demo" ||
+        (letterDraftRunner !== null &&
+          (await matchingRepository.snapshot(config.inference.dailyLimit)).route.status ===
+            "ready");
+      const taskTypes: TaskType[] =
         config.profile === "demo"
           ? ["demo_probe", "prepare", "submit", "reconcile"]
           : config.externalSubmissionEnabled
-            ? ["prepare", "submit", "reconcile"]
-            : ["prepare"],
-      );
+            ? canPrepare
+              ? ["prepare", "submit", "reconcile"]
+              : ["submit", "reconcile"]
+            : canPrepare
+              ? ["prepare"]
+              : [];
+      const task = await repository.claim(workerId, taskTypes);
       if (task) {
         try {
           if (task.type === "prepare") {
             if (!task.applicationId || typeof task.payload.assessmentId !== "string")
               throw new DomainError("CONFIG_INVALID", "Prepare task payload is incomplete.");
-            if (await documents.hasValidPacket(task.payload.assessmentId)) {
+            if (
+              await documents.hasValidPacket(task.payload.assessmentId, config.profile !== "demo")
+            ) {
               logger.info(
                 { taskId: task.id, applicationId: task.applicationId },
                 "Existing valid packet retained",
@@ -79,7 +103,13 @@ try {
               [],
               new Date().toISOString().slice(0, 10),
             );
-            await documents.savePacket(await buildPacket(artifacts, input), {
+            const letterDraft =
+              config.profile === "demo"
+                ? undefined
+                : await letterDraftRunner?.draft(input, generatePacketContent(input));
+            if (config.profile !== "demo" && !letterDraft)
+              throw new DomainError("MODEL_ROUTE_INELIGIBLE", "LLM letter route is unavailable.");
+            await documents.savePacket(await buildPacket(artifacts, input, letterDraft), {
               preserveValidAssessment: true,
             });
             logger.info({ taskId: task.id, applicationId: task.applicationId }, "Packet prepared");
@@ -197,7 +227,6 @@ try {
         }
       }
       await runDiscovery(discovery, config.profile);
-      await matching.run();
       await setTimeout(2000, undefined, { signal: controller.signal }).catch(() => undefined);
     } catch (error) {
       logger.error({ err: error }, "Worker iteration failed; retrying after backoff");

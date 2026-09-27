@@ -121,6 +121,15 @@ tampering with artifact bytes invalidates readiness and uncommitted intent.
 The Documents workspace exposes the bound source, tailored content, findings and
 immutable downloads. External submission remains the responsibility of P08.
 
+Owner amendment after P06: private real packet preparation now requires an
+LLM-authored role-specific proposal through the P05 pinned free route and daily
+reservation ledger. Code selects only approved contribution text from the
+proposal, validates model-authored opening/motivation, then runs the independent
+packet validator before rendering. The manifest records model, provider and
+response hash; the central real-adapter commit gate rejects deterministic
+letters. A missing or limited route leaves preparation queued rather than
+silently falling back. The synthetic demo retains deterministic packets.
+
 ## ADR-011: Owned Browser Preparation Before Commit
 
 Implemented in P07. The mock ATS is a first-party loopback server with separate
