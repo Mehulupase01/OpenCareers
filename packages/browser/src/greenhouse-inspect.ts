@@ -78,7 +78,7 @@ export async function inspectGreenhouseForm(
       };
     });
     const challenge = document.querySelector(
-      'iframe[src*="captcha"],iframe[src*="challenge"],[data-sitekey],.g-recaptcha,.h-captcha',
+      'script[src*="/recaptcha/"],iframe[src*="/recaptcha/"],iframe[src*="captcha"],iframe[src*="challenge"],[data-sitekey],.g-recaptcha,.h-captcha',
     );
     return {
       fields,

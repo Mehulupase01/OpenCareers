@@ -128,3 +128,10 @@ only two analytics requests appeared, with no application request or visible
 validation error. Do not infer a working final action from that probe. The
 read-only preparation write barrier is directly browser-tested in `e9038e7`,
 whose CI passed Ubuntu, Windows and PostgreSQL (`36311743031`).
+Follow-up after browser hydration with a valid synthetic CV found a hosted S3
+upload POST, reCAPTCHA Enterprise reload POST and application POST, all
+intercepted. The Adyen page loads reCAPTCHA scripts/iframe before final action;
+the inspector now classifies it as `challenge`. Read-only preparation cannot
+claim READY from an answer-complete form until upload and receipt handling
+exist. This variant needs the scoped P10 challenge handoff, not automated
+challenge solving. No employer-facing POST was sent.

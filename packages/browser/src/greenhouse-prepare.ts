@@ -44,6 +44,7 @@ export function greenhousePreparationResult(
     ...(snapshot.blocker === "login" ? ["Login is required."] : []),
     ...(snapshot.blocker === "unsupported" ? ["Form variant is unsupported."] : []),
     ...(blockedWriteCount ? ["The form attempted a write during read-only preparation."] : []),
+    "Hosted CV upload and final receipt verification are not yet supported.",
   ];
   const status =
     snapshot.blocker === "challenge"
@@ -52,7 +53,7 @@ export function greenhousePreparationResult(
         ? "unsupported"
         : plan.unresolved.length
           ? "needs_input"
-          : "ready";
+          : "unsupported";
   return dryRunResultSchema.parse({
     adapter: {
       id: "greenhouse",
@@ -102,7 +103,7 @@ export async function prepareGreenhousePacket(
       blockedWriteCount++;
     });
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.goto(url, { waitUntil: "networkidle" });
     const snapshot = await inspectGreenhouseForm(page, target);
     return greenhousePreparationResult(
       target,

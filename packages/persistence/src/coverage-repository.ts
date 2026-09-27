@@ -38,7 +38,7 @@ const support: Record<
     challengeNeed: "unknown",
     support: {
       discovery: "public_read",
-      inspection: "planned",
+      inspection: "public_read",
       commit: "planned",
       receipt: "planned",
       reconciliation: "planned",

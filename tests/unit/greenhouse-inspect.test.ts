@@ -96,7 +96,7 @@ describe("Greenhouse hosted form inspection", () => {
     const approved = { question_123: "Synthetic reviewed answer." };
     expect(greenhousePreparationResult(target, packet, cvPdf, approved, snapshot, 0)).toMatchObject(
       {
-        status: "ready",
+        status: "unsupported",
         blockedFinalActions: 0,
         serverApplicationCount: 0,
       },
@@ -131,12 +131,23 @@ describe("Greenhouse hosted form inspection", () => {
     }
   });
 
-  it("reports challenge widgets before preparation", async () => {
+  it("reports challenge scripts before preparation", async () => {
     await page.evaluate(() => {
-      const challenge = document.createElement("div");
-      challenge.className = "h-captcha";
+      const challenge = document.createElement("script");
+      challenge.src = "https://www.recaptcha.net/recaptcha/enterprise.js";
       document.body.append(challenge);
     });
-    expect((await inspectGreenhouseForm(page, target)).blocker).toBe("challenge");
+    const snapshot = await inspectGreenhouseForm(page, target);
+    expect(snapshot.blocker).toBe("challenge");
+    expect(
+      greenhousePreparationResult(
+        target,
+        packet,
+        cvPdf,
+        { question_123: "Synthetic reviewed answer." },
+        snapshot,
+        0,
+      ).status,
+    ).toBe("challenge");
   });
 });

@@ -42,6 +42,14 @@ A GET-only preparation using a synthetic packet on the same date found the same
 17 controls, no attempted writes, no visible challenge, and one unresolved
 mandatory employer question. It returned `needs_input`; no CV upload or final
 action occurred.
+Further isolated browser inspection after hydration showed a reCAPTCHA
+Enterprise script and iframe. A synthetic-data final-click trace intercepted
+every write and observed a CV upload POST to a Greenhouse S3 endpoint, a
+reCAPTCHA Enterprise reload POST, then an application POST to
+`boards.greenhouse.io`. No file or application reached those endpoints.
+This Adyen variant is `challenge` at preparation. An answer-complete form
+without a challenge remains `unsupported` until server-accepted upload and
+correlated receipt handling are implemented and verified.
 
 ## Adapter Scope
 
