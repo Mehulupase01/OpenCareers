@@ -123,3 +123,8 @@ mandatory visa/relocation answer, no visible challenge and zero write attempts.
 See `docs/sources/P09-greenhouse-hosted-form.md`. Greenhouse fill, final action,
 receipt correlation, SDK registration, drift handling and synthetic lifecycle
 tests remain. No private profile or live employer submission has been made.
+An isolated synthetic-data final-click probe on Adyen intercepted every POST;
+only two analytics requests appeared, with no application request or visible
+validation error. Do not infer a working final action from that probe. The
+read-only preparation write barrier is directly browser-tested in `e9038e7`,
+whose CI passed Ubuntu, Windows and PostgreSQL (`36311743031`).
