@@ -114,6 +114,9 @@ for (const engine of ["sqlite", "postgres"] as const) {
           family: "greenhouse",
           openJobs: 51,
           eligibility: { auto_eligible: 1, unassessed: 50 },
+          variants: [
+            { key: "global:synthetic-board", openJobs: 51, eligibility: { auto_eligible: 1 } },
+          ],
           accountNeed: "unknown",
           challengeNeed: "unknown",
           adapterVersion: null,

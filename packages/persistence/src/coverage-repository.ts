@@ -3,7 +3,7 @@ import type {
   PortalCoverageReport,
   PortalCoverageRow,
 } from "../../contracts/src/coverage.js";
-import { normalizedJobSchema, sourceInputSchema } from "../../contracts/src/discovery.js";
+import { sourceInputSchema } from "../../contracts/src/discovery.js";
 import { assessmentSchema, type MatchAssessment } from "../../contracts/src/matching.js";
 import { Repository } from "./repository.js";
 
@@ -86,7 +86,7 @@ export class CoverageRepository extends Repository {
       )[0];
       const activeProfileId = (candidate?.active_profile_id as string | null) ?? null;
       const listings = await tx.query(
-        "SELECT l.job_id,l.source_id,l.data,s.connector,s.policy FROM discovery_listings l JOIN sources s ON s.owner_id=l.owner_id AND s.id=l.source_id WHERE l.owner_id=$1 AND l.state='open' ORDER BY s.connector,l.source_id,l.job_id",
+        "SELECT l.job_id,s.connector,s.policy FROM discovery_listings l JOIN sources s ON s.owner_id=l.owner_id AND s.id=l.source_id WHERE l.owner_id=$1 AND l.state='open' ORDER BY s.connector,l.source_id,l.job_id",
         [this.ownerId],
       );
       const latest = activeProfileId
@@ -101,15 +101,21 @@ export class CoverageRepository extends Repository {
           return [String(row.job_id), assessment.outcome] as const;
         }),
       );
-      const grouped = new Map<Family, { variants: Set<string>; jobs: Map<string, Outcome> }>();
+      const grouped = new Map<
+        Family,
+        { variants: Map<string, Map<string, Outcome>>; jobs: Map<string, Outcome> }
+      >();
       for (const row of listings) {
         const family = sourceInputSchema.shape.connector.parse(row.connector);
         const source = sourceInputSchema.parse(JSON.parse(String(row.policy)));
-        normalizedJobSchema.parse(JSON.parse(String(row.data)));
-        const group = grouped.get(family) ?? { variants: new Set(), jobs: new Map() };
-        group.variants.add(`${source.region}:${source.board}`);
+        const group = grouped.get(family) ?? { variants: new Map(), jobs: new Map() };
+        const variantKey = `${source.region}:${source.board}`;
+        const variantJobs = group.variants.get(variantKey) ?? new Map<string, Outcome>();
         const jobId = String(row.job_id);
-        group.jobs.set(jobId, assessmentByJob.get(jobId) ?? "unassessed");
+        const outcome = assessmentByJob.get(jobId) ?? "unassessed";
+        group.jobs.set(jobId, outcome);
+        variantJobs.set(jobId, outcome);
+        group.variants.set(variantKey, variantJobs);
         grouped.set(family, group);
       }
       const rows = [...grouped.entries()].map(([family, group]): PortalCoverageRow => {
@@ -117,7 +123,17 @@ export class CoverageRepository extends Repository {
         for (const outcome of group.jobs.values()) eligibility[outcome] += 1;
         return {
           family,
-          variants: [...group.variants].sort(),
+          variants: [...group.variants.entries()]
+            .map(([key, jobs]) => {
+              const eligibility = outcomes();
+              for (const outcome of jobs.values()) eligibility[outcome] += 1;
+              return { key, openJobs: jobs.size, eligibility };
+            })
+            .sort(
+              (a, b) =>
+                b.eligibility.auto_eligible - a.eligibility.auto_eligible ||
+                a.key.localeCompare(b.key),
+            ),
           openJobs: group.jobs.size,
           eligibility,
           ...support[family],

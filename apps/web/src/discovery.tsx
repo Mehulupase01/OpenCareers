@@ -721,7 +721,14 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
                           {words(row.support.inspection)} / {words(row.support.commit)} /{" "}
                           {words(row.support.receipt)}
                         </td>
-                        <td>{row.variants.join(", ")}</td>
+                        <td>
+                          {row.variants.map((variant) => (
+                            <span className="coverage-variant" key={variant.key}>
+                              {variant.key}: {variant.eligibility.auto_eligible} eligible /{" "}
+                              {variant.openJobs} open
+                            </span>
+                          ))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

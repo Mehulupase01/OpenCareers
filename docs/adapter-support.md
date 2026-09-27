@@ -1,8 +1,9 @@
 # Adapter Support
 
 The owner workspace exposes a live coverage report under Discovery > Coverage.
-It counts all open persisted jobs per portal family and tenant, joins the latest
-assessment for the active profile, and ranks families by eligible jobs, then
+It counts all open persisted jobs per portal family and tenant, reports each
+tenant's eligible and open counts, joins the latest assessment for the active
+profile, and ranks families by eligible jobs, then
 open jobs and discovery maturity. Unassessed jobs are shown separately. The
 report does not turn a fixture or public read into live submission evidence.
 

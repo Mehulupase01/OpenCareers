@@ -10,7 +10,11 @@ export type CoverageLevel =
 
 export interface PortalCoverageRow {
   family: SourceInput["connector"];
-  variants: string[];
+  variants: Array<{
+    key: string;
+    openJobs: number;
+    eligibility: Record<MatchAssessment["outcome"] | "unassessed", number>;
+  }>;
   openJobs: number;
   eligibility: Record<MatchAssessment["outcome"] | "unassessed", number>;
   accountNeed: "not_required" | "required" | "unknown";

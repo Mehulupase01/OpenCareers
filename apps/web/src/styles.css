@@ -793,6 +793,10 @@ td:last-child {
   font-size: 12px;
   font-weight: 600;
 }
+.coverage-variant {
+  display: block;
+  white-space: nowrap;
+}
 .source-health-list article {
   display: flex;
   justify-content: space-between;
