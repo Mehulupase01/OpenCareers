@@ -5,6 +5,7 @@ import { sourceInputSchema } from "../../../packages/contracts/src/discovery.js"
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { parseHistory } from "../../../packages/discovery/src/history.js";
 import { recognizeUrl } from "../../../packages/discovery/src/normalize.js";
+import { CoverageRepository } from "../../../packages/persistence/src/coverage-repository.js";
 import { DiscoveryRepository } from "../../../packages/persistence/src/discovery-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 
@@ -14,6 +15,8 @@ export async function discoveryRoutes(
   repository: Repository,
 ) {
   const discovery = new DiscoveryRepository(repository.db, repository.ownerId);
+  const coverage = new CoverageRepository(repository.db, repository.ownerId);
+  app.get("/v1/discovery/coverage", () => coverage.report());
   app.get("/v1/discovery", (request) => {
     const query = z
       .object({

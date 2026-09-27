@@ -1,5 +1,11 @@
 # Adapter Support
 
+The owner workspace exposes a live coverage report under Discovery > Coverage.
+It counts all open persisted jobs per portal family and tenant, joins the latest
+assessment for the active profile, and ranks families by eligible jobs, then
+open jobs and discovery maturity. Unassessed jobs are shown separately. The
+report does not turn a fixture or public read into live submission evidence.
+
 | Family | Discovery | Inspect/fill | Commit/receipt | Reconciliation | Live evidence |
 | --- | --- | --- | --- | --- | --- |
 | Owned mock ATS | Fixture-tested P07 | Dry-run-tested P07 | Auto-submit tested P08 | Correlated receipt and recovery tested P08 | Synthetic only |

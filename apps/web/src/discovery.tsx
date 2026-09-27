@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import type { PortalCoverageReport } from "../../../packages/contracts/src/coverage.js";
 import {
   type DiscoveryListing,
   type DiscoverySnapshot,
@@ -495,6 +496,7 @@ function HistoryPanel({
 
 export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
   const [snapshot, setSnapshot] = useState<DiscoverySnapshot | null>(null);
+  const [coverage, setCoverage] = useState<PortalCoverageReport | null>(null);
   const [tab, setTab] = useState("vacancies");
   const [query, setQuery] = useState("");
   const [offset, setOffset] = useState(0);
@@ -503,11 +505,12 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<DiscoveryListing | null>(null);
   const refresh = useCallback(async () => {
-    setSnapshot(
-      await request<DiscoverySnapshot>(
-        `/v1/discovery?offset=${offset}&q=${encodeURIComponent(query)}`,
-      ),
-    );
+    const [nextSnapshot, nextCoverage] = await Promise.all([
+      request<DiscoverySnapshot>(`/v1/discovery?offset=${offset}&q=${encodeURIComponent(query)}`),
+      request<PortalCoverageReport>("/v1/discovery/coverage"),
+    ]);
+    setSnapshot(nextSnapshot);
+    setCoverage(nextCoverage);
   }, [offset, query]);
   useEffect(() => {
     let active = true;
@@ -548,7 +551,7 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
   return (
     <div className="candidate-workspace discovery-workspace">
       <div className="candidate-tabs" role="tablist" aria-label="Discovery views">
-        {["vacancies", "sources", "history", "identity"].map((value) => (
+        {["vacancies", "coverage", "sources", "history", "identity"].map((value) => (
           <button
             type="button"
             role="tab"
@@ -671,6 +674,60 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
                   </button>
                 </div>
               </div>
+            </section>
+          )}
+          {tab === "coverage" && coverage && (
+            <section className="candidate-section coverage-section">
+              <div className="section-toolbar">
+                <h2>Portal coverage</h2>
+                <span className="muted">
+                  {coverage.totals.autoEligible} eligible of {coverage.totals.openJobs} open
+                </span>
+              </div>
+              <p className="coverage-recommendation">
+                Next family: <strong>{coverage.recommendedNextFamily ?? "Awaiting corpus"}</strong>
+                {coverage.activeProfileId ? "" : " | Publish a profile to rank eligibility."}
+              </p>
+              <div className="table-scroll">
+                <table className="coverage-table">
+                  <thead>
+                    <tr>
+                      <th>Family</th>
+                      <th>Open / Eligible</th>
+                      <th>Account / Challenge</th>
+                      <th>Inspect / Commit / Receipt</th>
+                      <th>Variants</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.rows.map((row) => (
+                      <tr key={row.family}>
+                        <td>
+                          <strong>{row.family}</strong>
+                          <span className="company-name">
+                            {row.adapterVersion ?? "No submission adapter"}
+                          </span>
+                        </td>
+                        <td>
+                          {row.openJobs} / {row.eligibility.auto_eligible}
+                          <span className="company-name">
+                            {row.eligibility.unassessed} unassessed
+                          </span>
+                        </td>
+                        <td>
+                          {words(row.accountNeed)} / {words(row.challengeNeed)}
+                        </td>
+                        <td>
+                          {words(row.support.inspection)} / {words(row.support.commit)} /{" "}
+                          {words(row.support.receipt)}
+                        </td>
+                        <td>{row.variants.join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!coverage.rows.length && <div className="empty-state">No open portal coverage</div>}
             </section>
           )}
           {tab === "sources" && (

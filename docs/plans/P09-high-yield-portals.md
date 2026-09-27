@@ -43,6 +43,10 @@ unrelated adapter engineering to continue without relabeling P08 complete.
    vacancy, generated packet and commit target share one external identity.
 4. Build coverage reporting by portal family, variant, account/challenge need,
    eligibility and support status. Use it to choose the second family.
+   Implemented: owner-scoped full-corpus API and Discovery coverage view. Portal
+   account/challenge characteristics remain unknown until each variant is
+   inspected. The current synthetic workspace cannot establish a real-world
+   priority; use an owner profile and current live sources before choosing.
 5. Capture sanitized second-family variants and implement inspect/fill/commit and
    receipt correlation through the SDK. Include validation, drift, response-loss,
    duplicate and challenge fixtures.

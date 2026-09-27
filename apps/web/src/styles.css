@@ -772,6 +772,27 @@ td:last-child {
 .discovery-workspace h2 {
   font-size: 18px;
 }
+.coverage-recommendation {
+  margin: 0 0 18px;
+  color: var(--muted);
+}
+.coverage-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+.coverage-table th,
+.coverage-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 13px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.coverage-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
 .source-health-list article {
   display: flex;
   justify-content: space-between;
