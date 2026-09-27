@@ -24,6 +24,9 @@ test("immutable document packet review and downloads remain inspectable", async 
       return value;
     };
     let candidate = await json("/v1/candidate");
+    const fixturePhone = "+31 20 000 0000";
+    const fixturePortfolio =
+      "https://portfolio.synthetic.example/a-very-long-but-valid-profile-path";
     const identityFact = candidate.facts.find(
       (fact: { value: { kind: string } }) => fact.value.kind === "identity",
     ) as
@@ -31,7 +34,7 @@ test("immutable document packet review and downloads remain inspectable", async 
           id: string;
           key: string;
           revision: number;
-          value: { kind: string; links: string[] };
+          value: { kind: string; phone: string; links: string[] };
           expiresOn: string | null;
         }
       | undefined;
@@ -43,20 +46,21 @@ test("immutable document packet review and downloads remain inspectable", async 
           kind: "identity",
           fullName: "Alex Example",
           email: "alex@synthetic.example",
-          phone: "+31 20 000 0000",
-          links: ["https://portfolio.synthetic.example/alex"],
+          phone: fixturePhone,
+          links: [fixturePortfolio],
         },
         provenance: { kind: "owner", statement: "Synthetic browser packet identity." },
         expiresOn: null,
       });
-    else if (!identityFact.value.links[0]?.startsWith("https://portfolio.synthetic.example/"))
+    else if (!identityFact.value.phone || identityFact.value.links[0] !== fixturePortfolio)
       await json("/v1/candidate/facts", {
         id: identityFact.id,
         expectedRevision: identityFact.revision,
         key: identityFact.key,
         value: {
           ...identityFact.value,
-          links: ["https://portfolio.synthetic.example/alex"],
+          phone: identityFact.value.phone || fixturePhone,
+          links: [fixturePortfolio],
         },
         provenance: { kind: "owner", statement: "Synthetic reviewed portfolio link." },
         expiresOn: identityFact.expiresOn,
@@ -170,6 +174,10 @@ test("immutable document packet review and downloads remain inspectable", async 
   const dryRun = page.getByRole("region", { name: "Mock ATS dry run" });
   await expect(dryRun.getByLabel("Phone", { exact: true })).toHaveValue(result.phone);
   await expect(dryRun.getByLabel("Portfolio", { exact: true })).toHaveValue(result.portfolio);
+  expect(result.phone).not.toBe("");
+  expect(result.portfolio).toBe(
+    "https://portfolio.synthetic.example/a-very-long-but-valid-profile-path",
+  );
   await expect(dryRun.getByLabel("Phone", { exact: true })).toHaveAttribute("readonly");
   await expect(dryRun.getByLabel("Portfolio", { exact: true })).toHaveAttribute("readonly");
   await dryRun.getByRole("combobox", { name: "Country" }).selectOption("NL");

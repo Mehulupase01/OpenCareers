@@ -155,3 +155,7 @@ The first fresh CI for `f416328` still failed the Documents E2E because its
 synthetic profile had no portfolio link. The test setup now records a reviewed
 synthetic link before profile publication; real missing links must be supplied
 through Candidate and a regenerated packet. Fresh CI remains the proof gate.
+CI for `3040007` showed the next missing fixture value: phone was empty, so
+the immutable-input panel correctly disabled preparation. The synthetic
+identity setup now supplies a reviewed phone and the mock form's supported
+portfolio option, with explicit packet-value assertions. Recheck CI.
