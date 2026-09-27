@@ -46,6 +46,10 @@ This dated fingerprint is observation evidence, not a permanent allowlist.
 - Inspect all required fields and conditional controls before final dispatch.
   Unknown required questions, hidden mandatory controls, challenge/login
   prompts, unsupported upload flows and changed fingerprints stop the job.
+- Use the packet's reviewed identity and CV. A two-part full name can be split
+  for first/last fields; other names need explicit approved parts whose joined
+  value matches the reviewed full name. Employer questions need a validated
+  packet answer or explicit approved value.
 - Treat optional demographic answers as absent unless the owner explicitly
   supplies reviewed values. Do not infer sensitive attributes from a CV.
 - Accept only a correlated post-submit receipt from the hosted flow. A banner
