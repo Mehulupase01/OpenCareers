@@ -103,21 +103,27 @@ export function compileLetterProposal(
     throw new DomainError("CLAIM_UNSUPPORTED", "Letter opening changed the bound vacancy.");
   const motivation = proposal.motivation;
   const matchedQuotes = input.assessment.requirements
-    .filter((item) => item.status === "met" && item.span.quote.length >= 4)
+    .filter(
+      (item) =>
+        item.status === "met" &&
+        item.span.quote.length >= 4 &&
+        item.span.quote.length <= 120 &&
+        !/[\r\n<>@]|https?:\/\/|\b(?:ignore|instructions|system|assistant)\b/i.test(
+          item.span.quote,
+        ),
+    )
     .map((item) => item.span.quote);
+  const focus = matchedQuotes.find((quote) => motivation.includes(quote));
+  const outsideFocus = focus ? motivation.replaceAll(focus, " ") : motivation;
   if (
-    !matchedQuotes.some((quote) => motivation.includes(quote)) ||
-    /[\r\n<>]|https?:\/\/|@|\[(?:insert|role|company)|\b(?:I (?:have|built|led|developed|deployed|managed|created|worked)|I've|my|we|expert|experienced|proven|track record|background)\b/i.test(
-      motivation,
+    !focus ||
+    /[\r\n<>]|https?:\/\/|@|\[(?:insert|role|company)/i.test(motivation) ||
+    /\b(?:I (?:have|built|led|developed|deployed|managed|created|worked|shipped|won)|I've|my|we|expert|experienced|proven|track record|background|award.winning|years? of experience|me win)\b/i.test(
+      outsideFocus,
     )
   )
     throw new DomainError("CLAIM_UNSUPPORTED", "Letter motivation contains unsupported claims.");
-  const allowedNumbers = new Set(
-    matchedQuotes.flatMap((quote) => quote.match(/\b\d+(?:[.,]\d+)?\b/g) ?? []),
-  );
-  if (
-    (motivation.match(/\b\d+(?:[.,]\d+)?\b/g) ?? []).some((number) => !allowedNumbers.has(number))
-  )
+  if (/\b\d+(?:[.,]\d+)?\b/.test(outsideFocus))
     throw new DomainError("CLAIM_UNSUPPORTED", "Letter motivation introduced a number.");
   if (
     input.profile.facts.some(

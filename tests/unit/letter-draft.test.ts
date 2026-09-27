@@ -139,6 +139,23 @@ describe("LLM letter proposal boundary", () => {
     ).toThrow("repeats a contribution");
   });
 
+  it.each([
+    ["The role's focus on Python makes this opportunity compelling.", true],
+    ["I am drawn to the role's focus on PostgreSQL and platform services.", true],
+    ["The role's focus on Python is particularly interesting to me.", true],
+    ["The role's focus on Python matches my 10 years of experience.", false],
+    ["As an experienced engineer, I can bring Python expertise.", false],
+    ["The role's focus on Python helped me win awards.", false],
+    ["The role's focus on Python builds on the award-winning platform I shipped.", false],
+    ["The role's focus on Python means I deployed 100 services.", false],
+    ["The role's focus on Python is explained at https://example.com.", false],
+    ["The role's focus on Rust makes this opportunity compelling.", false],
+  ])("evaluates synthetic motivation: %s", (motivation, accepted) => {
+    const compile = () => compileLetterProposal(input, content, { ...proposal, motivation });
+    if (accepted) expect(compile).not.toThrow();
+    else expect(compile).toThrow();
+  });
+
   it("charges one durable reservation and returns validated route evidence", async () => {
     const ledger = {
       snapshot: vi.fn(async () => ({

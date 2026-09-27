@@ -24,8 +24,18 @@ synthetic mock workflow retains deterministic packets.
 Local checks: 24 test files passed, 139 tests passed and 57 PostgreSQL-only
 tests skipped locally; lint, typecheck, production build, public-source scan
 and production dependency audit passed. SQLite integration verifies that a
-deterministic packet is not mistaken for an LLM-ready one. PostgreSQL and
-cross-platform CI are pending for this commit.
+deterministic packet is not mistaken for an LLM-ready one. CI run
+36349393514 passed Windows, Ubuntu and PostgreSQL for this commit.
+
+The follow-up synthetic motivation table checks three ordinary role-focused
+sentences and seven unsafe variants (invented tenure, experience, awards,
+deployment claims, links and unmatched role focus). All ten behaved as
+expected. The compiler isolates the exact matched requirement quote before
+checking surrounding prose for self-claims and numbers, so a number inside
+a verified vacancy quote cannot authorize a new candidate claim. The full
+follow-up local check passed: 149 tests, 57 PostgreSQL-only skipped, lint,
+typecheck and build. Public-source scan and production dependency audit also
+passed. The follow-up commit needs its own CI verification.
 
 Remaining: the configured NVIDIA free route has no matching strict ZDR
 endpoint; the ModelRun/Qwen alternative returned 429 on synthetic probes.
