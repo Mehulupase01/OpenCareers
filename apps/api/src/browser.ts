@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prepareMockPacket } from "../../../packages/browser/src/prepare.js";
+import { prepareRecruiteePacket } from "../../../packages/browser/src/recruitee.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
@@ -31,6 +32,18 @@ const dryRunInput = z
   })
   .strict();
 
+const recruiteeInput = z
+  .object({
+    packetId: idSchema,
+    tenant: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
+    offerSlug: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/),
+    approvedValues: z.record(
+      z.string().min(1).max(120),
+      z.union([z.string().max(8000), z.boolean()]),
+    ),
+  })
+  .strict();
+
 export async function browserRoutes(app: FastifyInstance, config: Config, repository: Repository) {
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
@@ -46,5 +59,16 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const result = await prepareMockPacket(packet, cv.buffer, input.approvedValues, input.fixture);
     return browser.save(result, { queueMockSubmit: true });
+  });
+  app.post("/v1/browser/recruitee/prepare", async (request) => {
+    if (!config.externalSubmissionEnabled || config.profile === "demo")
+      throw new DomainError("UNAUTHORIZED", "External submission is not enabled.");
+    const input = recruiteeInput.parse(request.body);
+    const packet = (await documents.snapshot()).find((item) => item.manifest.id === input.packetId);
+    if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
+    const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
+    const target = { tenant: input.tenant, offerSlug: input.offerSlug };
+    const result = await prepareRecruiteePacket(target, packet, cv.buffer, input.approvedValues);
+    return browser.save(result, { queueRecruiteeSubmit: target });
   });
 }

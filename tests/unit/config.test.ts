@@ -23,6 +23,15 @@ describe("configuration fails closed", () => {
   it("requires private credentials and rejects demo directory overrides", () => {
     expect(() => loadConfig({ AUTOPILOT_PROFILE: "local" })).toThrow();
     expect(() => loadConfig({ AUTOPILOT_DATA_DIR: "D:/somewhere" })).toThrow();
+    expect(() => loadConfig({ AUTOPILOT_EXTERNAL_SUBMISSION: "true" })).toThrow(/Demo/);
+    expect(
+      loadConfig({
+        AUTOPILOT_PROFILE: "local",
+        AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-submit-test"),
+        AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+        AUTOPILOT_EXTERNAL_SUBMISSION: "true",
+      }).externalSubmissionEnabled,
+    ).toBe(true);
   });
   it("blocks synced/private-repo data and unconfigured server origins", () => {
     const privateEnv = { AUTOPILOT_PROFILE: "local", AUTOPILOT_OWNER_TOKEN: "x".repeat(40) };

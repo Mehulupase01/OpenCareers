@@ -34,3 +34,28 @@ POST, upload or submission was made. This exact variant is **unsupported**
 until its substantive answers have reviewed evidence and any verification
 challenge is handled through an allowed path. Inspection alone is not dry-run
 or live submission support.
+
+Recruitee's official Careers Site API is explicitly intended to let candidates
+view jobs and apply. Its documented candidate endpoint accepts multipart identity,
+CV, cover letter and screening answers, returns HTTP 201 with a server-side
+candidate ID, and triggers the same confirmation email as a hosted application.
+The documentation also warns that required screening questions can be omitted by
+an API client, so OpenCareers treats every required published question as mandatory
+and will not exploit that server-side gap. Sources:
+https://docs.recruitee.com/reference/intro-to-careers-site-api
+https://docs.recruitee.com/reference/offersoffer_idcandidates
+
+The public Freeday `software-engineer-3` offer was read through Recruitee's GET
+endpoint on 2026-09-27. It was published and exposed required phone and CV fields,
+an optional cover letter, one Rotterdam location and no custom open questions.
+This established a current read-only adapter fixture; no candidate data, upload or
+POST was sent. The role requires the candidate to be based in the Netherlands and
+work from the Rotterdam office regularly, so it cannot become the live canary until
+the private reviewed profile and standing policy prove those facts. Source:
+https://freeday.recruitee.com/o/software-engineer-3
+
+As of the same check, Recruitee documents a Careers Site token requirement taking
+effect on 10 February 2027. The adapter accepts no arbitrary host or credential and
+does not assume employer-issued access. Token lifecycle support must be added before
+claiming compatibility with a token-protected tenant. Source:
+https://docs.recruitee.com/reference/authentication-1

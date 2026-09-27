@@ -18,6 +18,7 @@ const envSchema = z.object({
   AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: z.string().optional(),
   AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: z.string().optional(),
   AUTOPILOT_INFERENCE_DAILY_LIMIT: z.coerce.number().int().min(1).max(50).default(40),
+  AUTOPILOT_EXTERNAL_SUBMISSION: z.enum(["true", "false"]).default("false"),
 });
 
 export interface Config {
@@ -36,7 +37,7 @@ export interface Config {
     modelAllowlist: string[];
     providerAllowlist: string[];
   };
-  externalSubmissionEnabled: false;
+  externalSubmissionEnabled: boolean;
 }
 
 function list(value: string | undefined, pattern: RegExp, label: string): string[] {
@@ -129,6 +130,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     );
   if (profile === "demo" && e.AUTOPILOT_OPENROUTER_API_KEY)
     throw new DomainError("CONFIG_INVALID", "Demo cannot use an external inference key.");
+  const externalSubmissionEnabled = e.AUTOPILOT_EXTERNAL_SUBMISSION === "true";
+  if (profile === "demo" && externalSubmissionEnabled)
+    throw new DomainError("CONFIG_INVALID", "Demo cannot enable external submissions.");
   if (e.AUTOPILOT_OPENROUTER_API_KEY && (!modelAllowlist.length || !providerAllowlist.length))
     throw new DomainError(
       "MODEL_ROUTE_INELIGIBLE",
@@ -152,6 +156,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
       modelAllowlist,
       providerAllowlist,
     },
-    externalSubmissionEnabled: false,
+    externalSubmissionEnabled,
   };
 }

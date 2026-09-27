@@ -7,6 +7,10 @@ import {
   DefinitiveMockRejection,
 } from "../../../packages/browser/src/commit-mock.js";
 import { observeMockReceipt } from "../../../packages/browser/src/observe-mock.js";
+import {
+  commitRecruiteePacket,
+  RecruiteeDefinitiveRejection,
+} from "../../../packages/browser/src/recruitee.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
 import { DomainError } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
@@ -47,7 +51,11 @@ try {
       await repository.heartbeat(workerId, "scheduler");
       const task = await repository.claim(
         workerId,
-        config.profile === "demo" ? ["demo_probe", "prepare", "submit", "reconcile"] : ["prepare"],
+        config.profile === "demo"
+          ? ["demo_probe", "prepare", "submit", "reconcile"]
+          : config.externalSubmissionEnabled
+            ? ["prepare", "submit", "reconcile"]
+            : ["prepare"],
       );
       if (task) {
         try {
@@ -102,46 +110,89 @@ try {
             );
             if (!packet?.valid || !preparation)
               throw new DomainError("PROFILE_STALE", "Submit task packet or preparation is stale.");
+            if (!(["mock-ats", "recruitee"] as string[]).includes(task.domain))
+              throw new DomainError("ADAPTER_UNSUPPORTED", "Submit adapter is unsupported.");
+            let recruiteeTarget: { tenant: string; offerSlug: string } | null = null;
+            if (task.domain === "recruitee") {
+              const tenant = task.payload.tenant;
+              const offerSlug = task.payload.offerSlug;
+              if (
+                typeof tenant !== "string" ||
+                !/^[a-z0-9][a-z0-9-]{0,62}$/.test(tenant) ||
+                typeof offerSlug !== "string" ||
+                !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/.test(offerSlug)
+              )
+                throw new DomainError("CONFIG_INVALID", "Recruitee target is incomplete.");
+              recruiteeTarget = { tenant, offerSlug };
+            }
             const cv = await documents.artifact(packetId, "cv_pdf", artifacts);
-            const approvedValues = Object.fromEntries(
-              preparation.result.plans.flatMap((plan) =>
-                plan.entries.map((entry) => [entry.semanticKey, entry.expected]),
-              ),
-            );
-            const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
-            try {
-              const app = (
-                await repository.db.query(
-                  "SELECT revision FROM applications WHERE owner_id=$1 AND id=$2",
-                  [repository.ownerId, task.applicationId],
-                )
-              )[0];
-              const handle = await submissions.begin(task, {
-                packetId,
-                preparationId,
-                expectedRevision: Number(app?.revision),
-              });
+            const app = (
+              await repository.db.query(
+                "SELECT revision FROM applications WHERE owner_id=$1 AND id=$2",
+                [repository.ownerId, task.applicationId],
+              )
+            )[0];
+            const handle = await submissions.begin(task, {
+              packetId,
+              preparationId,
+              expectedRevision: Number(app?.revision),
+            });
+            if (task.domain === "mock-ats") {
+              const approvedValues = Object.fromEntries(
+                preparation.result.plans.flatMap((plan) =>
+                  plan.entries.map((entry) => [entry.semanticKey, entry.expected]),
+                ),
+              );
+              const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
               try {
-                const evidence = await commitPreparedMockPacket(
-                  mock,
+                try {
+                  const evidence = await commitPreparedMockPacket(
+                    mock,
+                    packet,
+                    cv.buffer,
+                    approvedValues,
+                    preparation,
+                    () => submissions.authorizeDispatch(task, handle),
+                  );
+                  const receiptId = await submissions.confirmMockReceipt(task, handle, evidence);
+                  logger.info(
+                    { taskId: task.id, applicationId: task.applicationId, receiptId },
+                    "Mock application receipt confirmed",
+                  );
+                } catch (error) {
+                  if (!(error instanceof DefinitiveMockRejection)) throw error;
+                  await submissions.recordDefinitiveMockRejection(task, handle);
+                  logger.info({ taskId: task.id }, "Mock ATS definitively rejected application");
+                }
+              } finally {
+                await mock.app.close();
+              }
+            } else if (task.domain === "recruitee") {
+              if (!recruiteeTarget) throw new Error("Validated Recruitee target is missing.");
+              try {
+                const evidence = await commitRecruiteePacket(
+                  recruiteeTarget,
                   packet,
                   cv.buffer,
-                  approvedValues,
-                  preparation,
+                  preparation.result,
                   () => submissions.authorizeDispatch(task, handle),
                 );
-                const receiptId = await submissions.confirmMockReceipt(task, handle, evidence);
+                const receiptId = await submissions.confirmRecruiteeReceipt(task, handle, evidence);
                 logger.info(
                   { taskId: task.id, applicationId: task.applicationId, receiptId },
-                  "Mock application receipt confirmed",
+                  "Recruitee application receipt confirmed",
                 );
               } catch (error) {
-                if (!(error instanceof DefinitiveMockRejection)) throw error;
-                await submissions.recordDefinitiveMockRejection(task, handle);
-                logger.info({ taskId: task.id }, "Mock ATS definitively rejected application");
+                if (!(error instanceof RecruiteeDefinitiveRejection)) throw error;
+                await submissions.recordDefinitiveRejection(
+                  task,
+                  handle,
+                  "RECRUITEE_VALIDATION_REJECTED",
+                );
+                logger.info({ taskId: task.id }, "Recruitee definitively rejected application");
               }
-            } finally {
-              await mock.app.close();
+            } else {
+              throw new DomainError("ADAPTER_UNSUPPORTED", "Submit adapter is unsupported.");
             }
           }
           if (task.type === "reconcile") {
@@ -157,13 +208,23 @@ try {
               (item) => item.manifest.id === row?.packet_id,
             );
             if (!packet) throw new DomainError("NOT_FOUND", "Reconciliation packet is missing.");
-            const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
-            try {
-              const evidence = await observeMockReceipt(mock, packet);
-              const outcome = await submissions.reconcileMockReceipt(task, evidence);
-              logger.info({ taskId: task.id, outcome }, "Mock submission reconciled");
-            } finally {
-              await mock.app.close();
+            if (task.domain === "mock-ats") {
+              const mock = await startMockAts(join(config.dataDir, "mock-ats-records"));
+              try {
+                const evidence = await observeMockReceipt(mock, packet);
+                const outcome = await submissions.reconcileMockReceipt(task, evidence);
+                logger.info({ taskId: task.id, outcome }, "Mock submission reconciled");
+              } finally {
+                await mock.app.close();
+              }
+            } else if (task.domain === "recruitee") {
+              const outcome = await submissions.reconcileWithoutReceipt(task);
+              logger.info(
+                { taskId: task.id, outcome },
+                "Recruitee outcome requires receipt review",
+              );
+            } else {
+              throw new DomainError("ADAPTER_UNSUPPORTED", "Reconcile adapter is unsupported.");
             }
           }
           await repository.complete(task);

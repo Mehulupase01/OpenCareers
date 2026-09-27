@@ -81,6 +81,21 @@ describe("API trust boundary", () => {
         })
       ).statusCode,
     ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/browser/recruitee/prepare",
+          headers: authenticated,
+          payload: {
+            packetId: "packet-not-configured",
+            tenant: "synthetic",
+            offerSlug: "software-engineer",
+            approvedValues: {},
+          },
+        })
+      ).statusCode,
+    ).toBe(401);
     const payload = Buffer.concat([
       Buffer.from(
         '--synthetic-boundary\r\nContent-Disposition: form-data; name="file"; filename="synthetic.pdf"\r\nContent-Type: application/pdf\r\n\r\n',

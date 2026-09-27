@@ -5,6 +5,8 @@ import { DomainError, type Task } from "../../contracts/src/index.js";
 import {
   type MockReceiptEvidence,
   mockReceiptEvidenceSchema,
+  type RecruiteeReceiptEvidence,
+  recruiteeReceiptEvidenceSchema,
 } from "../../contracts/src/submission.js";
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
@@ -87,6 +89,26 @@ export class SubmissionRepository extends Repository {
       const result = dryRunResultSchema.parse(JSON.parse(String(preparation.result)));
       if (result.status !== "ready" || result.serverApplicationCount !== 0)
         throw new DomainError("FORM_CHANGED", "Browser preparation is not commit-ready.");
+      const mockPreparation = result.snapshots.every((snapshot) => {
+        const url = new URL(snapshot.url);
+        return url.protocol === "http:" && url.hostname === "127.0.0.1";
+      });
+      const recruiteePreparation =
+        result.snapshots.length === 1 &&
+        result.snapshots.every((snapshot) => {
+          const url = new URL(snapshot.url);
+          return (
+            url.protocol === "https:" &&
+            /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(url.hostname) &&
+            /^\/api\/offers\/[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/.test(url.pathname)
+          );
+        });
+      if (
+        (task.domain === "mock-ats" && !mockPreparation) ||
+        (task.domain === "recruitee" && !recruiteePreparation) ||
+        !["mock-ats", "recruitee"].includes(task.domain)
+      )
+        throw new DomainError("FORM_CHANGED", "Task adapter does not match its preparation.");
       const prior = await tx.query(
         "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
         [this.ownerId, applicationId],
@@ -106,6 +128,7 @@ export class SubmissionRepository extends Repository {
         throw new DomainError("POLICY_REVOKED", "Packet authorization revision changed.");
       const snapshot = {
         applicationId,
+        adapter: task.domain,
         jobId: manifest.jobId,
         packetId: manifest.id,
         packetArtifacts: manifest.artifacts.map((artifact) => ({
@@ -114,6 +137,7 @@ export class SubmissionRepository extends Repository {
         })),
         preparationId: input.preparationId,
         formFingerprints: result.snapshots.map((item) => item.fingerprint),
+        formUrls: result.snapshots.map((item) => item.url),
         authorizationId: policy.id,
         authorizationRevision: policy.revision,
         profileId: manifest.profileId,
@@ -294,6 +318,96 @@ export class SubmissionRepository extends Repository {
   }
 
   async recordDefinitiveMockRejection(task: Task, handle: CommitHandle): Promise<void> {
+    return this.recordDefinitiveRejection(task, handle, "MOCK_VALIDATION_REJECTED");
+  }
+
+  async confirmRecruiteeReceipt(
+    task: Task,
+    handle: CommitHandle,
+    evidenceInput: RecruiteeReceiptEvidence,
+  ): Promise<string> {
+    const evidence = recruiteeReceiptEvidenceSchema.parse(evidenceInput);
+    if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
+      throw new DomainError("LEASE_STALE", "Receipt handle does not match the leased task.");
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task);
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256,c.content FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4",
+          [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.attempt_state !== "IN_FLIGHT" ||
+        !row.dispatch_started_at
+      )
+        throw new DomainError("STATE_INVALID", "A dispatched in-flight attempt is required.");
+      if (Number(row.commit_fence) !== handle.fence)
+        throw new DomainError("LEASE_STALE", "Commit fence changed before receipt confirmation.");
+      const snapshot = JSON.parse(String(row.snapshot)) as {
+        jobId: string;
+        formUrls: string[];
+      };
+      const content = packetContentSchema.parse(JSON.parse(String(row.content)));
+      const responseUrl = new URL(evidence.responseUrl);
+      const expectedOfferUrl = `https://${evidence.tenant}.recruitee.com/api/offers/${encodeURIComponent(evidence.offerSlug)}`;
+      if (
+        digest(snapshot) !== row.sha256 ||
+        evidence.jobId !== snapshot.jobId ||
+        content.job.id !== evidence.jobId ||
+        evidence.emailHash !== digestEmail(content.cv.identity.email) ||
+        !snapshot.formUrls?.includes(expectedOfferUrl) ||
+        responseUrl.protocol !== "https:" ||
+        responseUrl.hostname !== `${evidence.tenant}.recruitee.com` ||
+        responseUrl.pathname !== `/api/offers/${evidence.offerSlug}/candidates` ||
+        responseUrl.search !== "?async=true"
+      )
+        throw new DomainError(
+          "RECEIPT_UNCORRELATED",
+          "Recruitee receipt does not match the intent and packet.",
+        );
+      assertTransition("IN_FLIGHT", "CONFIRMED");
+      const receiptId = randomUUID();
+      await tx.query(
+        "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          receiptId,
+          this.ownerId,
+          handle.applicationId,
+          handle.attemptId,
+          JSON.stringify(evidence),
+          digest(evidence),
+          this.now(),
+        ],
+      );
+      await tx.query(
+        "UPDATE attempts SET state='CONFIRMED',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT'",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      const updated = await tx.query(
+        "UPDATE applications SET state='CONFIRMED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND commit_fence=$4 RETURNING revision",
+        [this.now(), this.ownerId, handle.applicationId, handle.fence],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed before confirmation.");
+      await this.audit(
+        tx,
+        handle.applicationId,
+        "submission.confirmed",
+        Number(updated[0].revision),
+        { receiptId, provider: "recruitee", externalCandidateId: evidence.candidateId },
+      );
+      return receiptId;
+    });
+  }
+
+  async recordDefinitiveRejection(
+    task: Task,
+    handle: CommitHandle,
+    reason: "MOCK_VALIDATION_REJECTED" | "RECRUITEE_VALIDATION_REJECTED",
+  ): Promise<void> {
     if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
       throw new DomainError("LEASE_STALE", "Rejection handle does not match the leased task.");
     await this.db.transaction(async (tx) => {
@@ -329,7 +443,7 @@ export class SubmissionRepository extends Repository {
         "submission.definitive_failure",
         Number(updated[0].revision),
         {
-          reason: "MOCK_VALIDATION_REJECTED",
+          reason,
         },
       );
     });
@@ -399,6 +513,12 @@ export class SubmissionRepository extends Repository {
       });
       return evidence ? "confirmed" : "needs_review";
     });
+  }
+
+  async reconcileWithoutReceipt(task: Task): Promise<"needs_review"> {
+    const outcome = await this.reconcileMockReceipt(task, null);
+    if (outcome !== "needs_review") throw new Error("Receipt-free reconciliation was confirmed.");
+    return outcome;
   }
 }
 

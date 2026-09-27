@@ -15,8 +15,13 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
 export class BrowserRepository extends Repository {
   async save(
     resultInput: DryRunResult,
-    options: { queueMockSubmit?: boolean } = {},
+    options: {
+      queueMockSubmit?: boolean;
+      queueRecruiteeSubmit?: { tenant: string; offerSlug: string };
+    } = {},
   ): Promise<BrowserPreparation> {
+    if (options.queueMockSubmit && options.queueRecruiteeSubmit)
+      throw new DomainError("CONFIG_INVALID", "A preparation can queue only one adapter.");
     const result = dryRunResultSchema.parse(resultInput);
     const ready = result.status === "ready";
     const completeReadBack = result.snapshots.every((snapshot, index) => {
@@ -43,16 +48,37 @@ export class BrowserRepository extends Repository {
         );
       });
     });
+    const mockShape =
+      result.snapshots.length === 2 &&
+      result.snapshots.every((snapshot) => {
+        const url = new URL(snapshot.url);
+        return (
+          url.protocol === "http:" && url.hostname === "127.0.0.1" && snapshot.origin === url.origin
+        );
+      }) &&
+      result.reports[0]?.uploadStatus === "accepted";
+    const recruiteeShape =
+      result.snapshots.length === 1 &&
+      result.snapshots.every((snapshot) => {
+        const url = new URL(snapshot.url);
+        return (
+          url.protocol === "https:" &&
+          /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(url.hostname) &&
+          /^\/api\/offers\/[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/.test(url.pathname) &&
+          snapshot.origin === url.origin
+        );
+      }) &&
+      result.reports[0]?.uploadStatus ===
+        (result.snapshots[0]?.fields.some((field) => field.name === "cv") ? "selected" : "idle");
     if (
       result.serverApplicationCount !== 0 ||
       (ready &&
-        (result.snapshots.length !== 2 ||
-          result.plans.length !== 2 ||
-          result.reports.length !== 2 ||
+        ((!mockShape && !recruiteeShape) ||
+          result.plans.length !== result.snapshots.length ||
+          result.reports.length !== result.snapshots.length ||
           !completeReadBack ||
           result.reports.some((report) => report.status !== "ready") ||
           result.reports.some((report) => report.readBack.some((field) => !field.matches)) ||
-          result.reports[0]?.uploadStatus !== "accepted" ||
           result.issues.length > 0))
     )
       throw new DomainError(
@@ -138,6 +164,22 @@ export class BrowserRepository extends Repository {
           domain: "mock-ats",
           applicationId: result.applicationId,
           payload: { schemaVersion: 1, packetId: result.packetId, preparationId: id },
+          priority: 50,
+          maxAttempts: 1,
+        });
+      if (ready && options.queueRecruiteeSubmit)
+        await this.enqueueIn(tx, {
+          type: "submit",
+          dedupeKey: `recruitee-submit:${id}`,
+          domain: "recruitee",
+          applicationId: result.applicationId,
+          payload: {
+            schemaVersion: 1,
+            packetId: result.packetId,
+            preparationId: id,
+            tenant: options.queueRecruiteeSubmit.tenant,
+            offerSlug: options.queueRecruiteeSubmit.offerSlug,
+          },
           priority: 50,
           maxAttempts: 1,
         });

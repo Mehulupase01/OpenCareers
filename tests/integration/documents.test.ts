@@ -328,6 +328,28 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const repeated = await browser.save(result);
         expect(repeated.status).toBe("ready");
         expect(await browser.snapshot()).toHaveLength(2);
+        const recruitee = structuredClone(result);
+        recruitee.snapshots = [recruitee.snapshots[0] as (typeof recruitee.snapshots)[number]];
+        recruitee.plans = [recruitee.plans[0] as (typeof recruitee.plans)[number]];
+        recruitee.reports = [recruitee.reports[0] as (typeof recruitee.reports)[number]];
+        const recruiteeSnapshot = recruitee.snapshots[0];
+        const recruiteeReport = recruitee.reports[0];
+        if (!recruiteeSnapshot || !recruiteeReport)
+          throw new Error("Expected a Recruitee preparation step.");
+        recruiteeSnapshot.url = "https://synthetic.recruitee.com/api/offers/software-engineer";
+        recruiteeSnapshot.origin = "https://synthetic.recruitee.com";
+        recruiteeReport.snapshot = recruiteeSnapshot;
+        recruiteeReport.uploadStatus = "selected";
+        expect(
+          (
+            await browser.save(recruitee, {
+              queueRecruiteeSubmit: {
+                tenant: "synthetic",
+                offerSlug: "software-engineer",
+              },
+            })
+          ).status,
+        ).toBe("ready");
         const challenge = structuredClone(result);
         challenge.status = "challenge";
         const firstReport = challenge.reports[0];
@@ -345,6 +367,17 @@ for (const engine of ["sqlite", "postgres"] as const) {
           ]),
         ).toEqual([{ state: "CHALLENGE_REQUIRED" }]);
         expect((await browser.save(result)).status).toBe("ready");
+        const queued = (
+          await db.query(
+            "SELECT domain,payload,state FROM tasks WHERE owner_id=$1 AND type='submit'",
+            [owner],
+          )
+        )[0];
+        expect(queued).toMatchObject({ domain: "recruitee", state: "ready" });
+        expect(JSON.parse(String(queued?.payload))).toMatchObject({
+          tenant: "synthetic",
+          offerSlug: "software-engineer",
+        });
       });
 
       it("records intent before a single-use fenced dispatch", async () => {
@@ -443,6 +476,110 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ]),
         ).toEqual([{ id: receiptId }]);
+        await queue.complete(task);
+      });
+
+      it("correlates a Recruitee candidate receipt to its prepared offer", async () => {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const result = readyBrowserResult(packet);
+        result.snapshots = [result.snapshots[0] as (typeof result.snapshots)[number]];
+        result.plans = [result.plans[0] as (typeof result.plans)[number]];
+        result.reports = [result.reports[0] as (typeof result.reports)[number]];
+        const snapshot = result.snapshots[0];
+        const report = result.reports[0];
+        if (!snapshot || !report) throw new Error("Expected a Recruitee preparation step.");
+        snapshot.url = "https://synthetic.recruitee.com/api/offers/software-engineer";
+        snapshot.origin = "https://synthetic.recruitee.com";
+        report.snapshot = snapshot;
+        report.uploadStatus = "selected";
+        const preparation = await new BrowserRepository(db, owner, clock).save(result);
+        await queue.enqueue({
+          type: "submit",
+          dedupeKey: `submit:${packet.manifest.applicationId}`,
+          applicationId: packet.manifest.applicationId,
+          domain: "recruitee",
+        });
+        const task = await queue.claim("synthetic-worker", ["submit"]);
+        if (!task) throw new Error("Expected a leased submit task.");
+        const app = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ])
+        )[0];
+        const submissions = new SubmissionRepository(db, owner, clock);
+        await expect(
+          submissions.begin(
+            { ...task, domain: "mock-ats" },
+            {
+              packetId: packet.manifest.id,
+              preparationId: preparation.id,
+              expectedRevision: Number(app?.revision),
+            },
+          ),
+        ).rejects.toMatchObject({ code: "FORM_CHANGED" });
+        const handle = await submissions.begin(task, {
+          packetId: packet.manifest.id,
+          preparationId: preparation.id,
+          expectedRevision: Number(app?.revision),
+        });
+        await submissions.authorizeDispatch(task, handle);
+        const evidence = {
+          kind: "recruitee" as const,
+          candidateId: 8123,
+          tenant: "synthetic",
+          offerSlug: "software-engineer",
+          jobId: packet.manifest.jobId,
+          responseUrl:
+            "https://synthetic.recruitee.com/api/offers/software-engineer/candidates?async=true",
+          receivedAt: clock().toISOString(),
+          emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+        };
+        await expect(
+          submissions.confirmRecruiteeReceipt(task, handle, {
+            ...evidence,
+            offerSlug: "different-offer",
+          }),
+        ).rejects.toMatchObject({ code: "RECEIPT_UNCORRELATED" });
+        const receiptId = await submissions.confirmRecruiteeReceipt(task, handle, evidence);
+        expect(receiptId).toBeTruthy();
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "CONFIRMED" }]);
+        expect(
+          await db.query("SELECT evidence FROM receipts WHERE owner_id=$1 AND id=$2", [
+            owner,
+            receiptId,
+          ]),
+        ).toEqual([{ evidence: JSON.stringify(evidence) }]);
         await queue.complete(task);
       });
 
