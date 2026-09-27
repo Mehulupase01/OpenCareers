@@ -151,3 +151,7 @@ CI for the preceding planner-guard commit failed its Documents E2E: that panel
 still offered editable packet-backed phone and portfolio values. The panel now
 displays those reviewed values read-only and sends only supplementary answers;
 the E2E asserts the packet values. Re-run full CI before calling this repaired.
+The first fresh CI for `f416328` still failed the Documents E2E because its
+synthetic profile had no portfolio link. The test setup now records a reviewed
+synthetic link before profile publication; real missing links must be supplied
+through Candidate and a regenerated packet. Fresh CI remains the proof gate.

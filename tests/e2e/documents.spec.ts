@@ -24,9 +24,18 @@ test("immutable document packet review and downloads remain inspectable", async 
       return value;
     };
     let candidate = await json("/v1/candidate");
-    if (
-      !candidate.facts.some((fact: { value: { kind: string } }) => fact.value.kind === "identity")
-    )
+    const identityFact = candidate.facts.find(
+      (fact: { value: { kind: string } }) => fact.value.kind === "identity",
+    ) as
+      | {
+          id: string;
+          key: string;
+          revision: number;
+          value: { kind: string; links: string[] };
+          expiresOn: string | null;
+        }
+      | undefined;
+    if (!identityFact)
       await json("/v1/candidate/facts", {
         expectedRevision: 0,
         key: `identity.documents.${projectName}`,
@@ -39,6 +48,18 @@ test("immutable document packet review and downloads remain inspectable", async 
         },
         provenance: { kind: "owner", statement: "Synthetic browser packet identity." },
         expiresOn: null,
+      });
+    else if (!identityFact.value.links[0]?.startsWith("https://portfolio.synthetic.example/"))
+      await json("/v1/candidate/facts", {
+        id: identityFact.id,
+        expectedRevision: identityFact.revision,
+        key: identityFact.key,
+        value: {
+          ...identityFact.value,
+          links: ["https://portfolio.synthetic.example/alex"],
+        },
+        provenance: { kind: "owner", statement: "Synthetic reviewed portfolio link." },
+        expiresOn: identityFact.expiresOn,
       });
     await json("/v1/candidate/facts", {
       expectedRevision: 0,
@@ -117,7 +138,7 @@ test("immutable document packet review and downloads remain inspectable", async 
       title: listing.job.title as string,
       authorization: authorization.id as string,
       phone: packet.content.cv.identity.phone as string,
-      portfolio: packet.content.cv.identity.links[0] as string,
+      portfolio: (packet.content.cv.identity.links[0] ?? "") as string,
     };
   }, info.project.name);
   expect(result.authorization).toBeTruthy();
