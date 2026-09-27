@@ -24,7 +24,7 @@
     "api": "tsx apps/api/src/main.ts",
     "worker": "tsx apps/worker/src/main.ts",
     "start": "node dist/apps/api/src/main.js",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
