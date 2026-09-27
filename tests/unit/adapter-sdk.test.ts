@@ -45,6 +45,20 @@ afterAll(async () => {
 });
 
 describe("submission adapter SDK", () => {
+  it("rejects caller overrides of packet-backed fields before dispatch", async () => {
+    const adapter = createAdapterRegistry(root).get("mock-ats");
+    for (const key of ["full_name", "email", "phone", "motivation", "portfolio", "cv"]) {
+      await expect(
+        adapter.prepare({
+          packet,
+          cvPdf,
+          target: { fixture: "standard" },
+          approvedValues: { [key]: "unreviewed replacement" },
+        }),
+      ).rejects.toThrow(`packet-backed field: ${key}`);
+    }
+  });
+
   it("runs mock ATS through the common prepare and commit contract", async () => {
     const registry = createAdapterRegistry(root);
     expect(registry.support()).toEqual([

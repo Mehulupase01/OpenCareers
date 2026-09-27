@@ -86,6 +86,12 @@ describe("Greenhouse hosted form inspection", () => {
     expect(() =>
       planGreenhouseFields(snapshot, packet, { first_name: "Wrong", last_name: "Name" }),
     ).toThrow("must match");
+    expect(() => planGreenhouseFields(snapshot, packet, { email: "other@example.org" })).toThrow(
+      "packet-backed field: email",
+    );
+    expect(() => planGreenhouseFields(snapshot, packet, { cv: "other.pdf" })).toThrow(
+      "packet-backed field: cv",
+    );
   });
 
   it("keeps read-only preparation blocked until questions are resolved", async () => {

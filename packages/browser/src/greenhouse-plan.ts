@@ -34,6 +34,7 @@ export function planGreenhouseFields(
     phone: { value: identity.phone, evidence: identity.evidence.map((fact) => fact.factId) },
     cv: { value: cv.filename, evidence: [cv.sha256] },
   };
+  const packetBackedKeys = new Set(["email", "phone", "cv"]);
   if (typeof firstName === "string" && typeof lastName === "string") {
     mapped.first_name = {
       value: firstName,
@@ -45,6 +46,11 @@ export function planGreenhouseFields(
     mapped.last_name = { value: names[1], evidence: identity.evidence.map((fact) => fact.factId) };
   }
   for (const answer of packet.content.answers) {
+    if (
+      packetBackedKeys.has(answer.semanticKey) ||
+      ["first_name", "last_name"].includes(answer.semanticKey)
+    )
+      throw new Error(`Answer conflicts with packet-backed field: ${answer.semanticKey}`);
     if (answer.status !== "deferred" && answer.answer !== null)
       mapped[answer.semanticKey] = {
         value: String(answer.answer),
@@ -53,6 +59,11 @@ export function planGreenhouseFields(
   }
   for (const [key, value] of Object.entries(approvedValues)) {
     if (key === "first_name" || key === "last_name") continue;
+    if (packetBackedKeys.has(key)) {
+      if (mapped[key]?.value !== value)
+        throw new Error(`Approved value conflicts with packet-backed field: ${key}`);
+      continue;
+    }
     mapped[key] = { value, evidence: [] };
   }
   const entries: FieldPlan["entries"] = [];

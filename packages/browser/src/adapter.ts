@@ -135,14 +135,31 @@ export function planFields(
     },
     ...(cv ? { cv: { value: cv.filename, evidence: [cv.sha256] } } : {}),
   };
+  const packetBackedKeys = new Set([
+    "full_name",
+    "email",
+    "phone",
+    "motivation",
+    "portfolio",
+    "cv",
+  ]);
   for (const answer of packet.content.answers) {
+    if (packetBackedKeys.has(answer.semanticKey))
+      throw new Error(`Answer conflicts with packet-backed field: ${answer.semanticKey}`);
     if (answer.status !== "deferred" && answer.answer !== null)
       known[answer.semanticKey] = {
         value: String(answer.answer),
         evidence: answer.evidence.map((fact) => fact.factId),
       };
   }
-  for (const [key, value] of Object.entries(approvedValues)) known[key] = { value, evidence: [] };
+  for (const [key, value] of Object.entries(approvedValues)) {
+    if (packetBackedKeys.has(key)) {
+      if (known[key]?.value !== value)
+        throw new Error(`Approved value conflicts with packet-backed field: ${key}`);
+      continue;
+    }
+    known[key] = { value, evidence: [] };
+  }
   const entries: FieldPlan["entries"] = [];
   const unresolved: string[] = [];
   for (const field of snapshot.fields) {

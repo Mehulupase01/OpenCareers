@@ -135,3 +135,9 @@ the inspector now classifies it as `challenge`. Read-only preparation cannot
 claim READY from an answer-complete form until upload and receipt handling
 exist. This variant needs the scoped P10 challenge handoff, not automated
 challenge solving. No employer-facing POST was sent.
+
+P09 planner hardening: mock/Recruitee and provisional Greenhouse preparation
+now reject changed caller values for packet-backed identity, CV and related
+fields. Exact internal replay retains packet evidence. Focused tests and the
+full check passed (121 tests; 55 database-dependent tests skipped locally).
+The second-family commit/receipt gates remain open.
