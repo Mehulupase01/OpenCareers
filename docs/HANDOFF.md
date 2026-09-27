@@ -145,17 +145,10 @@ The second-family commit/receipt gates remain open.
 P09 coverage now includes a dated variant-level support matrix in the API and
 Discovery view, separate from owner-corpus counts. It distinguishes synthetic
 mock and Recruitee lifecycle evidence from public-read-only challenged Adyen
-Greenhouse and Protolabs Lever forms. SQLite coverage and desktop/mobile
-Discovery tests pass. This does not complete P09-G2/G6 or authorize a live POST.
-CI for the preceding planner-guard commit failed its Documents E2E: that panel
-still offered editable packet-backed phone and portfolio values. The panel now
-displays those reviewed values read-only and sends only supplementary answers;
-the E2E asserts the packet values. Re-run full CI before calling this repaired.
-The first fresh CI for `f416328` still failed the Documents E2E because its
-synthetic profile had no portfolio link. The test setup now records a reviewed
-synthetic link before profile publication; real missing links must be supplied
-through Candidate and a regenerated packet. Fresh CI remains the proof gate.
-CI for `3040007` showed the next missing fixture value: phone was empty, so
-the immutable-input panel correctly disabled preparation. The synthetic
-identity setup now supplies a reviewed phone and the mock form's supported
-portfolio option, with explicit packet-value assertions. Recheck CI.
+Greenhouse and Protolabs Lever forms. The mock dry-run panel now displays
+packet-backed phone and portfolio read-only and sends only supplementary
+answers. Its synthetic E2E fixture supplies reviewed required identity values;
+real missing values need a Candidate update and regenerated packet. Full CI
+`36327443129` passed Windows, Ubuntu and PostgreSQL at `b2de20c`. See
+`docs/evidence/P09-coverage-verification.md`. P09-G5 reporting is complete;
+P09-G2/G6 and private live submission remain open.
