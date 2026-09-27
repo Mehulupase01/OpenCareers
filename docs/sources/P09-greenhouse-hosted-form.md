@@ -69,3 +69,23 @@ correlated receipt handling are implemented and verified.
 - Use synthetic fixtures for final-action and response-loss tests. Public
   inspection remains read-only until the private profile, policy and job are
   ready for a real submission.
+
+## Inspection And Receipt Limits
+
+The browser fixture now treats an invisible required conditional control as an
+unsupported form and includes its identity in the structural fingerprint. A
+later form inspection cannot silently equate that structure with a prior
+visible-only preparation. This is a conservative stop; it does not establish
+that the hosted upload or final submission path works.
+
+Greenhouse [allows each employer to customize the application confirmation
+page](https://support.greenhouse.io/hc/en-us/articles/115005516483-Edit-application-confirmation-page).
+Its visible text alone is therefore not a portable, correlated receipt. The
+Greenhouse adapter must remain provisional until a variant-specific receipt
+can be tied to the exact posting and candidate without relying on a banner.
+
+The synthetic preparation fixture now fills only a matching, challenge-free
+form under the read-only write barrier. It reads each field back, checks the
+selected CV bytes against the packet hash, and reports page-side mutation or
+file rejection. Selection is not server upload acceptance. Even a clean fill
+remains `unsupported`, and no Greenhouse submit task is queued.

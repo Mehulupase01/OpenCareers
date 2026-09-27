@@ -137,6 +137,33 @@ describe("Greenhouse hosted form inspection", () => {
     }
   });
 
+  it("blocks an invisible mandatory conditional field and fingerprints its presence", async () => {
+    const before = await inspectGreenhouseForm(page, target);
+    await page.evaluate(() => {
+      const label = document.createElement("label");
+      label.htmlFor = "question_456";
+      label.textContent = "Conditional work authorization*";
+      const input = document.createElement("input");
+      input.id = "question_456";
+      input.style.display = "none";
+      document.querySelector("form")?.append(label, input);
+    });
+    const after = await inspectGreenhouseForm(page, target);
+    expect(after.blocker).toBe("unsupported");
+    expect(after.fingerprint).not.toBe(before.fingerprint);
+    expect(after.fields.some((field) => field.name === "question_456")).toBe(false);
+    expect(
+      greenhousePreparationResult(
+        target,
+        packet,
+        cvPdf,
+        { question_123: "Synthetic reviewed answer." },
+        after,
+        0,
+      ).status,
+    ).toBe("unsupported");
+  });
+
   it("reports challenge scripts before preparation", async () => {
     await page.evaluate(() => {
       const challenge = document.createElement("script");

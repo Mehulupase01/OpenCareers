@@ -164,3 +164,12 @@ post-permit refusal. Local `pnpm check` passed (122 tests, 56 skipped). Full CI
 `36329334882` passed Windows, Ubuntu and PostgreSQL at `a2f755d`. P09-G3/G4
 are complete for the registered adapters. Exact drift details are not yet
 surfaced in the operations UI.
+
+P09 Greenhouse inspection/fill checkpoint: invisible mandatory controls now
+block the provisional variant and affect its fingerprint. A synthetic
+challenge-free form is filled under the GET-only barrier with exact-plan
+read-back and packet-CV byte verification; page-side value changes, CV
+selection failure and attempted writes are tested. The adapter still returns
+`unsupported` after a clean fill because upload acceptance and correlated
+receipt are unimplemented. Local `pnpm check` passed with 128 tests and 56
+PostgreSQL-dependent tests skipped. P09-G1/G2/G6 remain open; no live POST.

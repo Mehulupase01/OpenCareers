@@ -40,14 +40,26 @@ export async function inspectGreenhouseForm(
     if (forms.length !== 1) throw new Error("Expected one Greenhouse application form.");
     const form = forms[0];
     if (!form) throw new Error("Greenhouse application form is missing.");
-    const controls = [
+    const allControls = [
       ...form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
         "input,textarea,select",
       ),
-    ].filter((field) => {
-      if (field instanceof HTMLInputElement && field.type === "hidden") return false;
-      return field.getClientRects().length > 0;
-    });
+    ].filter((field) => !(field instanceof HTMLInputElement && field.type === "hidden"));
+    const required = (field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
+      const label = (field.labels?.[0]?.textContent ?? field.getAttribute("aria-label") ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return (
+        field.required ||
+        field.getAttribute("aria-required") === "true" ||
+        ["first_name", "last_name", "email", "resume"].includes(field.id) ||
+        /\*\s*$/.test(label)
+      );
+    };
+    const hiddenRequired = allControls
+      .filter((field) => field.getClientRects().length === 0 && required(field))
+      .map((field) => field.id || field.getAttribute("name") || "unnamed");
+    const controls = allControls.filter((field) => field.getClientRects().length > 0);
     const fields = controls.map((field) => {
       const label = (field.labels?.[0]?.textContent ?? field.getAttribute("aria-label") ?? "")
         .replace(/\s+/g, " ")
@@ -62,11 +74,7 @@ export async function inspectGreenhouseForm(
         kind: ["text", "email", "tel", "textarea", "select", "file", "checkbox"].includes(type)
           ? type
           : "unsupported",
-        required:
-          field.required ||
-          field.getAttribute("aria-required") === "true" ||
-          ["first_name", "last_name", "email", "resume"].includes(field.id) ||
-          /\*\s*$/.test(label),
+        required: required(field),
         maxLength:
           field instanceof HTMLSelectElement || field.maxLength <= 0 ? null : field.maxLength,
         options:
@@ -82,11 +90,14 @@ export async function inspectGreenhouseForm(
     );
     return {
       fields,
+      hiddenRequired,
       blocker: challenge
         ? "challenge"
         : form.querySelector('input[type="password"]')
           ? "login"
-          : "none",
+          : hiddenRequired.length
+            ? "unsupported"
+            : "none",
     };
   });
   const fields = raw.fields as FormField[];
@@ -104,9 +115,13 @@ export async function inspectGreenhouseForm(
     jobId: target.postingId,
     step: 1,
     fields,
+    hiddenRequired: raw.hiddenRequired,
   };
   return formSnapshotSchema.parse({
-    ...structure,
+    origin: structure.origin,
+    jobId: structure.jobId,
+    step: structure.step,
+    fields: structure.fields,
     url: actual.toString(),
     fingerprint: createHash("sha256").update(JSON.stringify(structure)).digest("hex"),
     blocker: raw.blocker,
