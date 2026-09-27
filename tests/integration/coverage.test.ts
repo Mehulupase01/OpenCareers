@@ -67,7 +67,9 @@ for (const engine of ["sqlite", "postgres"] as const) {
           source,
           await pollSource(source, async () => ({
             status: 200,
-            body: JSON.stringify(greenhouseFixture(Array.from({ length: 51 }, (_, index) => index + 1))),
+            body: JSON.stringify(
+              greenhouseFixture(Array.from({ length: 51 }, (_, index) => index + 1)),
+            ),
             etag: '"coverage"',
             retryAfter: null,
           })),
