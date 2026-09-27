@@ -668,7 +668,7 @@
     {
       "id": "P09",
       "title": "High-yield portal coverage",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P08"],
       "tickets": [
         [
