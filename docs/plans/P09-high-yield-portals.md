@@ -47,6 +47,8 @@ unrelated adapter engineering to continue without relabeling P08 complete.
    account/challenge characteristics remain unknown until each variant is
    inspected. The current synthetic workspace cannot establish a real-world
    priority; use an owner profile and current live sources before choosing.
+   Greenhouse hosted external forms are the provisional second family based on
+   [read-only variant research](../sources/P09-greenhouse-hosted-form.md).
 5. Capture sanitized second-family variants and implement inspect/fill/commit and
    receipt correlation through the SDK. Include validation, drift, response-loss,
    duplicate and challenge fixtures.
