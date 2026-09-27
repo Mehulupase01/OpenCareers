@@ -200,3 +200,10 @@ ModelRun/Qwen endpoint advertises `structured_outputs`; the policy accepts
 that documented capability without requiring an additional catalogue label.
 Synthetic-only probes returned 429, so no real candidate inference was sent.
 See `docs/evidence/P05-openrouter-live-route.md` for the route limits.
+
+Seventeen exact-source draft facts for skills, languages and education were
+created in the private local database. They remain `extracted`, not reviewed;
+employment workload, composite identity and visa terms were not inferred.
+Matching now withholds work-authorization as well as identity from OpenRouter
+and validates proposals against the reduced fact set. Local deterministic
+authorization gates remain active. No live candidate request has been sent.

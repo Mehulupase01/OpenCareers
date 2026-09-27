@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MatchingInput } from "../../packages/contracts/src/matching.js";
-import { buildRequest, parseStructured } from "../../packages/inference/src/gateway.js";
+import {
+  buildRequest,
+  inferenceFacts,
+  parseStructured,
+} from "../../packages/inference/src/gateway.js";
 import { OpenRouterTransport } from "../../packages/inference/src/transport.js";
 import { matchingEvaluationCases } from "../fixtures/matching-evaluation.js";
 
@@ -18,6 +22,12 @@ describe("bounded inference gateway", () => {
     expect(request).not.toHaveProperty("tools");
     expect(JSON.stringify(request)).not.toContain("apiKey");
     expect(JSON.stringify(request)).not.toContain("identity");
+    expect(JSON.stringify(request)).not.toContain("work_authorization");
+    expect(JSON.stringify(request)).not.toContain("future sponsorship");
+    expect(inferenceFacts(input.facts).map((fact) => fact.value.kind)).toEqual([
+      "skill",
+      "language",
+    ]);
   });
 
   it("permits one syntax-only envelope repair and rejects invalid output", () => {

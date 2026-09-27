@@ -30,6 +30,9 @@ export interface InferenceTransport {
   complete(request: CompletionRequest): Promise<CompletionResponse>;
 }
 
+export const inferenceFacts = (facts: CandidateFact[]) =>
+  facts.filter((fact) => !["identity", "work_authorization"].includes(fact.value.kind));
+
 function factSummary(fact: CandidateFact): string {
   switch (fact.value.kind) {
     case "skill":
@@ -44,12 +47,11 @@ function factSummary(fact: CandidateFact): string {
       return `${fact.value.name}; ${fact.value.description}`;
     case "metric":
       return `${fact.value.statement}; ${fact.value.value} ${fact.value.unit}; ${fact.value.context}`;
-    case "work_authorization":
-      return `${fact.value.country}; current ${fact.value.currentlyAuthorized}; future sponsorship ${fact.value.futureSponsorship}`;
     case "availability":
       return `earliest ${fact.value.earliestDate ?? "unknown"}; notice ${fact.value.noticeDays ?? "unknown"} days`;
     case "identity":
-      return "Identity fact withheld from matching inference.";
+    case "work_authorization":
+      throw new Error("Private policy facts must not enter matching inference.");
   }
 }
 
@@ -60,9 +62,11 @@ export function buildRequest(
 ): CompletionRequest {
   const payload = {
     vacancy: { title: input.job.title, description: input.job.description },
-    facts: input.facts
-      .filter((fact) => fact.value.kind !== "identity")
-      .map((fact) => ({ id: fact.id, kind: fact.value.kind, evidence: factSummary(fact) })),
+    facts: inferenceFacts(input.facts).map((fact) => ({
+      id: fact.id,
+      kind: fact.value.kind,
+      evidence: factSummary(fact),
+    })),
   };
   const request: CompletionRequest = {
     model,
@@ -351,7 +355,11 @@ export class MatchingRunner {
         error instanceof Error ? error.message : "Inference failed closed.",
       );
     }
-    const validated = validateProposal(proposal, input.job.description, input.facts);
+    const validated = validateProposal(
+      proposal,
+      input.job.description,
+      inferenceFacts(input.facts),
+    );
     const score = scoreMatch(gates, validated.requirements, validated.uncertainty);
     const assessedOutcome = outcome(gates, validated.requirements, score, validated.uncertainty);
     let applicationId: string | null = null;

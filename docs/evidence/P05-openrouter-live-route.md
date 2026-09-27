@@ -40,3 +40,9 @@ probes returned HTTP 429. No private input was sent, and this endpoint is not
 yet demonstrated as reliable for production use. ModelRun's terms prohibit
 special-category and other sensitive data requiring heightened terms; any
 future input must remain minimized and exclude such fields.
+
+The matching request now excludes both identity and work-authorization facts.
+Local deterministic gates still evaluate authorization, while the model's
+proposal is validated only against the fact IDs actually sent. This minimizes
+provider exposure without allowing an omitted private fact to support an
+inference-generated claim.
