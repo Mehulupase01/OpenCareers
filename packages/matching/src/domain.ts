@@ -111,24 +111,38 @@ export function deterministicGates(
             auth ? [auth.id] : [],
           );
   const sponsorshipRestricted =
-    /\b(no|without|cannot|can't|unable to)\s+(?:visa\s+)?sponsor(?:ship)?\b|\bmust (?:already )?be (?:legally )?authorized\b/i.test(
+    /\b(?:no|without)\s+(?:visa\s+)?sponsorship\b|\b(?:cannot|can't|do not|don't|does not|doesn't|will not|won't|unable to)\s+(?:provide\s+)?(?:visa\s+)?sponsor(?:ship)?(?:\s+visas?)?\b|\bmust (?:already )?be (?:legally )?authorized\b/i.test(
       input.job.description,
     );
   const sponsorship = !sponsorshipRestricted
     ? gate("sponsorship", "pass", "No explicit sponsorship exclusion found.")
-    : authStatus.status === "pass"
+    : authFact?.futureSponsorship === "yes"
       ? gate(
           "sponsorship",
-          "pass",
-          "Existing authorization satisfies the explicit restriction.",
-          [auth?.id ?? ""].filter(Boolean),
-        )
-      : gate(
-          "sponsorship",
-          authStatus.status === "fail" ? "fail" : "review",
-          "Sponsorship is restricted and current authorization is not conclusively sufficient.",
+          "review",
+          "Vacancy restricts sponsorship but the candidate needs it after current permission ends.",
           auth ? [auth.id] : [],
-        );
+        )
+      : authFact?.futureSponsorship === "unknown"
+        ? gate(
+            "sponsorship",
+            "review",
+            "Vacancy restricts sponsorship and future need is unknown.",
+            auth ? [auth.id] : [],
+          )
+        : authStatus.status === "pass"
+          ? gate(
+              "sponsorship",
+              "pass",
+              "Approved current and future authorization satisfies the explicit restriction.",
+              [auth?.id ?? ""].filter(Boolean),
+            )
+          : gate(
+              "sponsorship",
+              authStatus.status === "fail" ? "fail" : "review",
+              "Sponsorship is restricted and current authorization is not conclusively sufficient.",
+              auth ? [auth.id] : [],
+            );
   return [
     gate(
       "vacancy",

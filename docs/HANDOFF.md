@@ -233,3 +233,13 @@ categories and shows them in Applications; no candidate text or exception
 message is persisted in that field. Its local full check passed 149 tests,
 with 57 PostgreSQL-only tests skipped; CI is pending. P08/P09 still need
 genuine private receipt and second-family lifecycle respectively.
+
+On 2026-09-28 the owner confirmed employment workloads and Netherlands
+work-authorization terms in chat. Three owner-asserted facts were saved only
+in the private local database, with month dates read from the imported CV.
+No profile or standing submission authorization was published. The private
+work-authorization fact has no recruiter-facing approved wording. Matching
+now routes explicit no-sponsorship vacancies to review when future sponsorship
+is needed; they remain discoverable, since a separately verified payroll
+arrangement may be possible. Do not infer such an arrangement or answer a
+mandatory application question inaccurately. See the synthetic gate test.

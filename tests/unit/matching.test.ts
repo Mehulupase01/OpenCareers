@@ -157,6 +157,48 @@ describe("deterministic and evidence-bound matching", () => {
     const languageGap = deterministicGates({ ...input, facts: [skill, work] }, "2026-09-16");
     expect(languageGap.find((gate) => gate.code === "language")?.status).toBe("fail");
   });
+  it("does not auto-approve no-sponsorship roles when future sponsorship is needed", () => {
+    const futureSponsorship = {
+      ...work,
+      value: {
+        ...work.value,
+        futureSponsorship: "yes" as const,
+        permitExpiresOn: "2027-08-31",
+      },
+    } as CandidateFact;
+    const requirement = {
+      id: "requirement-1",
+      kind: "skill" as const,
+      required: true,
+      text: "Python",
+      span: { start: 6, end: 12, quote: "Python" },
+      status: "met" as const,
+      factIds: [skill.id],
+      explanation: "Supported.",
+    };
+    for (const restriction of [
+      "No visa sponsorship.",
+      "We do not sponsor visas.",
+      "We cannot provide visa sponsorship.",
+    ]) {
+      const gates = deterministicGates(
+        {
+          ...input,
+          facts: [skill, language, futureSponsorship],
+          job: {
+            ...input.job,
+            description: `${description.replace(" No visa sponsorship.", "")} ${restriction}`,
+          },
+        },
+        "2026-09-28",
+      );
+      expect(gates.find((gate) => gate.code === "work_authorization")?.status).toBe("pass");
+      expect(gates.find((gate) => gate.code === "sponsorship")?.status).toBe("review");
+      expect(outcome(gates, [requirement], scoreMatch(gates, [requirement], 0.1), 0.1)).toBe(
+        "review",
+      );
+    }
+  });
   it("rejects schema-valid unsupported facts and inexact source spans", () => {
     const start = description.indexOf("Python");
     const proposal: SemanticProposal = {
