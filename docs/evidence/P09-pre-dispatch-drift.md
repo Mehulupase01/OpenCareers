@@ -24,3 +24,21 @@ desktop/mobile tests. Fresh GitHub Actions run
 passed Windows, Ubuntu and PostgreSQL jobs. This closes P09-G3/G4 for the
 registered mock and Recruitee adapters. Exact changed-field details are not
 yet persisted or shown in the operations UI, so P09 remains in progress.
+# Operator Drift Reason Checkpoint
+
+The pre-dispatch abort audit event now records a bounded category for adapter
+identity, mock form, Recruitee offer fields, or other form drift. The operations
+summary reads the latest event for currently unsupported applications and the
+Applications view displays that category beneath the stage. No exception
+message, form value or candidate data is persisted in this field. A new
+integration assertion verifies the reason is returned after a blocked attempt;
+existing tests still verify that no permit or receipt exists for that attempt.
+
+This distinguishes known drift families for re-preparation, but it does not
+yet enumerate each changed control or make a Greenhouse form live-submittable.
+P09-G2/G6 remain open.
+
+The local full check for this follow-up passed 149 tests (57 PostgreSQL-only
+skipped), lint, typecheck and build. The changed summary query passed its
+focused SQLite integration test; public-source scan and production dependency
+audit passed. Cross-platform CI remains to be checked after the push.

@@ -43,6 +43,13 @@ type View =
   | "matching"
   | "documents";
 
+const driftLabels = {
+  ADAPTER_IDENTITY_CHANGED: "Adapter target or version changed",
+  MOCK_FORM_CHANGED: "Mock form changed",
+  RECRUITEE_FIELDS_CHANGED: "Recruitee offer fields changed",
+  OTHER_FORM_CHANGED: "Form changed before submission",
+} as const;
+
 function App() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [candidate, setCandidate] = useState<CandidateSnapshot | null>(null);
@@ -394,6 +401,11 @@ function App() {
                                   <Circle size={7} fill="currentColor" />
                                   {(app?.state ?? "DISCOVERED").replaceAll("_", " ").toLowerCase()}
                                 </span>
+                                {app?.driftReason && (
+                                  <span className="company-name">
+                                    {driftLabels[app.driftReason]}
+                                  </span>
+                                )}
                               </td>
                               <td>
                                 <span className="muted">{job.source}</span>

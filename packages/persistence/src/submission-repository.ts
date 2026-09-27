@@ -5,7 +5,7 @@ import {
   packetContentSchema,
   packetManifestSchema,
 } from "../../contracts/src/documents.js";
-import { DomainError, type Task } from "../../contracts/src/index.js";
+import { DomainError, type FormDriftReason, type Task } from "../../contracts/src/index.js";
 import {
   type MockReceiptEvidence,
   mockReceiptEvidenceSchema,
@@ -200,7 +200,11 @@ export class SubmissionRepository extends Repository {
     });
   }
 
-  async abortBeforeDispatch(task: Task, handle: CommitHandle): Promise<void> {
+  async abortBeforeDispatch(
+    task: Task,
+    handle: CommitHandle,
+    driftReason: FormDriftReason = "OTHER_FORM_CHANGED",
+  ): Promise<void> {
     if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
       throw new DomainError("LEASE_STALE", "Commit handle does not match the leased task.");
     await this.db.transaction(async (tx) => {
@@ -246,6 +250,7 @@ export class SubmissionRepository extends Repository {
         {
           attemptId: handle.attemptId,
           reason: "FORM_CHANGED",
+          driftReason,
         },
       );
     });

@@ -589,7 +589,17 @@ for (const engine of ["sqlite", "postgres"] as const) {
           owner,
           initial.handle.intentId,
         ]);
-        await submissions.abortBeforeDispatch(initial.task, initial.handle);
+        await submissions.abortBeforeDispatch(
+          initial.task,
+          initial.handle,
+          "RECRUITEE_FIELDS_CHANGED",
+        );
+        expect((await queue.summary("demo")).applications).toContainEqual(
+          expect.objectContaining({
+            id: packet.manifest.applicationId,
+            driftReason: "RECRUITEE_FIELDS_CHANGED",
+          }),
+        );
         await expect(
           submissions.authorizeDispatch(initial.task, initial.handle),
         ).rejects.toMatchObject({

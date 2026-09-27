@@ -7,6 +7,7 @@ import {
   controlSchema,
   DomainError,
   type ErrorCode,
+  formDriftReasonSchema,
   type Job,
   type JobInput,
   jobInputSchema,
@@ -572,6 +573,23 @@ export class Repository extends OwnerScope {
         "SELECT * FROM applications WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 100",
         [this.ownerId],
       );
+      const unsupportedIds = apps
+        .filter((app) => app.state === "UNSUPPORTED")
+        .map((app) => String(app.id));
+      const driftRows = unsupportedIds.length
+        ? await tx.query(
+            `SELECT aggregate_id,payload FROM (SELECT aggregate_id,payload,ROW_NUMBER() OVER(PARTITION BY aggregate_id ORDER BY occurred_at DESC,id DESC) AS rank FROM audit_events WHERE owner_id=$1 AND action='submission.pre_dispatch_blocked' AND aggregate_id IN (${unsupportedIds.map((_, index) => `$${index + 2}`).join(",")})) ranked WHERE rank=1`,
+            [this.ownerId, ...unsupportedIds],
+          )
+        : [];
+      const driftReasons = new Map<string, Application["driftReason"]>();
+      for (const row of driftRows) {
+        const id = String(row.aggregate_id);
+        if (driftReasons.has(id)) continue;
+        const payload = JSON.parse(String(row.payload)) as { driftReason?: unknown };
+        const reason = formDriftReasonSchema.safeParse(payload.driftReason);
+        if (reason.success) driftReasons.set(id, reason.data);
+      }
       const tasks = await tx.query(
         "SELECT * FROM tasks WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 100",
         [this.ownerId],
@@ -594,7 +612,10 @@ export class Repository extends OwnerScope {
         control: await this.readControl(tx),
         asOf: this.now(),
         jobs,
-        applications: apps.map(applicationFromRow),
+        applications: apps.map((app) => {
+          const driftReason = driftReasons.get(String(app.id));
+          return { ...applicationFromRow(app), ...(driftReason ? { driftReason } : {}) };
+        }),
         tasks: tasks.map(taskFromRow),
         counts: {
           jobs: await count("jobs"),

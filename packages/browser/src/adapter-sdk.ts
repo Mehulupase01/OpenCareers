@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { BrowserPreparation, DryRunResult } from "../../contracts/src/browser.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
-import { DomainError } from "../../contracts/src/index.js";
+import { DomainError, FormDriftError } from "../../contracts/src/index.js";
 import type { ReceiptEvidence } from "../../contracts/src/submission.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
 import { commitPreparedMockPacket, DefinitiveMockRejection } from "./commit-mock.js";
@@ -84,13 +84,19 @@ function assertPreparation(
   target: unknown,
 ) {
   if (!preparation.result.adapter)
-    throw new DomainError("FORM_CHANGED", "Preparation predates adapter identity binding.");
+    throw new FormDriftError(
+      "ADAPTER_IDENTITY_CHANGED",
+      "Preparation predates adapter identity binding.",
+    );
   if (
     preparation.result.adapter.id !== adapter.id ||
     preparation.result.adapter.version !== adapter.version ||
     preparation.result.adapter.targetFingerprint !== targetFingerprint(target)
   )
-    throw new DomainError("FORM_CHANGED", "Adapter target or version changed after preparation.");
+    throw new FormDriftError(
+      "ADAPTER_IDENTITY_CHANGED",
+      "Adapter target or version changed after preparation.",
+    );
 }
 
 function valuesFrom(preparation: BrowserPreparation) {

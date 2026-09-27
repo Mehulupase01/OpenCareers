@@ -224,3 +224,12 @@ live free-route verification remain before this amendment can be called done.
 Local verification for this amendment passed 139 tests (57 PostgreSQL-only
 skipped), lint, typecheck, build, source scan and dependency audit. See
 `docs/evidence/P06-llm-letter-checkpoint.md`; cross-platform CI is pending.
+
+The P06 letter filter follow-up `b6ff6c6` adds a ten-case synthetic adversarial
+motivation table. Local check passed 149 tests; previous amendment CI passed
+Windows, Ubuntu and PostgreSQL. This is not live LLM quality verification.
+The P09 operator drift follow-up now records bounded pre-dispatch drift
+categories and shows them in Applications; no candidate text or exception
+message is persisted in that field. Its local full check passed 149 tests,
+with 57 PostgreSQL-only tests skipped; CI is pending. P08/P09 still need
+genuine private receipt and second-family lifecycle respectively.

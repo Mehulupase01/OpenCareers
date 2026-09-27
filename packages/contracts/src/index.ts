@@ -86,6 +86,24 @@ export class DomainError extends Error {
   }
 }
 
+export const formDriftReasonSchema = z.enum([
+  "ADAPTER_IDENTITY_CHANGED",
+  "MOCK_FORM_CHANGED",
+  "RECRUITEE_FIELDS_CHANGED",
+  "OTHER_FORM_CHANGED",
+]);
+export type FormDriftReason = z.infer<typeof formDriftReasonSchema>;
+
+export class FormDriftError extends DomainError {
+  constructor(
+    public readonly reason: FormDriftReason,
+    message: string,
+  ) {
+    super("FORM_CHANGED", message);
+    this.name = "FormDriftError";
+  }
+}
+
 export const jobInputSchema = z
   .object({
     id: idSchema,
@@ -125,6 +143,7 @@ export interface Application {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  driftReason?: FormDriftReason;
 }
 export interface Task {
   id: string;

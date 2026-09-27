@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { BrowserPreparation, FormSnapshot } from "../../contracts/src/browser.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
-import { DomainError } from "../../contracts/src/index.js";
+import { FormDriftError } from "../../contracts/src/index.js";
 import type { MockReceiptEvidence } from "../../contracts/src/submission.js";
 import type { startMockAts } from "../../mock-ats/src/server.js";
 import { fillStep, inspectForm, planFields } from "./adapter.js";
@@ -53,11 +53,17 @@ export async function commitPreparedMockPacket(
       const snapshot = await inspectForm(owned.page);
       const expected = preparation.result.snapshots[index];
       if (!expected || !sameForm(snapshot, expected))
-        throw new DomainError("FORM_CHANGED", "Mock ATS form changed since the READY preparation.");
+        throw new FormDriftError(
+          "MOCK_FORM_CHANGED",
+          "Mock ATS form changed since the READY preparation.",
+        );
       const plan = planFields(snapshot, packet, approvedValues);
       const filled = await fillStep(owned.page, plan, cvPdf);
       if (filled.snapshot.fingerprint !== snapshot.fingerprint)
-        throw new DomainError("FORM_CHANGED", "Mock ATS form changed during final read-back.");
+        throw new FormDriftError(
+          "MOCK_FORM_CHANGED",
+          "Mock ATS form changed during final read-back.",
+        );
       if (filled.status !== "ready" || filled.readBack.some((field) => !field.matches))
         throw new Error("Final form read-back did not match the packet.");
       if (index === 0) await owned.page.getByRole("button", { name: "Next" }).click();

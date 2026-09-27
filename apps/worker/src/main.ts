@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
-import { DomainError, type TaskType } from "../../../packages/contracts/src/index.js";
+import {
+  DomainError,
+  FormDriftError,
+  type TaskType,
+} from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
 import { generatePacketContent } from "../../../packages/documents/src/domain.js";
@@ -161,7 +165,11 @@ try {
               });
             } catch (error) {
               if (!(error instanceof DomainError) || error.code !== "FORM_CHANGED") throw error;
-              await submissions.abortBeforeDispatch(task, handle);
+              await submissions.abortBeforeDispatch(
+                task,
+                handle,
+                error instanceof FormDriftError ? error.reason : "OTHER_FORM_CHANGED",
+              );
               outcome = null;
               logger.warn(
                 { taskId: task.id, applicationId: task.applicationId, adapterId: adapter.id },
