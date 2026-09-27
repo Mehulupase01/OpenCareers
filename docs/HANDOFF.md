@@ -112,3 +112,14 @@ existing Chromium install before browser-backed conformance tests. GitHub Action
 run `36307529528` passed Ubuntu, Windows and PostgreSQL. Next: add Recruitee
 discovery/coverage reporting and a second compliant real portal family with
 sanitized drift fixtures; do not count the owned mock ATS as that second family.
+
+P09 continued through `47a1058`. Recruitee public discovery is implemented;
+the Discovery coverage view now ranks the full owner corpus by latest active
+profile eligibility and shows each portal tenant's counts. Greenhouse hosted
+external forms are the provisional second family. A read-only Chromium
+inspector, reviewed-answer planner and GET-only preparation are tested with
+synthetic fixtures. A public Adyen form check found 17 controls, one unresolved
+mandatory visa/relocation answer, no visible challenge and zero write attempts.
+See `docs/sources/P09-greenhouse-hosted-form.md`. Greenhouse fill, final action,
+receipt correlation, SDK registration, drift handling and synthetic lifecycle
+tests remain. No private profile or live employer submission has been made.
