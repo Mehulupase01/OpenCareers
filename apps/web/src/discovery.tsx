@@ -130,6 +130,7 @@ function SourceEditor({
           >
             <option value="greenhouse">Greenhouse</option>
             <option value="lever">Lever</option>
+            <option value="recruitee">Recruitee</option>
           </select>
         </label>
         <label>

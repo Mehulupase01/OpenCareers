@@ -49,6 +49,22 @@ const leverJob = z.object({
   workplaceType: z.string().optional(),
   createdAt: z.number().optional(),
 });
+const recruiteeJob = z.object({
+  id: z.number().int().positive(),
+  slug: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/),
+  title: z.string().min(1).max(240),
+  status: z.literal("published"),
+  location: z.string().max(240).nullable().optional(),
+  country_code: z.string().max(2).nullable().optional(),
+  description: text.nullable().optional(),
+  requirements: text.nullable().optional(),
+  created_at: z.string().optional(),
+  published_at: z.string().nullable().optional(),
+  updated_at: z.string().optional(),
+  remote: z.boolean().optional(),
+  hybrid: z.boolean().optional(),
+  on_site: z.boolean().optional(),
+});
 
 export function normalizePage(
   raw: unknown,
@@ -93,6 +109,45 @@ export function normalizePage(
       );
     }
     return { jobs, size: data.jobs.length };
+  }
+  if (source.connector === "recruitee") {
+    const data = z.object({ offers: z.array(recruiteeJob).max(10000) }).parse(raw);
+    for (const [index, job] of data.offers.entries()) {
+      const requisitionId = `${sourceKey(source)}:offer:${job.id}`;
+      const location = job.location || "Unknown";
+      const workplace = job.remote
+        ? "remote"
+        : job.hybrid
+          ? "hybrid"
+          : job.on_site
+            ? "on-site"
+            : undefined;
+      jobs.push(
+        normalizedJobSchema.parse({
+          id: digest(`${source.employerId}:${requisitionId}`),
+          employerId: source.employerId,
+          requisitionId,
+          title: job.title,
+          company: source.company,
+          location,
+          ...locationFields(location, job.country_code, workplace),
+          url: hostedUrl(source, job.slug),
+          canonicalUrl: hostedUrl(source, job.slug),
+          postingId: job.slug,
+          providerRequisition: String(job.id),
+          description: [plainText(job.description ?? ""), plainText(job.requirements ?? "")]
+            .filter(Boolean)
+            .join("\n\n"),
+          source: source.connector,
+          synthetic: source.mode === "fixture",
+          postedAt: normalizedDate(job.published_at ?? job.created_at),
+          updatedAt: normalizedDate(job.updated_at),
+          roleFamily: roleFamily(job.title),
+          evidence: { page, locator: `offers[${index}]` },
+        }),
+      );
+    }
+    return { jobs, size: data.offers.length };
   }
   const data = z.array(leverJob).max(100).parse(raw);
   for (const [index, job] of data.entries()) {
@@ -152,7 +207,9 @@ export async function pollSource(
       const url =
         source.connector === "greenhouse"
           ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
-          : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
+          : source.connector === "recruitee"
+            ? `https://${source.board}.recruitee.com/api/offers/`
+            : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
       const response = await read(
         url,
         source.connector === "greenhouse" ? source.etag : null,
@@ -197,7 +254,7 @@ export async function pollSource(
           result.warnings.push(`Empty or very short description: ${job.postingId}`);
         result.jobs.push(job);
       }
-      if (source.connector === "greenhouse" || normalized.size < 100) {
+      if (source.connector !== "lever" || normalized.size < 100) {
         result.etag = source.connector === "greenhouse" ? response.etag : null;
         return result;
       }

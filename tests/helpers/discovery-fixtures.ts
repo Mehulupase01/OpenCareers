@@ -47,3 +47,20 @@ export function leverFixture(from: number, count: number) {
     workplaceType: "hybrid",
   }));
 }
+export function recruiteeFixture(ids = [1, 2, 3]) {
+  return {
+    offers: ids.map((id) => ({
+      id: 200 + id,
+      slug: `synthetic-engineer-${id}`,
+      title: `Platform Engineer ${id}`,
+      status: "published",
+      location: "Rotterdam, Netherlands",
+      country_code: "NL",
+      description: "<p>Build reliable synthetic platform services.</p>",
+      requirements: "<p>Use TypeScript and careful operational practices.</p>",
+      published_at: "2026-09-16T10:00:00Z",
+      updated_at: "2026-09-16T11:00:00Z",
+      hybrid: true,
+    })),
+  };
+}

@@ -5,7 +5,7 @@ export const sourceInputSchema = z
   .object({
     id: idSchema.optional(),
     expectedRevision: z.number().int().min(0),
-    connector: z.enum(["greenhouse", "lever"]),
+    connector: z.enum(["greenhouse", "lever", "recruitee"]),
     board: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
     region: z.enum(["global", "eu"]),
     employerId: idSchema,
@@ -14,7 +14,17 @@ export const sourceInputSchema = z
     enabled: z.boolean(),
     mode: z.enum(["fixture", "live"]),
   })
-  .strict();
+  .strict()
+  .superRefine((source, context) => {
+    if (source.connector === "recruitee" && source.region !== "global")
+      context.addIssue({ code: "custom", path: ["region"], message: "Recruitee is global." });
+    if (source.connector === "recruitee" && !/^[a-z0-9][a-z0-9-]{0,62}$/.test(source.board))
+      context.addIssue({
+        code: "custom",
+        path: ["board"],
+        message: "Recruitee tenant must be a lowercase subdomain.",
+      });
+  });
 export type SourceInput = z.infer<typeof sourceInputSchema>;
 export type SourceHealth =
   | "waiting"

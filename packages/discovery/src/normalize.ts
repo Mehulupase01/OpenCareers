@@ -87,10 +87,12 @@ export function hostedUrl(
 ): string {
   if (source.connector === "greenhouse")
     return `https://job-boards.greenhouse.io/${source.board}/jobs/${encodeURIComponent(posting)}`;
+  if (source.connector === "recruitee")
+    return `https://${source.board}.recruitee.com/o/${encodeURIComponent(posting)}`;
   return `https://jobs.${source.region === "eu" ? "eu." : ""}lever.co/${source.board}/${encodeURIComponent(posting)}`;
 }
 export function recognizeUrl(input: string): {
-  connector: "greenhouse" | "lever";
+  connector: SourceInput["connector"];
   board: string;
   region: "global" | "eu";
   postingId: string;
@@ -103,7 +105,7 @@ export function recognizeUrl(input: string): {
       "Only supported public HTTPS vacancy URLs are accepted.",
     );
   const parts = url.pathname.split("/").filter(Boolean);
-  let connector: "greenhouse" | "lever";
+  let connector: SourceInput["connector"];
   let region: "global" | "eu" = "global";
   let postingId: string;
   if (
@@ -122,12 +124,21 @@ export function recognizeUrl(input: string): {
     connector = "lever";
     region = url.hostname === "jobs.eu.lever.co" ? "eu" : "global";
     postingId = parts[1] as string;
+  } else if (
+    /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(url.hostname) &&
+    parts.length === 2 &&
+    parts[0] === "o" &&
+    /^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/.test(parts[1] ?? "")
+  ) {
+    connector = "recruitee";
+    postingId = parts[1] as string;
   } else
     throw new DomainError(
       "ADAPTER_UNSUPPORTED",
       "This URL is not a supported public ATS vacancy. Redirectors are not followed.",
     );
-  const board = parts[0] ?? "";
+  const board =
+    connector === "recruitee" ? url.hostname.slice(0, -".recruitee.com".length) : (parts[0] ?? "");
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(board))
     throw new DomainError("CONFIG_INVALID", "Invalid board token.");
   const result = { connector, board, region, postingId };

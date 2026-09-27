@@ -3,7 +3,12 @@ import { normalizePage, pollSource } from "../../packages/discovery/src/connecto
 import { parseHistory } from "../../packages/discovery/src/history.js";
 import { locationFields, recognizeUrl } from "../../packages/discovery/src/normalize.js";
 import { publicAddress, retryAfter } from "../../packages/discovery/src/transport.js";
-import { greenhouseFixture, leverFixture, sourceFixture } from "../helpers/discovery-fixtures.js";
+import {
+  greenhouseFixture,
+  leverFixture,
+  recruiteeFixture,
+  sourceFixture,
+} from "../helpers/discovery-fixtures.js";
 
 describe("public discovery contracts", () => {
   it("normalizes typed vacancies and retains identity, source location and locators", () => {
@@ -43,6 +48,30 @@ describe("public discovery contracts", () => {
     expect(result.jobs).toHaveLength(200);
     expect(requests).toHaveLength(3);
     expect(new Set(result.jobs.map((j) => j.id)).size).toBe(200);
+  });
+  it("normalizes one bounded Recruitee snapshot with adapter-compatible identity", async () => {
+    const requests: string[] = [];
+    const source = { ...sourceFixture, connector: "recruitee" as const, board: "synthetic" };
+    const result = await pollSource(source, async (url) => {
+      requests.push(url);
+      return {
+        status: 200,
+        body: JSON.stringify(recruiteeFixture([7])),
+        etag: null,
+        retryAfter: null,
+      };
+    });
+    expect(requests).toEqual(["https://synthetic.recruitee.com/api/offers/"]);
+    expect(result.jobs[0]).toMatchObject({
+      postingId: "synthetic-engineer-7",
+      providerRequisition: "207",
+      canonicalUrl: "https://synthetic.recruitee.com/o/synthetic-engineer-7",
+      countryCode: "NL",
+      city: "Rotterdam",
+      remote: "hybrid",
+      evidence: { page: 0, locator: "offers[0]" },
+    });
+    expect(result.jobs[0]?.description).toContain("operational practices");
   });
   it("rejects repeated pages and incomplete snapshots without a partial success", async () => {
     await expect(
@@ -100,12 +129,22 @@ describe("public discovery contracts", () => {
     expect(
       recognizeUrl("https://jobs.eu.lever.co/synthetic-board/abc-123/apply?source=test"),
     ).toMatchObject({ connector: "lever", region: "eu", postingId: "abc-123" });
+    expect(
+      recognizeUrl("https://synthetic.recruitee.com/o/platform-engineer?source=test#apply"),
+    ).toEqual({
+      connector: "recruitee",
+      board: "synthetic",
+      region: "global",
+      postingId: "platform-engineer",
+      canonicalUrl: "https://synthetic.recruitee.com/o/platform-engineer",
+    });
     for (const url of [
       "http://jobs.lever.co/board/id",
       "https://jobs.lever.co@127.0.0.1/board/id",
       "https://jobs.lever.co.attacker.example/board/id",
       "https://jobs.lever.co:444/board/id",
       "https://example.com/redirect?url=https://jobs.lever.co/board/id",
+      "https://synthetic.recruitee.com.attacker.example/o/platform-engineer",
     ])
       expect(() => recognizeUrl(url)).toThrow();
   });

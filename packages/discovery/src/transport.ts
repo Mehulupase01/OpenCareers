@@ -27,6 +27,8 @@ export type ReadPublic = (
   signal?: AbortSignal,
 ) => Promise<ReadResponse>;
 const hosts = new Set(["boards-api.greenhouse.io", "api.lever.co", "api.eu.lever.co"]);
+const approvedHost = (hostname: string) =>
+  hosts.has(hostname) || /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(hostname);
 export function publicAddress(address: string): boolean {
   try {
     return ipaddr.process(address).range() === "unicast";
@@ -46,7 +48,7 @@ const safeLookup: LookupFunction = (hostname, options, callback) => {
 export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
-    !hosts.has(url.hostname) ||
+    !approvedHost(url.hostname) ||
     url.protocol !== "https:" ||
     url.port ||
     url.username ||
