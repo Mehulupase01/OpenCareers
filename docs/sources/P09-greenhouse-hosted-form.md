@@ -89,3 +89,7 @@ form under the read-only write barrier. It reads each field back, checks the
 selected CV bytes against the packet hash, and reports page-side mutation or
 file rejection. Selection is not server upload acceptance. Even a clean fill
 remains `unsupported`, and no Greenhouse submit task is queued.
+
+The packet must also be valid and bound to the exact Greenhouse board and
+posting URL before browser preparation or filling. Synthetic tests reject a
+different posting and an invalid packet before any field is changed.

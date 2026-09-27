@@ -18,7 +18,14 @@ import { planGreenhouseFields } from "./greenhouse-plan.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
-function packetCv(packet: PacketSnapshot, cvPdf: Buffer) {
+function packetCv(target: GreenhouseTarget, packet: PacketSnapshot, cvPdf: Buffer) {
+  if (!packet.valid || packet.manifest.validation.status === "blocked")
+    throw new Error("The packet is not valid for Greenhouse preparation.");
+  const packetUrl = new URL(packet.content.job.url);
+  packetUrl.search = "";
+  packetUrl.hash = "";
+  if (packetUrl.toString().replace(/\/$/, "") !== greenhouseUrl(target))
+    throw new Error("Packet vacancy URL does not match the Greenhouse posting.");
   const cv = packet.manifest.artifacts.find((item) => item.kind === "cv_pdf");
   if (!cv || createHash("sha256").update(cvPdf).digest("hex") !== cv.sha256)
     throw new Error("Greenhouse CV bytes do not match the packet.");
@@ -45,7 +52,7 @@ export function greenhousePreparationResult(
   blockedWriteCount: number,
   fillReport?: FillReport,
 ): DryRunResult {
-  packetCv(packet, cvPdf);
+  packetCv(target, packet, cvPdf);
   const plan = planGreenhouseFields(snapshot, packet, approvedValues);
   const issues = [
     ...plan.unresolved.map((key) => `Required answer unresolved: ${key}`),
@@ -101,7 +108,7 @@ export async function fillGreenhouseForm(
   packet: PacketSnapshot,
   cvPdf: Buffer,
 ): Promise<FillReport> {
-  const cv = packetCv(packet, cvPdf);
+  const cv = packetCv(target, packet, cvPdf);
   const current = await inspectGreenhouseForm(page, target);
   if (snapshot.blocker !== "none" || current.blocker !== "none")
     throw new Error("Greenhouse form is blocked; filling is not permitted.");
@@ -210,6 +217,7 @@ export async function prepareGreenhousePacket(
   cvPdf: Buffer,
   approvedValues: Record<string, string | boolean>,
 ): Promise<DryRunResult> {
+  packetCv(target, packet, cvPdf);
   const url = greenhouseUrl(target);
   const browser = await chromium.launch({ headless: true });
   try {

@@ -67,6 +67,28 @@ describe("Greenhouse synthetic fill", () => {
 
   const approved = { question_123: "Synthetic reviewed answer.", consent: true };
 
+  it("rejects an invalid or wrong-posting packet before filling", async () => {
+    const snapshot = await inspectGreenhouseForm(page, target);
+    const plan = planGreenhouseFields(snapshot, packet, approved);
+    const invalid = { ...packet, valid: false };
+    await expect(fillGreenhouseForm(page, target, snapshot, plan, invalid, cvPdf)).rejects.toThrow(
+      "not valid",
+    );
+    const wrongPosting = {
+      ...packet,
+      content: {
+        ...packet.content,
+        job: { ...packet.content.job, url: greenhouseUrl({ ...target, postingId: "654321" }) },
+      },
+    };
+    await expect(
+      fillGreenhouseForm(page, target, snapshot, plan, wrongPosting, cvPdf),
+    ).rejects.toThrow("does not match");
+    expect(await page.locator("#first_name").inputValue()).toBe("");
+    expect(blocked).toBe(0);
+    await page.context().close();
+  });
+
   it("fills the exact plan, selects packet CV bytes, and remains unsupported", async () => {
     const snapshot = await inspectGreenhouseForm(page, target);
     const plan = planGreenhouseFields(snapshot, packet, approved);
