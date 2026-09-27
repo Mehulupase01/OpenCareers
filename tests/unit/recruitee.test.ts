@@ -169,6 +169,29 @@ describe("Recruitee candidate adapter", () => {
       ),
     ).rejects.toThrow("fields changed");
     expect(events).toEqual([]);
+
+    current = offer(true);
+    const injected = current.offer.open_questions[0];
+    if (!injected) throw new Error("Expected an injected mandatory question.");
+    injected.kind = "file";
+    const blocked = await prepareRecruiteePacket(target, packet, cvPdf, {}, request);
+    expect(blocked.status).toBe("unsupported");
+    expect(blocked.issues).toContain("Required field type is unsupported: recruitee_question_91");
+    await expect(
+      commitRecruiteePacket(
+        target,
+        packet,
+        cvPdf,
+        prepared,
+        async () => {
+          events.push("authorize");
+          return { expiresAt: "2026-09-27T00:03:00.000Z" };
+        },
+        request,
+        () => new Date("2026-09-27T00:02:00.000Z"),
+      ),
+    ).rejects.toMatchObject({ code: "FORM_CHANGED" });
+    expect(events).toEqual([]);
   });
 
   it("classifies a returned validation response as definitive", async () => {

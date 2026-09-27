@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   type Application,
   type ApplicationState,
@@ -252,6 +252,21 @@ export class Repository extends OwnerScope {
     return this.db.transaction((tx) => this.enqueueIn(tx, input));
   }
 
+  private async stoppedBeforeDispatch(tx: SqlExecutor, task: Task): Promise<boolean> {
+    if (!task.applicationId) return false;
+    const rows = await tx.query(
+      "SELECT i.snapshot,i.sha256 FROM attempts a JOIN intents i ON i.owner_id=a.owner_id AND i.id=a.intent_id WHERE a.owner_id=$1 AND a.application_id=$2 AND a.fence=$3 AND a.state='BLOCKED_BEFORE_DISPATCH' AND a.dispatch_started_at IS NULL",
+      [this.ownerId, task.applicationId, task.fence],
+    );
+    return rows.some((row) => {
+      const snapshot = JSON.parse(String(row.snapshot)) as { taskId?: string };
+      return (
+        snapshot.taskId === task.id &&
+        createHash("sha256").update(JSON.stringify(snapshot)).digest("hex") === row.sha256
+      );
+    });
+  }
+
   protected async recoverTask(tx: SqlExecutor, task: Task, cancelled = false): Promise<void> {
     const app = task.applicationId
       ? (
@@ -290,6 +305,15 @@ export class Repository extends OwnerScope {
         [this.ownerId, task.id],
       );
     } else if (app?.state === "CONFIRMED" && task.type === "submit") {
+      await tx.query(
+        "UPDATE tasks SET state='completed',lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND id=$2",
+        [this.ownerId, task.id],
+      );
+    } else if (
+      app?.state === "UNSUPPORTED" &&
+      task.type === "submit" &&
+      (await this.stoppedBeforeDispatch(tx, task))
+    ) {
       await tx.query(
         "UPDATE tasks SET state='completed',lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND id=$2",
         [this.ownerId, task.id],
@@ -409,7 +433,10 @@ export class Repository extends OwnerScope {
         )[0];
         if (
           !application ||
-          !["CONFIRMED", "DEFINITIVE_FAILURE"].includes(String(application.state))
+          (!["CONFIRMED", "DEFINITIVE_FAILURE"].includes(String(application.state)) &&
+            !(
+              application.state === "UNSUPPORTED" && (await this.stoppedBeforeDispatch(tx, stored))
+            ))
         )
           throw new DomainError(
             "STATE_INVALID",

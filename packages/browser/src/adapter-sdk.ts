@@ -90,7 +90,7 @@ function assertPreparation(
     preparation.result.adapter.version !== adapter.version ||
     preparation.result.adapter.targetFingerprint !== targetFingerprint(target)
   )
-    throw new Error("Adapter target or version changed after preparation.");
+    throw new DomainError("FORM_CHANGED", "Adapter target or version changed after preparation.");
 }
 
 function valuesFrom(preparation: BrowserPreparation) {

@@ -303,6 +303,47 @@ test("mock final click requires a fresh permit and correlates a server receipt",
   }
 });
 
+test("changed mock question stops before dispatch permission", async () => {
+  const approved = {
+    country: "NL",
+    sponsorship_required: "no",
+    available_from: "2026-11-01",
+    remote_preference: "yes",
+    terms: true,
+  };
+  const result = await prepareMockPacket(packet, cvPdf, approved);
+  expect(result.status).toBe("ready");
+  const mock = await startMockAts();
+  let permits = 0;
+  try {
+    await expect(
+      commitPreparedMockPacket(
+        mock,
+        packet,
+        cvPdf,
+        approved,
+        {
+          id: randomUUID(),
+          status: result.status,
+          result,
+          createdAt: new Date().toISOString(),
+          expiresAt: null,
+          resolvedAt: null,
+        },
+        async () => {
+          permits++;
+          return { expiresAt: new Date(Date.now() + 10000).toISOString() };
+        },
+        "changed-question",
+      ),
+    ).rejects.toMatchObject({ code: "FORM_CHANGED" });
+    expect(permits).toBe(0);
+    expect((await mock.app.inject({ url: "/__test/records" })).json().count).toBe(0);
+  } finally {
+    await mock.app.close();
+  }
+});
+
 test("expired dispatch permit cannot click the mock final submit", async () => {
   const approved = {
     country: "NL",

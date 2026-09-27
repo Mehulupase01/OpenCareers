@@ -152,3 +152,13 @@ real missing values need a Candidate update and regenerated packet. Full CI
 `36327443129` passed Windows, Ubuntu and PostgreSQL at `b2de20c`. See
 `docs/evidence/P09-coverage-verification.md`. P09-G5 reporting is complete;
 P09-G2/G6 and private live submission remain open.
+
+P09 drift handling now distinguishes a changed form before a dispatch permit
+from a possible employer-facing action. Explicit adapter fingerprint mismatch
+aborts the fenced attempt as `BLOCKED_BEFORE_DISPATCH`, leaves that application
+`UNSUPPORTED`, and permits a fresh preparation. A post-permit attempt cannot
+use this path and remains subject to unknown-outcome reconciliation. The mock
+desktop/mobile and Recruitee injected-question tests pass; SQLite integration
+tests cover task acknowledgement, lease recovery, intent tampering and the
+post-permit refusal. Local `pnpm check` passed (122 tests, 56 skipped). Full CI
+is pending. Exact drift details are not yet surfaced in the operations UI.

@@ -94,7 +94,7 @@ export class SubmissionRepository extends Repository {
       if (result.adapter?.id !== task.domain)
         throw new DomainError("FORM_CHANGED", "Task adapter does not match its preparation.");
       const prior = await tx.query(
-        "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
+        "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
         [this.ownerId, applicationId],
       );
       if (prior.length)
@@ -112,6 +112,7 @@ export class SubmissionRepository extends Repository {
         throw new DomainError("POLICY_REVOKED", "Packet authorization revision changed.");
       const snapshot = {
         applicationId,
+        taskId: task.id,
         adapter: task.domain,
         adapterVersion: result.adapter.version,
         targetFingerprint: result.adapter.targetFingerprint,
@@ -173,6 +174,57 @@ export class SubmissionRepository extends Repository {
     });
   }
 
+  async abortBeforeDispatch(task: Task, handle: CommitHandle): Promise<void> {
+    if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
+      throw new DomainError("LEASE_STALE", "Commit handle does not match the leased task.");
+    await this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task);
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.revision,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256 FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4",
+          [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.attempt_state !== "IN_FLIGHT" ||
+        Number(row.commit_fence) !== handle.fence ||
+        row.dispatch_started_at
+      )
+        throw new DomainError(
+          "STATE_INVALID",
+          "A dispatched attempt cannot be marked pre-dispatch blocked.",
+        );
+      const snapshot = JSON.parse(String(row.snapshot)) as { taskId?: string };
+      if (digest(snapshot) !== row.sha256 || snapshot.taskId !== task.id)
+        throw new DomainError("FORM_CHANGED", "Pre-dispatch attempt is not bound to this task.");
+      assertTransition("IN_FLIGHT", "UNSUPPORTED");
+      const attempt = await tx.query(
+        "UPDATE attempts SET state='BLOCKED_BEFORE_DISPATCH',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND dispatch_started_at IS NULL RETURNING id",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      if (!attempt[0])
+        throw new DomainError("STATE_INVALID", "Attempt changed before pre-dispatch abort.");
+      const updated = await tx.query(
+        "UPDATE applications SET state='UNSUPPORTED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND commit_fence=$4 RETURNING revision",
+        [this.now(), this.ownerId, handle.applicationId, handle.fence],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed before pre-dispatch abort.");
+      await this.audit(
+        tx,
+        handle.applicationId,
+        "submission.pre_dispatch_blocked",
+        Number(updated[0].revision),
+        {
+          attemptId: handle.attemptId,
+          reason: "FORM_CHANGED",
+        },
+      );
+    });
+  }
+
   async authorizeDispatch(task: Task, handle: CommitHandle): Promise<{ expiresAt: string }> {
     if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
       throw new DomainError("LEASE_STALE", "Commit handle does not match the leased task.");
@@ -190,6 +242,7 @@ export class SubmissionRepository extends Repository {
       if (Number(row.commit_fence) !== handle.fence || row.dispatch_started_at)
         throw new DomainError("LEASE_STALE", "Dispatch capability is stale or already used.");
       const snapshot = JSON.parse(String(row.snapshot)) as {
+        taskId: string;
         packetId: string;
         preparationId: string;
         profileId: string;
@@ -198,6 +251,7 @@ export class SubmissionRepository extends Repository {
       };
       if (
         digest(snapshot) !== row.sha256 ||
+        snapshot.taskId !== task.id ||
         snapshot.packetId !== handle.packetId ||
         snapshot.preparationId !== handle.preparationId ||
         snapshot.fence !== handle.fence

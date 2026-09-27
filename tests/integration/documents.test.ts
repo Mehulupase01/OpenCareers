@@ -489,6 +489,144 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await queue.complete(task);
       });
 
+      it("stops pre-dispatch drift without an unknown outcome and permits fresh preparation", async () => {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+        let now = Date.parse("2026-09-17T09:00:00.000Z");
+        const clock = () => new Date(now);
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const browser = new BrowserRepository(db, owner, clock);
+        const first = await browser.save(readyBrowserResult(packet));
+        const submissions = new SubmissionRepository(db, owner, clock);
+        const lease = async (preparationId: string) => {
+          await queue.enqueue({
+            type: "submit",
+            dedupeKey: `submit:${preparationId}`,
+            applicationId: packet.manifest.applicationId,
+            domain: "mock-ats",
+          });
+          const task = await queue.claim("synthetic-worker", ["submit"]);
+          if (!task) throw new Error("Expected a leased submit task.");
+          const app = (
+            await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ])
+          )[0];
+          const handle = await submissions.begin(task, {
+            packetId: packet.manifest.id,
+            preparationId,
+            expectedRevision: Number(app?.revision),
+          });
+          return { task, handle };
+        };
+        const initial = await lease(first.id);
+        const intent = (
+          await db.query("SELECT sha256 FROM intents WHERE owner_id=$1 AND id=$2", [
+            owner,
+            initial.handle.intentId,
+          ])
+        )[0];
+        if (typeof intent?.sha256 !== "string") throw new Error("Expected an intent hash.");
+        await db.query("UPDATE intents SET sha256='tampered' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          initial.handle.intentId,
+        ]);
+        await expect(
+          submissions.abortBeforeDispatch(initial.task, initial.handle),
+        ).rejects.toMatchObject({
+          code: "FORM_CHANGED",
+        });
+        await db.query("UPDATE intents SET sha256=$1 WHERE owner_id=$2 AND id=$3", [
+          intent.sha256,
+          owner,
+          initial.handle.intentId,
+        ]);
+        await submissions.abortBeforeDispatch(initial.task, initial.handle);
+        await expect(
+          submissions.authorizeDispatch(initial.task, initial.handle),
+        ).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "UNSUPPORTED" }]);
+        expect(
+          await db.query("SELECT state,dispatch_started_at FROM attempts WHERE owner_id=$1", [
+            owner,
+          ]),
+        ).toEqual([{ state: "BLOCKED_BEFORE_DISPATCH", dispatch_started_at: null }]);
+        expect(await db.query("SELECT id FROM receipts WHERE owner_id=$1", [owner])).toEqual([]);
+        expect((await queue.cancelTask(initial.task.id)).state).toBe("completed");
+
+        now += 1000;
+        const second = await browser.save(readyBrowserResult(packet));
+        const repeated = await lease(second.id);
+        await submissions.abortBeforeDispatch(repeated.task, repeated.handle);
+        const secondIntent = (
+          await db.query("SELECT sha256 FROM intents WHERE owner_id=$1 AND id=$2", [
+            owner,
+            repeated.handle.intentId,
+          ])
+        )[0];
+        if (typeof secondIntent?.sha256 !== "string") throw new Error("Expected an intent hash.");
+        await db.query("UPDATE intents SET sha256='tampered' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          repeated.handle.intentId,
+        ]);
+        await expect(queue.complete(repeated.task)).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+        await db.query("UPDATE intents SET sha256=$1 WHERE owner_id=$2 AND id=$3", [
+          secondIntent.sha256,
+          owner,
+          repeated.handle.intentId,
+        ]);
+        await queue.complete(repeated.task);
+
+        now += 1000;
+        const fresh = await browser.save(readyBrowserResult(packet));
+        const resumed = await lease(fresh.id);
+        await submissions.authorizeDispatch(resumed.task, resumed.handle);
+        await expect(
+          submissions.abortBeforeDispatch(resumed.task, resumed.handle),
+        ).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+        await queue.fail(resumed.task, new DomainError("COMMIT_UNKNOWN", "Response was lost."));
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "UNKNOWN" }]);
+      });
+
       it("correlates a Recruitee candidate receipt to its prepared offer", async () => {
         for (const fact of documentFacts) {
           await db.query(

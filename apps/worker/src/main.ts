@@ -120,14 +120,25 @@ try {
               preparationId,
               expectedRevision: Number(app?.revision),
             });
-            const outcome = await adapter.commit({
-              packet,
-              cvPdf: cv.buffer,
-              preparation,
-              target,
-              authorizeDispatch: () => submissions.authorizeDispatch(task, handle),
-            });
-            if (outcome.status === "confirmed") {
+            let outcome: Awaited<ReturnType<typeof adapter.commit>> | null;
+            try {
+              outcome = await adapter.commit({
+                packet,
+                cvPdf: cv.buffer,
+                preparation,
+                target,
+                authorizeDispatch: () => submissions.authorizeDispatch(task, handle),
+              });
+            } catch (error) {
+              if (!(error instanceof DomainError) || error.code !== "FORM_CHANGED") throw error;
+              await submissions.abortBeforeDispatch(task, handle);
+              outcome = null;
+              logger.warn(
+                { taskId: task.id, applicationId: task.applicationId, adapterId: adapter.id },
+                "Submission stopped before dispatch after form drift",
+              );
+            }
+            if (outcome?.status === "confirmed") {
               const receiptId = await submissions.confirmReceipt(task, handle, outcome.evidence);
               logger.info(
                 {
@@ -138,7 +149,7 @@ try {
                 },
                 "Application receipt confirmed",
               );
-            } else {
+            } else if (outcome) {
               await submissions.recordDefinitiveRejection(task, handle, outcome.reason);
               logger.info(
                 { taskId: task.id, adapterId: adapter.id, reason: outcome.reason },

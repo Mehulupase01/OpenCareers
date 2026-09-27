@@ -8,6 +8,7 @@ import {
   formSnapshotSchema,
 } from "../../contracts/src/browser.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
+import { DomainError } from "../../contracts/src/index.js";
 import {
   type RecruiteeReceiptEvidence,
   recruiteeReceiptEvidenceSchema,
@@ -326,7 +327,7 @@ export async function commitRecruiteePacket(
   const loaded = await loadOffer(target, request);
   const current = snapshotFor(target, packet, loaded);
   if (current.fingerprint !== preparation.snapshots[0]?.fingerprint)
-    throw new Error("Recruitee offer fields changed after preparation.");
+    throw new DomainError("FORM_CHANGED", "Recruitee offer fields changed after preparation.");
   const plan = preparation.plans[0];
   if (!plan || plan.unresolved.length)
     throw new Error("Recruitee preparation has unresolved fields.");
