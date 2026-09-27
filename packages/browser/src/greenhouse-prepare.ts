@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chromium } from "playwright";
+import { type BrowserContext, chromium } from "playwright";
 import {
   type DryRunResult,
   dryRunResultSchema,
@@ -14,6 +14,17 @@ import {
 import { planGreenhouseFields } from "./greenhouse-plan.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+export async function installGreenhouseReadOnlyRoutes(
+  context: BrowserContext,
+  onBlockedWrite: () => void,
+) {
+  await context.route("**/*", async (route) => {
+    if (["GET", "HEAD"].includes(route.request().method())) return route.continue();
+    onBlockedWrite();
+    return route.fulfill({ status: 409, body: "Read-only preparation blocked this request." });
+  });
+}
 
 export function greenhousePreparationResult(
   target: GreenhouseTarget,
@@ -87,10 +98,8 @@ export async function prepareGreenhousePacket(
     });
     context.setDefaultTimeout(10000);
     context.setDefaultNavigationTimeout(20000);
-    await context.route("**/*", async (route) => {
-      if (["GET", "HEAD"].includes(route.request().method())) return route.continue();
+    await installGreenhouseReadOnlyRoutes(context, () => {
       blockedWriteCount++;
-      return route.fulfill({ status: 409, body: "Read-only preparation blocked this request." });
     });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded" });

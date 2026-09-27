@@ -8,7 +8,10 @@ import {
   inspectGreenhouseForm,
 } from "../../packages/browser/src/greenhouse-inspect.js";
 import { planGreenhouseFields } from "../../packages/browser/src/greenhouse-plan.js";
-import { greenhousePreparationResult } from "../../packages/browser/src/greenhouse-prepare.js";
+import {
+  greenhousePreparationResult,
+  installGreenhouseReadOnlyRoutes,
+} from "../../packages/browser/src/greenhouse-prepare.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
@@ -104,6 +107,28 @@ describe("Greenhouse hosted form inspection", () => {
     expect(() =>
       greenhousePreparationResult(target, packet, Buffer.from("wrong"), approved, snapshot, 0),
     ).toThrow("do not match");
+  });
+
+  it("intercepts a synthetic write before it reaches the form server", async () => {
+    const context = await browser.newContext();
+    try {
+      let blocked = 0;
+      await installGreenhouseReadOnlyRoutes(context, () => {
+        blocked++;
+      });
+      const isolated = await context.newPage();
+      await isolated.route(url, (route) =>
+        route.fulfill({ status: 200, contentType: "text/html", body: html }),
+      );
+      await isolated.goto(url);
+      const status = await isolated.evaluate(
+        async () => (await fetch("/synthetic-application", { method: "POST" })).status,
+      );
+      expect(status).toBe(409);
+      expect(blocked).toBe(1);
+    } finally {
+      await context.close();
+    }
   });
 
   it("reports challenge widgets before preparation", async () => {
