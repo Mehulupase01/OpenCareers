@@ -27,6 +27,17 @@ has first/last name, email, optional phone, required CV, optional cover letter,
 a required visa/relocation support question, an optional demographic survey,
 and a final Submit application button. No final action was taken. The rendered
 text did not show a challenge widget, which is not proof one will never appear.
+An isolated Playwright DOM read found one form and no iframes. The core inputs
+had stable IDs (`first_name`, `last_name`, `email`, `resume`); the required
+visa/relocation textarea used a `question_<numeric-id>` ID. The inputs had no
+`name` attributes and their native `required` properties were false even when
+the visible labels showed `*`. The inspector therefore needs visible label and
+control association, not only HTML attributes, and must stop on ambiguity.
+The first read-only inspector run found 17 controls and five required controls:
+`first_name`, `last_name`, `email`, `resume`, and the visa/relocation question.
+Its structural SHA-256 was
+`576ddd3c9bb6278fca1986dca86ed7793c417293491deb6be71bdea1239b698c`.
+This dated fingerprint is observation evidence, not a permanent allowlist.
 
 ## Adapter Scope
 
