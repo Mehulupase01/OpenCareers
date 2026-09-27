@@ -12,7 +12,7 @@ report does not turn a fixture or public read into live submission evidence.
 | Owned mock ATS | Fixture-tested P07 | Dry-run-tested P07 | Auto-submit tested P08 | Correlated receipt and recovery tested P08 | Synthetic only |
 | Recruitee Careers Site API v1 | Collection live-read and fixture-tested P09 | Payload preparation tested P08 | Multipart commit and candidate-ID receipt fixture-tested P08 | Email reconciliation pending P11 | Freeday collection read-only, 2026-09-27; live POST pending |
 | Lever hosted Protolabs variant | Public form inspected read-only | Unsupported: substantive answers and challenge | None | None | Public read-only 2026-09-27 |
-| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Read-only inspector and answer planner tested; fill planned | Planned | Planned | Adyen form read-only, 2026-09-27 |
+| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Read-only preparation tested; fill planned | Planned | Planned | Adyen form GET-only with synthetic packet, 2026-09-27 |
 | Lever public postings GET | Fixture-tested P04 | Planned | Planned | Planned | No live read |
 | Ashby | Planned P04 | Planned | Planned | Planned | None |
 

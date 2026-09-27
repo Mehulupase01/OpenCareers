@@ -38,6 +38,10 @@ The first read-only inspector run found 17 controls and five required controls:
 Its structural SHA-256 was
 `576ddd3c9bb6278fca1986dca86ed7793c417293491deb6be71bdea1239b698c`.
 This dated fingerprint is observation evidence, not a permanent allowlist.
+A GET-only preparation using a synthetic packet on the same date found the same
+17 controls, no attempted writes, no visible challenge, and one unresolved
+mandatory employer question. It returned `needs_input`; no CV upload or final
+action occurred.
 
 ## Adapter Scope
 

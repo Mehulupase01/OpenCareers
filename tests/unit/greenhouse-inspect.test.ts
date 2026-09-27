@@ -8,6 +8,7 @@ import {
   inspectGreenhouseForm,
 } from "../../packages/browser/src/greenhouse-inspect.js";
 import { planGreenhouseFields } from "../../packages/browser/src/greenhouse-plan.js";
+import { greenhousePreparationResult } from "../../packages/browser/src/greenhouse-prepare.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
@@ -17,6 +18,7 @@ describe("Greenhouse hosted form inspection", () => {
   let browser: Browser;
   let page: Page;
   let packet: PacketSnapshot;
+  let cvPdf: Buffer;
   let artifactDir: string;
   const target = { board: "synthetic-board", postingId: "123456" };
   const url = greenhouseUrl(target);
@@ -36,6 +38,9 @@ describe("Greenhouse hosted form inspection", () => {
     input.job.url = url;
     const built = await buildPacket(store, input);
     packet = { manifest: built.manifest, content: built.content, valid: true, invalidReason: null };
+    const cv = built.manifest.artifacts.find((item) => item.kind === "cv_pdf");
+    if (!cv) throw new Error("Synthetic CV PDF missing.");
+    cvPdf = await store.read(cv.storageKey, cv.sha256);
     browser = await chromium.launch();
     page = await browser.newPage();
     await page.route(url, (route) =>
@@ -78,6 +83,27 @@ describe("Greenhouse hosted form inspection", () => {
     expect(() =>
       planGreenhouseFields(snapshot, packet, { first_name: "Wrong", last_name: "Name" }),
     ).toThrow("must match");
+  });
+
+  it("keeps read-only preparation blocked until questions are resolved", async () => {
+    const snapshot = await inspectGreenhouseForm(page, target);
+    expect(greenhousePreparationResult(target, packet, cvPdf, {}, snapshot, 0).status).toBe(
+      "needs_input",
+    );
+    const approved = { question_123: "Synthetic reviewed answer." };
+    expect(greenhousePreparationResult(target, packet, cvPdf, approved, snapshot, 0)).toMatchObject(
+      {
+        status: "ready",
+        blockedFinalActions: 0,
+        serverApplicationCount: 0,
+      },
+    );
+    expect(greenhousePreparationResult(target, packet, cvPdf, approved, snapshot, 1).status).toBe(
+      "unsupported",
+    );
+    expect(() =>
+      greenhousePreparationResult(target, packet, Buffer.from("wrong"), approved, snapshot, 0),
+    ).toThrow("do not match");
   });
 
   it("reports challenge widgets before preparation", async () => {
