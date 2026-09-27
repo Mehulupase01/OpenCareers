@@ -173,3 +173,13 @@ selection failure and attempted writes are tested. The adapter still returns
 `unsupported` after a clean fill because upload acceptance and correlated
 receipt are unimplemented. Local `pnpm check` passed with 128 tests and 56
 PostgreSQL-dependent tests skipped. P09-G1/G2/G6 remain open; no live POST.
+
+OpenRouter private-local setup checkpoint: the ignored `.env` was normalized
+without printing its key, and the app now loads a local profile with explicit
+free model/provider allowlists; external submission remains disabled. A live
+catalogue GET found new pagination metadata, now accepted by the typed parser.
+Synthetic-only completion probes proved Nemotron Super strict output and Ultra
+prose work technically when privacy filters are removed, but Super returned
+HTTP 404 under ZDR plus data-collection denial. NVIDIA trial terms currently
+prevent treating real candidate facts as approved input. See
+`docs/evidence/P05-openrouter-live-route.md`. Rotate the key exposed in chat.

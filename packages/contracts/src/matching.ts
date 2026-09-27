@@ -5,6 +5,8 @@ import { idSchema, jobInputSchema } from "./index.js";
 const bounded = z.string().trim().min(1).max(4000);
 export const modelCatalogueSchema = z
   .object({
+    total_count: z.number().int().nonnegative().optional(),
+    links: z.object({ next: z.url().nullable() }).passthrough().optional(),
     data: z
       .array(
         z

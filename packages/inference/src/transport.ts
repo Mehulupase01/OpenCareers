@@ -78,6 +78,11 @@ export class OpenRouterTransport {
         `Free inference is rate limited until ${new Date(Date.now() + retryAfter(response.headers.get("retry-after"))).toISOString()}.`,
         true,
       );
+    if (response.status === 404 && path === "/chat/completions")
+      throw new DomainError(
+        "MODEL_ROUTE_INELIGIBLE",
+        "No endpoint accepted the pinned model, provider, capability and privacy requirements.",
+      );
     if (!response.ok)
       throw new DomainError(
         "MODEL_ROUTE_INELIGIBLE",
@@ -109,9 +114,12 @@ export class OpenRouterTransport {
       typeof raw.choices?.[0]?.message?.content !== "string"
     )
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference response shape was invalid.");
+    const pinnedProvider = request.provider.only[0];
+    if (!pinnedProvider || raw.provider.toLowerCase() !== pinnedProvider.toLowerCase())
+      throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference provider differed from the pin.");
     return {
       model: raw.model,
-      provider: raw.provider,
+      provider: pinnedProvider,
       content: raw.choices[0].message.content,
       usage: {
         promptTokens: Number(raw.usage?.prompt_tokens ?? 0),

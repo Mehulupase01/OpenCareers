@@ -40,4 +40,48 @@ describe("bounded inference gateway", () => {
       retryable: true,
     });
   });
+
+  it("identifies a missing privacy-compatible endpoint without relaxing the request", async () => {
+    const transport = new OpenRouterTransport("synthetic-not-a-real-key", async (_url, init) => {
+      expect(JSON.parse(String(init?.body)).provider).toEqual({
+        only: ["nvidia"],
+        allow_fallbacks: false,
+        require_parameters: true,
+        data_collection: "deny",
+        zdr: true,
+      });
+      return new Response("{}", { status: 404 });
+    });
+    const request = buildRequest(
+      matchingEvaluationCases[0]?.input as MatchingInput,
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "nvidia",
+    );
+    await expect(transport.complete(request)).rejects.toMatchObject({
+      code: "MODEL_ROUTE_INELIGIBLE",
+      message: expect.stringContaining("privacy requirements"),
+    });
+  });
+
+  it("normalizes a case-only provider display difference and rejects another provider", async () => {
+    const request = buildRequest(
+      matchingEvaluationCases[0]?.input as MatchingInput,
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "nvidia",
+    );
+    const response = (provider: string) =>
+      new Response(
+        JSON.stringify({
+          model: request.model,
+          provider,
+          choices: [{ message: { content: "{}" } }],
+          usage: { prompt_tokens: 10, completion_tokens: 2 },
+        }),
+        { status: 200 },
+      );
+    const matching = new OpenRouterTransport("synthetic-key", async () => response("Nvidia"));
+    expect((await matching.complete(request)).provider).toBe("nvidia");
+    const changed = new OpenRouterTransport("synthetic-key", async () => response("Other"));
+    await expect(changed.complete(request)).rejects.toThrow("provider differed");
+  });
 });
