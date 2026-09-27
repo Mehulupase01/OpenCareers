@@ -271,6 +271,11 @@ export async function prepareRecruiteePacket(
   ];
   const status = issues.length ? "unsupported" : "ready";
   return dryRunResultSchema.parse({
+    adapter: {
+      id: "recruitee",
+      version: "recruitee-careers-v1",
+      targetFingerprint: digest(target),
+    },
     packetId: packet.manifest.id,
     applicationId: packet.manifest.applicationId,
     status,

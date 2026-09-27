@@ -82,6 +82,15 @@ export type FillReport = z.infer<typeof fillReportSchema>;
 
 export const dryRunResultSchema = z
   .object({
+    adapter: z
+      .object({
+        id: z.string().regex(/^[a-z][a-z0-9-]{0,79}$/),
+        version: z.string().regex(/^[a-z][a-z0-9.-]{0,119}$/),
+        targetFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .nullable()
+      .default(null),
     packetId: z.string().min(1).max(120),
     applicationId: z.string().min(1).max(120),
     status: z.enum(["ready", "needs_input", "challenge", "unsupported", "upload_failed"]),

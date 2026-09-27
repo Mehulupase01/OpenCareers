@@ -16,13 +16,14 @@ export class BrowserRepository extends Repository {
   async save(
     resultInput: DryRunResult,
     options: {
-      queueMockSubmit?: boolean;
-      queueRecruiteeSubmit?: { tenant: string; offerSlug: string };
+      queueSubmit?: { adapterId: string; target: Record<string, unknown> };
     } = {},
   ): Promise<BrowserPreparation> {
-    if (options.queueMockSubmit && options.queueRecruiteeSubmit)
-      throw new DomainError("CONFIG_INVALID", "A preparation can queue only one adapter.");
+    if (options.queueSubmit && !/^[a-z][a-z0-9-]{0,79}$/.test(options.queueSubmit.adapterId))
+      throw new DomainError("CONFIG_INVALID", "Invalid submission adapter ID.");
     const result = dryRunResultSchema.parse(resultInput);
+    if (options.queueSubmit && result.adapter?.id !== options.queueSubmit.adapterId)
+      throw new DomainError("FORM_CHANGED", "Queued adapter does not match the preparation.");
     const ready = result.status === "ready";
     const completeReadBack = result.snapshots.every((snapshot, index) => {
       const plan = result.plans[index];
@@ -157,28 +158,17 @@ export class BrowserRepository extends Repository {
         ],
       );
       await this.audit(tx, id, "browser.prepared", 1, { status: result.status });
-      if (ready && options.queueMockSubmit)
+      if (ready && options.queueSubmit)
         await this.enqueueIn(tx, {
           type: "submit",
-          dedupeKey: `mock-submit:${id}`,
-          domain: "mock-ats",
-          applicationId: result.applicationId,
-          payload: { schemaVersion: 1, packetId: result.packetId, preparationId: id },
-          priority: 50,
-          maxAttempts: 1,
-        });
-      if (ready && options.queueRecruiteeSubmit)
-        await this.enqueueIn(tx, {
-          type: "submit",
-          dedupeKey: `recruitee-submit:${id}`,
-          domain: "recruitee",
+          dedupeKey: `${options.queueSubmit.adapterId}-submit:${id}`,
+          domain: options.queueSubmit.adapterId,
           applicationId: result.applicationId,
           payload: {
             schemaVersion: 1,
             packetId: result.packetId,
             preparationId: id,
-            tenant: options.queueRecruiteeSubmit.tenant,
-            offerSlug: options.queueRecruiteeSubmit.offerSlug,
+            ...options.queueSubmit.target,
           },
           priority: 50,
           maxAttempts: 1,

@@ -61,6 +61,11 @@ export async function prepareMockPacket(
       };
       if (server.count !== 0) throw new Error("A dry run created a mock application record.");
       return dryRunResultSchema.parse({
+        adapter: {
+          id: "mock-ats",
+          version: "mock-ats-v1",
+          targetFingerprint: createHash("sha256").update(JSON.stringify({ fixture })).digest("hex"),
+        },
         packetId: packet.manifest.id,
         applicationId: packet.manifest.applicationId,
         status,

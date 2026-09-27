@@ -25,3 +25,9 @@ export const recruiteeReceiptEvidenceSchema = z
   })
   .strict();
 export type RecruiteeReceiptEvidence = z.infer<typeof recruiteeReceiptEvidenceSchema>;
+
+export const receiptEvidenceSchema = z.discriminatedUnion("kind", [
+  mockReceiptEvidenceSchema,
+  recruiteeReceiptEvidenceSchema,
+]);
+export type ReceiptEvidence = z.infer<typeof receiptEvidenceSchema>;

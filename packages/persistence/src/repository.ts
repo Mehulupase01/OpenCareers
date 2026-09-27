@@ -282,6 +282,7 @@ export class Repository extends OwnerScope {
         dedupeKey: `reconcile:${app.id}:${task.id}`,
         applicationId: String(app.id),
         domain: task.domain,
+        payload: task.payload,
         priority: 100,
       });
       await tx.query(

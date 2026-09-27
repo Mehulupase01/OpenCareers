@@ -30,12 +30,18 @@ async function launchOwnedBrowser(
     await context.route("**/*", async (route) => {
       const request = route.request();
       const destination = new URL(request.url());
+      if (destination.origin !== allowed.origin) return route.abort("blockedbyclient");
       if (
-        destination.origin !== allowed.origin ||
-        (!allowMockCommit && destination.pathname === "/applications" && request.method() !== "GET")
+        !allowMockCommit &&
+        destination.pathname === "/applications" &&
+        request.method() !== "GET"
       ) {
-        if (destination.pathname === "/applications") blockedCommitCount++;
-        return route.abort("blockedbyclient");
+        blockedCommitCount++;
+        return route.fulfill({
+          status: 409,
+          contentType: "text/html; charset=utf-8",
+          body: "<!doctype html><title>Final action blocked</title><p>Dry-run final action blocked.</p>",
+        });
       }
       return route.continue();
     });

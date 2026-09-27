@@ -5,7 +5,9 @@ import { DomainError, type Task } from "../../contracts/src/index.js";
 import {
   type MockReceiptEvidence,
   mockReceiptEvidenceSchema,
+  type ReceiptEvidence,
   type RecruiteeReceiptEvidence,
+  receiptEvidenceSchema,
   recruiteeReceiptEvidenceSchema,
 } from "../../contracts/src/submission.js";
 import { assertTransition } from "../../domain/src/state.js";
@@ -89,25 +91,7 @@ export class SubmissionRepository extends Repository {
       const result = dryRunResultSchema.parse(JSON.parse(String(preparation.result)));
       if (result.status !== "ready" || result.serverApplicationCount !== 0)
         throw new DomainError("FORM_CHANGED", "Browser preparation is not commit-ready.");
-      const mockPreparation = result.snapshots.every((snapshot) => {
-        const url = new URL(snapshot.url);
-        return url.protocol === "http:" && url.hostname === "127.0.0.1";
-      });
-      const recruiteePreparation =
-        result.snapshots.length === 1 &&
-        result.snapshots.every((snapshot) => {
-          const url = new URL(snapshot.url);
-          return (
-            url.protocol === "https:" &&
-            /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(url.hostname) &&
-            /^\/api\/offers\/[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/.test(url.pathname)
-          );
-        });
-      if (
-        (task.domain === "mock-ats" && !mockPreparation) ||
-        (task.domain === "recruitee" && !recruiteePreparation) ||
-        !["mock-ats", "recruitee"].includes(task.domain)
-      )
+      if (result.adapter?.id !== task.domain)
         throw new DomainError("FORM_CHANGED", "Task adapter does not match its preparation.");
       const prior = await tx.query(
         "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
@@ -129,6 +113,8 @@ export class SubmissionRepository extends Repository {
       const snapshot = {
         applicationId,
         adapter: task.domain,
+        adapterVersion: result.adapter.version,
+        targetFingerprint: result.adapter.targetFingerprint,
         jobId: manifest.jobId,
         packetId: manifest.id,
         packetArtifacts: manifest.artifacts.map((artifact) => ({
@@ -315,6 +301,17 @@ export class SubmissionRepository extends Repository {
       );
       return receiptId;
     });
+  }
+
+  async confirmReceipt(
+    task: Task,
+    handle: CommitHandle,
+    evidenceInput: ReceiptEvidence,
+  ): Promise<string> {
+    const evidence = receiptEvidenceSchema.parse(evidenceInput);
+    return evidence.kind === "mock_ats"
+      ? this.confirmMockReceipt(task, handle, evidence)
+      : this.confirmRecruiteeReceipt(task, handle, evidence);
   }
 
   async recordDefinitiveMockRejection(task: Task, handle: CommitHandle): Promise<void> {
@@ -519,6 +516,19 @@ export class SubmissionRepository extends Repository {
     const outcome = await this.reconcileMockReceipt(task, null);
     if (outcome !== "needs_review") throw new Error("Receipt-free reconciliation was confirmed.");
     return outcome;
+  }
+
+  async reconcileReceipt(
+    task: Task,
+    evidenceInput: ReceiptEvidence | null,
+  ): Promise<"confirmed" | "needs_review"> {
+    if (!evidenceInput) return this.reconcileWithoutReceipt(task);
+    const evidence = receiptEvidenceSchema.parse(evidenceInput);
+    if (evidence.kind === "mock_ats") return this.reconcileMockReceipt(task, evidence);
+    throw new DomainError(
+      "ADAPTER_UNSUPPORTED",
+      "Recruitee receipt reconciliation is introduced with email integration in P11.",
+    );
   }
 }
 

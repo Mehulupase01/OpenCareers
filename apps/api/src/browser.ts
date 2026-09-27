@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { prepareMockPacket } from "../../../packages/browser/src/prepare.js";
-import { prepareRecruiteePacket } from "../../../packages/browser/src/recruitee.js";
+import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
@@ -48,6 +47,7 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
   const store = new ArtifactStore(config.dataDir);
+  const adapters = createAdapterRegistry(config.dataDir);
   await store.initialize();
   app.get("/v1/browser", () => browser.snapshot());
   app.post("/v1/browser/dry-run", async (request) => {
@@ -57,8 +57,17 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     const packet = (await documents.snapshot()).find((item) => item.manifest.id === input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
-    const result = await prepareMockPacket(packet, cv.buffer, input.approvedValues, input.fixture);
-    return browser.save(result, { queueMockSubmit: true });
+    const adapter = adapters.get("mock-ats");
+    const target = adapter.parseTarget({ fixture: input.fixture });
+    const result = await adapter.prepare({
+      packet,
+      cvPdf: cv.buffer,
+      approvedValues: input.approvedValues,
+      target,
+    });
+    return browser.save(result, {
+      queueSubmit: { adapterId: adapter.id, target: target as Record<string, unknown> },
+    });
   });
   app.post("/v1/browser/recruitee/prepare", async (request) => {
     if (!config.externalSubmissionEnabled || config.profile === "demo")
@@ -67,8 +76,16 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     const packet = (await documents.snapshot()).find((item) => item.manifest.id === input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
-    const target = { tenant: input.tenant, offerSlug: input.offerSlug };
-    const result = await prepareRecruiteePacket(target, packet, cv.buffer, input.approvedValues);
-    return browser.save(result, { queueRecruiteeSubmit: target });
+    const adapter = adapters.get("recruitee");
+    const target = adapter.parseTarget({ tenant: input.tenant, offerSlug: input.offerSlug });
+    const result = await adapter.prepare({
+      packet,
+      cvPdf: cv.buffer,
+      approvedValues: input.approvedValues,
+      target,
+    });
+    return browser.save(result, {
+      queueSubmit: { adapterId: adapter.id, target: target as Record<string, unknown> },
+    });
   });
 }

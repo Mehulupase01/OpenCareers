@@ -91,6 +91,11 @@ function readyBrowserResult(packet: PacketSnapshot): DryRunResult {
     { name: "sponsorship", semanticKey: "sponsorship_required", expected: "no", evidence: [] },
   ];
   return {
+    adapter: {
+      id: "mock-ats",
+      version: "mock-ats-v1",
+      targetFingerprint: "c".repeat(64),
+    },
     packetId: packet.manifest.id,
     applicationId: packet.manifest.applicationId,
     status: "ready",
@@ -332,6 +337,11 @@ for (const engine of ["sqlite", "postgres"] as const) {
         recruitee.snapshots = [recruitee.snapshots[0] as (typeof recruitee.snapshots)[number]];
         recruitee.plans = [recruitee.plans[0] as (typeof recruitee.plans)[number]];
         recruitee.reports = [recruitee.reports[0] as (typeof recruitee.reports)[number]];
+        recruitee.adapter = {
+          id: "recruitee",
+          version: "recruitee-careers-v1",
+          targetFingerprint: "d".repeat(64),
+        };
         const recruiteeSnapshot = recruitee.snapshots[0];
         const recruiteeReport = recruitee.reports[0];
         if (!recruiteeSnapshot || !recruiteeReport)
@@ -343,9 +353,9 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(
           (
             await browser.save(recruitee, {
-              queueRecruiteeSubmit: {
-                tenant: "synthetic",
-                offerSlug: "software-engineer",
+              queueSubmit: {
+                adapterId: "recruitee",
+                target: { tenant: "synthetic", offerSlug: "software-engineer" },
               },
             })
           ).status,
@@ -510,6 +520,11 @@ for (const engine of ["sqlite", "postgres"] as const) {
         result.snapshots = [result.snapshots[0] as (typeof result.snapshots)[number]];
         result.plans = [result.plans[0] as (typeof result.plans)[number]];
         result.reports = [result.reports[0] as (typeof result.reports)[number]];
+        result.adapter = {
+          id: "recruitee",
+          version: "recruitee-careers-v1",
+          targetFingerprint: "d".repeat(64),
+        };
         const snapshot = result.snapshots[0];
         const report = result.reports[0];
         if (!snapshot || !report) throw new Error("Expected a Recruitee preparation step.");
