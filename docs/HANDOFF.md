@@ -141,3 +141,13 @@ now reject changed caller values for packet-backed identity, CV and related
 fields. Exact internal replay retains packet evidence. Focused tests and the
 full check passed (121 tests; 55 database-dependent tests skipped locally).
 The second-family commit/receipt gates remain open.
+
+P09 coverage now includes a dated variant-level support matrix in the API and
+Discovery view, separate from owner-corpus counts. It distinguishes synthetic
+mock and Recruitee lifecycle evidence from public-read-only challenged Adyen
+Greenhouse and Protolabs Lever forms. SQLite coverage and desktop/mobile
+Discovery tests pass. This does not complete P09-G2/G6 or authorize a live POST.
+CI for the preceding planner-guard commit failed its Documents E2E: that panel
+still offered editable packet-backed phone and portfolio values. The panel now
+displays those reviewed values read-only and sends only supplementary answers;
+the E2E asserts the packet values. Re-run full CI before calling this repaired.

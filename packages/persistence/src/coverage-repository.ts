@@ -2,6 +2,7 @@ import type {
   CoverageLevel,
   PortalCoverageReport,
   PortalCoverageRow,
+  PortalSupportVariant,
 } from "../../contracts/src/coverage.js";
 import { sourceInputSchema } from "../../contracts/src/discovery.js";
 import { assessmentSchema, type MatchAssessment } from "../../contracts/src/matching.js";
@@ -44,7 +45,7 @@ const support: Record<
       reconciliation: "planned",
     },
     adapterVersion: null,
-    limitations: ["Application form variants have not yet been classified."],
+    limitations: ["Adyen hosted form is challenged; other application variants are unclassified."],
   },
   lever: {
     accountNeed: "unknown",
@@ -76,6 +77,63 @@ const levelWeight: Record<CoverageLevel, number> = {
   dry_run_tested: 3,
   live_verified: 4,
 };
+
+const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "mock-ats-standard",
+    family: "mock_ats",
+    variant: "Owned standard form",
+    adapterVersion: "mock-ats-v1",
+    accountNeed: "not_required",
+    challengeNeed: "not_present",
+    support: {
+      discovery: "fixture_tested",
+      inspection: "dry_run_tested",
+      commit: "fixture_tested",
+      receipt: "fixture_tested",
+      reconciliation: "fixture_tested",
+    },
+    observedAt: null,
+    evidence: "Synthetic P07/P08 lifecycle and recovery fixtures",
+    limitations: ["Owned test portal only; no employer submission."],
+  },
+  {
+    id: "recruitee-careers-v1",
+    family: "recruitee",
+    variant: "Published, single-location Careers Site offer",
+    adapterVersion: "recruitee-careers-v1",
+    accountNeed: "not_required",
+    challengeNeed: "not_present",
+    support: support.recruitee.support,
+    observedAt: "2026-09-27",
+    evidence: "Public Freeday collection read; synthetic candidate-ID receipt fixtures",
+    limitations: ["Private live POST and email reconciliation pending."],
+  },
+  {
+    id: "greenhouse-adyen-hosted",
+    family: "greenhouse",
+    variant: "Adyen hosted external form",
+    adapterVersion: null,
+    accountNeed: "not_required",
+    challengeNeed: "required",
+    support: support.greenhouse.support,
+    observedAt: "2026-09-27",
+    evidence: "Hydrated public form and intercepted synthetic final-action trace",
+    limitations: ["reCAPTCHA Enterprise; upload, commit and correlated receipt unsupported."],
+  },
+  {
+    id: "lever-protolabs-hosted",
+    family: "lever",
+    variant: "Protolabs hosted form",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "required",
+    support: { ...support.lever.support, inspection: "public_read" },
+    observedAt: "2026-09-27",
+    evidence: "Public hosted form read-only inspection",
+    limitations: ["Challenge and substantive answers; no submission adapter."],
+  },
+];
 
 export class CoverageRepository extends Repository {
   async report(): Promise<PortalCoverageReport> {
@@ -158,6 +216,7 @@ export class CoverageRepository extends Repository {
         },
         recommendedNextFamily,
         rows,
+        supportMatrix,
       };
     });
   }

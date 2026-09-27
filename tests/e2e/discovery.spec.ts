@@ -9,6 +9,17 @@ test("discovery source, evidence, historical import and reversible identity", as
   await page.goto("/");
   await expect(page.getByText("No real applications submitted")).toBeVisible();
   await page.getByRole("button", { name: "Discovery", exact: true }).click();
+  await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Variant support" })).toBeVisible();
+  const adyen = page
+    .locator(".coverage-table tbody tr")
+    .filter({ hasText: "Adyen hosted external form" });
+  await expect(adyen).toContainText("required");
+  await expect(adyen).toContainText("planned / planned");
+  await page.screenshot({
+    path: `test-results/discovery-coverage-${info.project.name}.png`,
+    fullPage: true,
+  });
   await page.getByRole("tab", { name: "Sources", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Source health" })).toBeVisible();
   const existing = page.locator(".source-health-list article").filter({ hasText: "synthetic-e2e" });

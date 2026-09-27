@@ -6,13 +6,17 @@ tenant's eligible and open counts, joins the latest assessment for the active
 profile, and ranks families by eligible jobs, then
 open jobs and discovery maturity. Unassessed jobs are shown separately. The
 report does not turn a fixture or public read into live submission evidence.
+The same view publishes a dated, variant-level support matrix. Its entries are
+curated engineering evidence, separate from the owner's live vacancy counts;
+an observed challenge on one employer form does not classify every posting in
+that portal family.
 
 | Family | Discovery | Inspect/fill | Commit/receipt | Reconciliation | Live evidence |
 | --- | --- | --- | --- | --- | --- |
 | Owned mock ATS | Fixture-tested P07 | Dry-run-tested P07 | Auto-submit tested P08 | Correlated receipt and recovery tested P08 | Synthetic only |
 | Recruitee Careers Site API v1 | Collection live-read and fixture-tested P09 | Payload preparation tested P08 | Multipart commit and candidate-ID receipt fixture-tested P08 | Email reconciliation pending P11 | Freeday collection read-only, 2026-09-27; live POST pending |
 | Lever hosted Protolabs variant | Public form inspected read-only | Unsupported: substantive answers and challenge | None | None | Public read-only 2026-09-27 |
-| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Public form inspected; fill/upload unsupported | Planned | Planned | Adyen challenge detected, read-only 2026-09-27 |
+| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Adyen hosted form inspected read-only; fill/upload unsupported | Planned | Planned | Adyen reCAPTCHA Enterprise detected after hydration, read-only 2026-09-27 |
 | Lever public postings GET | Fixture-tested P04 | Planned | Planned | Planned | No live read |
 | Ashby | Planned P04 | Planned | Planned | Planned | None |
 

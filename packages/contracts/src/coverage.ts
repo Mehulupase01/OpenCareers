@@ -40,4 +40,18 @@ export interface PortalCoverageReport {
   };
   recommendedNextFamily: SourceInput["connector"] | null;
   rows: PortalCoverageRow[];
+  supportMatrix: PortalSupportVariant[];
+}
+
+export interface PortalSupportVariant {
+  id: string;
+  family: SourceInput["connector"] | "mock_ats";
+  variant: string;
+  adapterVersion: string | null;
+  accountNeed: PortalCoverageRow["accountNeed"];
+  challengeNeed: PortalCoverageRow["challengeNeed"];
+  support: PortalCoverageRow["support"];
+  observedAt: string | null;
+  evidence: string;
+  limitations: string[];
 }

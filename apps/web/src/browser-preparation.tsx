@@ -6,8 +6,8 @@ import { request } from "./api.js";
 
 export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) {
   const [country, setCountry] = useState("");
-  const [phone, setPhone] = useState(packet.content.cv.identity.phone);
-  const [portfolio, setPortfolio] = useState(packet.content.cv.identity.links[0] ?? "");
+  const phone = packet.content.cv.identity.phone;
+  const portfolio = packet.content.cv.identity.links[0] ?? "";
   const [sponsorship, setSponsorship] = useState("");
   const [available, setAvailable] = useState("");
   const [remote, setRemote] = useState("");
@@ -34,8 +34,6 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
         packetId: packet.manifest.id,
         approvedValues: {
           country,
-          phone,
-          portfolio,
           sponsorship_required: sponsorship,
           available_from: available,
           remote_preference: remote,
@@ -69,15 +67,11 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
       <div className="browser-answer-grid">
         <label>
           Phone
-          <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input type="tel" value={phone} readOnly />
         </label>
         <label>
           Portfolio
-          <input
-            type="url"
-            value={portfolio}
-            onChange={(event) => setPortfolio(event.target.value)}
-          />
+          <input type="url" value={portfolio} readOnly />
         </label>
         <label>
           Country

@@ -121,6 +121,20 @@ for (const engine of ["sqlite", "postgres"] as const) {
           challengeNeed: "unknown",
           adapterVersion: null,
         });
+        expect(report.supportMatrix).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: "recruitee-careers-v1",
+              support: expect.objectContaining({ commit: "fixture_tested" }),
+            }),
+            expect.objectContaining({
+              id: "greenhouse-adyen-hosted",
+              challengeNeed: "required",
+              adapterVersion: null,
+              support: expect.objectContaining({ commit: "planned", receipt: "planned" }),
+            }),
+          ]),
+        );
       });
     },
   );

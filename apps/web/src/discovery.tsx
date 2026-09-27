@@ -735,6 +735,42 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
                 </table>
               </div>
               {!coverage.rows.length && <div className="empty-state">No open portal coverage</div>}
+              <div className="section-toolbar">
+                <h3>Variant support</h3>
+              </div>
+              <div className="table-scroll">
+                <table className="coverage-table">
+                  <thead>
+                    <tr>
+                      <th>Variant</th>
+                      <th>Inspect / Commit / Receipt</th>
+                      <th>Challenge</th>
+                      <th>Evidence</th>
+                      <th>Limitations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.supportMatrix.map((variant) => (
+                      <tr key={variant.id}>
+                        <td>
+                          <strong>{variant.family}</strong>
+                          <span className="company-name">{variant.variant}</span>
+                        </td>
+                        <td>
+                          {words(variant.support.inspection)} / {words(variant.support.commit)} /{" "}
+                          {words(variant.support.receipt)}
+                        </td>
+                        <td>{words(variant.challengeNeed)}</td>
+                        <td>
+                          {variant.evidence}
+                          {variant.observedAt ? ` (${variant.observedAt})` : ""}
+                        </td>
+                        <td>{variant.limitations.join(" ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           )}
           {tab === "sources" && (

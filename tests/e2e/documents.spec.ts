@@ -116,6 +116,8 @@ test("immutable document packet review and downloads remain inspectable", async 
       applicationId: assessment.applicationId as string,
       title: listing.job.title as string,
       authorization: authorization.id as string,
+      phone: packet.content.cv.identity.phone as string,
+      portfolio: packet.content.cv.identity.links[0] as string,
     };
   }, info.project.name);
   expect(result.authorization).toBeTruthy();
@@ -145,10 +147,10 @@ test("immutable document packet review and downloads remain inspectable", async 
     fullPage: true,
   });
   const dryRun = page.getByRole("region", { name: "Mock ATS dry run" });
-  await dryRun.getByLabel("Phone", { exact: true }).fill("+31 20 000 0000");
-  await dryRun
-    .getByLabel("Portfolio", { exact: true })
-    .fill("https://portfolio.synthetic.example/a-very-long-but-valid-profile-path");
+  await expect(dryRun.getByLabel("Phone", { exact: true })).toHaveValue(result.phone);
+  await expect(dryRun.getByLabel("Portfolio", { exact: true })).toHaveValue(result.portfolio);
+  await expect(dryRun.getByLabel("Phone", { exact: true })).toHaveAttribute("readonly");
+  await expect(dryRun.getByLabel("Portfolio", { exact: true })).toHaveAttribute("readonly");
   await dryRun.getByRole("combobox", { name: "Country" }).selectOption("NL");
   await dryRun.getByRole("combobox", { name: "Future sponsorship" }).selectOption("no");
   await dryRun.getByLabel("Available from", { exact: true }).fill("2026-11-01");
