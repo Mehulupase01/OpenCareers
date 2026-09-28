@@ -7,7 +7,9 @@ test("employer accounts prepare locally and refuse an external dispatch until au
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page.getByText("No real applications submitted")).toBeVisible();
+  // The shell loads the operations summary, discovery, matching and documents
+  // before it renders. A 5 second default is not a realistic expectation here.
+  await expect(page.getByText("No real applications submitted")).toBeVisible({ timeout: 30000 });
   await page.getByRole("button", { name: "Documents", exact: true }).click();
   const panel = page.getByRole("region", { name: "Employer accounts" });
   await expect(panel).toBeVisible({ timeout: 30000 });

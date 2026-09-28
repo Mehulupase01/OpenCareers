@@ -157,15 +157,18 @@ describe("phase ledger", () => {
     }
   });
 
-  it("leaves the two P10 gates that are genuinely open open", () => {
+  it("leaves the P10 gate that is genuinely open open", async () => {
     const p10 = byId.get("P10");
     expect(p10?.status).toBe("in_progress");
-    expect(p10?.gates.find((gate) => gate.id === "P10-G6")?.status).toBe("not_started");
     expect(p10?.gates.find((gate) => gate.id === "P10-G7")?.status).toBe("not_started");
-    expect(p10?.gates.filter((gate) => gate.status === "complete")).toHaveLength(5);
+    expect(p10?.gates.filter((gate) => gate.status === "complete")).toHaveLength(6);
     expect(
       p10?.tickets.filter((ticket) => ticket.status === "complete").map((ticket) => ticket.id),
     ).toEqual(["P10-01", "P10-02", "P10-03"]);
+    // The exception inbox and the rebuild path are the remaining P10 work, and the
+    // ledger must say so rather than letting the phase look finished.
+    expect(p10?.nextAction).toBe("P10-04");
+    expect(p10?.tickets.find((ticket) => ticket.id === "P10-04")?.status).not.toBe("complete");
   });
 
   it("tracks the owner-added breadth phase without borrowing P09 evidence", () => {

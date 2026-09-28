@@ -29,6 +29,7 @@ import {
   documentJob,
   documentProfile,
 } from "../fixtures/document-packets.js";
+import { identity } from "../helpers/candidate-fixtures.js";
 
 function readyBrowserResult(packet: PacketSnapshot): DryRunResult {
   const cv = packet.manifest.artifacts.find((item) => item.kind === "cv_pdf");
@@ -226,6 +227,43 @@ for (const engine of ["sqlite", "postgres"] as const) {
       afterEach(async () => {
         await db?.close();
         if (dir) await rm(dir, { recursive: true, force: true });
+      });
+
+      it("excludes an approved answer that is scoped to a different employer", async () => {
+        const evidenceFact = await new CandidateRepository(
+          db,
+          owner,
+          () => new Date("2026-09-17T09:00:00.000Z"),
+        ).saveFact(identity);
+        const save = async (semanticKey: string, employerIds: string[], countries: string[]) =>
+          new CandidateRepository(db, owner, () => new Date("2026-09-17T09:00:00.000Z")).saveAnswer(
+            {
+              semanticKey,
+              meaning: `Meaning for ${semanticKey}`,
+              answer: "approved wording",
+              validFrom: "2026-09-01",
+              validUntil: "2026-10-01",
+              employerIds,
+              countries,
+              evidenceFactIds: [evidenceFact.id],
+            },
+          );
+        await save("sponsorship.future", ["a-different-employer"], ["NL"]);
+        await save("notice.period", [], []);
+
+        const input = await documents.generationInput(
+          "application-documents",
+          documentAssessment.id,
+          [],
+          "2026-09-17",
+        );
+        expect(input.approvedAnswers.map((answer) => answer.semanticKey)).toEqual([
+          "notice.period",
+        ]);
+
+        // The packet itself must not carry the other employer's wording.
+        const packet = await buildPacket(artifacts, input);
+        expect(JSON.stringify(packet.content.answers)).not.toContain("sponsorship.future");
       });
 
       it("requires an LLM packet when checking readiness for private preparation", async () => {

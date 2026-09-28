@@ -279,6 +279,82 @@ for (const engine of ["sqlite", "postgres"] as const) {
           ),
         ).resolves.toMatchObject({ id: authorization.id });
       });
+      it("keeps a differently worded legal question from inheriting a resolved answer", async () => {
+        const { fact, app } = await authorized();
+        const current = await repo.saveAnswer({
+          semanticKey: "work.current",
+          meaning: "Currently authorized to work in NL",
+          answer: true,
+          validFrom: "2026-09-16",
+          validUntil: "2026-10-16",
+          employerIds: [],
+          countries: ["NL"],
+          evidenceFactIds: [fact.id],
+        });
+        // Every one of these reads as a work-authorization or sponsorship question
+        // to a keyword matcher. None of them is the question that was answered.
+        const distinct = [
+          ["work.current", "Do you currently have the right to work in the Netherlands?"],
+          ["work.current", "Are you legally permitted to work in NL today?"],
+          ["sponsorship.required", "Will you require future employer sponsorship in NL?"],
+          ["work.nationality", "What is your nationality?"],
+          ["work.ethnicity", "What is your ethnic origin?"],
+        ] as const;
+        for (const [key, meaning] of distinct) {
+          expect(await repo.resolveQuestion(app.id, key, meaning)).toBeNull();
+        }
+        expect(
+          (await repo.resolveQuestion(app.id, "work.current", "Currently authorized to work in NL"))
+            ?.id,
+        ).toBe(current.id);
+      });
+      it("scopes answers to one job so another employer never sees them", async () => {
+        const { fact } = await authorized();
+        const scoped = await repo.saveAnswer({
+          semanticKey: "salary.numeric",
+          meaning: "Gross annual salary in EUR",
+          answer: 65000,
+          validFrom: "2026-09-16",
+          validUntil: "2026-10-16",
+          employerIds: ["synthetic-employer"],
+          countries: ["NL"],
+          evidenceFactIds: [fact.id],
+        });
+        const everywhere = await repo.saveAnswer({
+          semanticKey: "notice.period",
+          meaning: "Notice period in months",
+          answer: 1,
+          validFrom: "2026-09-16",
+          validUntil: "2026-10-16",
+          employerIds: [],
+          countries: [],
+          evidenceFactIds: [fact.id],
+        });
+        const keys = async (context: { employerId: string; country?: string; asOf: string }) =>
+          (await repo.scopedAnswers(context)).map((answer) => answer.semanticKey).sort();
+
+        expect(
+          await keys({ employerId: "synthetic-employer", country: "NL", asOf: "2026-09-16" }),
+        ).toEqual(["notice.period", "salary.numeric"]);
+        // A different employer, and a different country, must not see the scoped answer.
+        expect(
+          await keys({ employerId: "other-employer", country: "NL", asOf: "2026-09-16" }),
+        ).toEqual(["notice.period"]);
+        expect(
+          await keys({ employerId: "synthetic-employer", country: "DE", asOf: "2026-09-16" }),
+        ).toEqual(["notice.period"]);
+        // Outside the validity window, nothing is offered at all.
+        expect(
+          await keys({ employerId: "synthetic-employer", country: "NL", asOf: "2026-11-01" }),
+        ).toEqual([]);
+        await repo.saveFact({ ...identity, id: fact.id, expectedRevision: fact.revision });
+        // Both answers rested on that fact, so superseding it withdraws both
+        // rather than leaving a stale one on offer.
+        expect(
+          await keys({ employerId: "synthetic-employer", country: "NL", asOf: "2026-09-16" }),
+        ).toEqual([]);
+        expect(scoped.id).not.toBe(everywhere.id);
+      });
       it("serializes revocation against a competing policy check and rejects subsequent checks", async () => {
         const { authorization, gate } = await authorized();
         const outcomes = await Promise.allSettled([

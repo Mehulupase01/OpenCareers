@@ -620,6 +620,61 @@ export class CandidateRepository extends Repository {
     }
     return null;
   }
+  /**
+   * Answers whose scope is satisfied for one specific job. Meaning is deliberately
+   * not applied here: meaning can only be checked against a real form question.
+   * Scope, though, is knowable the moment a job is known, so an answer scoped to
+   * another employer or country, expired, or resting on superseded evidence must
+   * never be handed to a fill plan for this job. The commit gate re-checks
+   * meaning; this prevents the wrong value from being on the page at all.
+   */
+  async scopedAnswers(context: {
+    employerId: string;
+    country?: string;
+    asOf: string;
+  }): Promise<ApprovedAnswer[]> {
+    return this.db.transaction(async (tx) => {
+      const facts = await this.facts(tx);
+      const rows = await tx.query(
+        "SELECT * FROM approved_answers WHERE owner_id=$1 ORDER BY semantic_key,revision DESC",
+        [this.ownerId],
+      );
+      const seen = new Set<string>();
+      const scoped: ApprovedAnswer[] = [];
+      for (const row of rows) {
+        const answer = json<ApprovedAnswer>(row);
+        if (seen.has(answer.semanticKey)) continue;
+        if (answer.employerIds.length && !answer.employerIds.includes(context.employerId)) continue;
+        if (
+          context.country &&
+          answer.countries.length &&
+          !answer.countries.includes(context.country)
+        )
+          continue;
+        if (answer.validFrom > context.asOf || answer.validUntil < context.asOf) continue;
+        if (
+          answer.evidenceFactIds.some(
+            (id) =>
+              !facts.some(
+                (fact) =>
+                  fact.id === id &&
+                  fact.revision === answer.evidenceRevisions[id] &&
+                  usableFact(fact, context.asOf),
+              ),
+          )
+        )
+          continue;
+        seen.add(answer.semanticKey);
+        scoped.push({
+          ...answer,
+          id: String(row.id),
+          revision: Number(row.revision),
+          approvedAt: String(row.approved_at),
+        });
+      }
+      return scoped;
+    });
+  }
   async saveAnswer(raw: AnswerInput): Promise<ApprovedAnswer> {
     const input = answerInputSchema.parse(raw);
     return this.db.transaction(async (tx) => {

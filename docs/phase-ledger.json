@@ -1055,14 +1055,11 @@
           "status": "complete",
           "acceptanceTests": [],
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/accounts.test.ts",
             "tests/unit/vault.test.ts",
-            "tests/unit/signup.test.ts",
-            "tests/integration/handoff.test.ts",
-            "tests/e2e/handoff-broker.spec.ts",
-            "tests/integration/api.test.ts",
-            "tests/integration/documents.test.ts"
+            "tests/integration/account-api.test.ts",
+            "tests/e2e/accounts.spec.ts"
           ],
           "nextAction": null
         },
@@ -1072,14 +1069,9 @@
           "status": "complete",
           "acceptanceTests": [],
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
-            "tests/integration/accounts.test.ts",
-            "tests/unit/vault.test.ts",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/unit/signup.test.ts",
-            "tests/integration/handoff.test.ts",
-            "tests/e2e/handoff-broker.spec.ts",
-            "tests/integration/api.test.ts",
-            "tests/integration/documents.test.ts"
+            "tests/integration/account-api.test.ts"
           ],
           "nextAction": null
         },
@@ -1089,14 +1081,11 @@
           "status": "complete",
           "acceptanceTests": [],
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
-            "tests/integration/accounts.test.ts",
-            "tests/unit/vault.test.ts",
-            "tests/unit/signup.test.ts",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/handoff.test.ts",
+            "tests/integration/handoff-external.test.ts",
             "tests/e2e/handoff-broker.spec.ts",
-            "tests/integration/api.test.ts",
-            "tests/integration/documents.test.ts"
+            "tests/e2e/handoff-external.spec.ts"
           ],
           "nextAction": null
         },
@@ -1123,25 +1112,33 @@
           "requirement": "Supported signup stores credentials safely and never exposes them to model prompts or logs.",
           "status": "complete",
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/accounts.test.ts",
-            "tests/unit/vault.test.ts"
+            "tests/unit/vault.test.ts",
+            "tests/integration/account-api.test.ts",
+            "tests/e2e/accounts.spec.ts"
           ]
         },
         {
           "id": "P10-G2",
           "requirement": "A lost signup response does not automatically create a second account.",
           "status": "complete",
-          "evidence": ["docs/evidence/P10-security-checkpoints.md", "tests/unit/signup.test.ts"]
+          "evidence": [
+            "docs/evidence/P10-closeout-checkpoint.md",
+            "tests/unit/signup.test.ts",
+            "tests/integration/account-api.test.ts"
+          ]
         },
         {
           "id": "P10-G3",
           "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
           "status": "complete",
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/handoff.test.ts",
-            "tests/e2e/handoff-broker.spec.ts"
+            "tests/integration/handoff-external.test.ts",
+            "tests/e2e/handoff-broker.spec.ts",
+            "tests/e2e/handoff-external.spec.ts"
           ]
         },
         {
@@ -1149,9 +1146,10 @@
           "requirement": "Handoff URLs/handles expire, are owner-bound, and cannot control another session.",
           "status": "complete",
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/api.test.ts",
-            "tests/integration/handoff.test.ts"
+            "tests/integration/handoff.test.ts",
+            "tests/unit/handoff-policy.test.ts"
           ]
         },
         {
@@ -1159,16 +1157,21 @@
           "requirement": "User interaction and automation cannot race the final submit.",
           "status": "complete",
           "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
+            "docs/evidence/P10-closeout-checkpoint.md",
             "tests/e2e/handoff-broker.spec.ts",
-            "tests/integration/documents.test.ts"
+            "tests/e2e/handoff-external.spec.ts",
+            "tests/integration/handoff-external.test.ts"
           ]
         },
         {
           "id": "P10-G6",
           "requirement": "Resolving one answer does not incorrectly propagate to differently worded legal or sponsorship questions.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-closeout-checkpoint.md",
+            "tests/integration/candidate.test.ts",
+            "tests/integration/documents.test.ts"
+          ]
         },
         {
           "id": "P10-G7",
@@ -1198,15 +1201,8 @@
       "acceptanceTests": ["T21", "T22", "T32"],
       "nextAction": "P10-04",
       "evidence": [
-        "docs/plans/P10-closeout.md",
-        "docs/evidence/P10-security-checkpoints.md",
-        "tests/integration/accounts.test.ts",
-        "tests/unit/vault.test.ts",
-        "tests/unit/signup.test.ts",
-        "tests/integration/handoff.test.ts",
-        "tests/e2e/handoff-broker.spec.ts",
-        "tests/integration/api.test.ts",
-        "tests/integration/documents.test.ts"
+        "docs/evidence/P10-closeout-checkpoint.md",
+        "docs/evidence/P10-security-checkpoints.md"
       ]
     },
     {

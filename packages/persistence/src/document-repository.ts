@@ -42,7 +42,7 @@ export class DocumentRepository extends Repository {
       throw new DomainError("PROFILE_STALE", "An active profile and authorization are required.");
     const row = (
       await this.db.query(
-        "SELECT a.id AS application_id,a.job_id,a.state,j.data AS job_data,m.data AS assessment_data FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id JOIN match_assessments m ON m.owner_id=a.owner_id AND m.id=$3 WHERE a.owner_id=$1 AND a.id=$2 AND m.application_id=a.id AND m.job_id=a.job_id",
+        "SELECT a.id AS application_id,a.job_id,a.state,j.employer_id,j.data AS job_data,m.data AS assessment_data FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id JOIN match_assessments m ON m.owner_id=a.owner_id AND m.id=$3 WHERE a.owner_id=$1 AND a.id=$2 AND m.application_id=a.id AND m.job_id=a.job_id",
         [this.ownerId, applicationId, assessmentId],
       )
     )[0];
@@ -55,12 +55,25 @@ export class DocumentRepository extends Repository {
         "PROFILE_STALE",
         "Assessment does not use the active profile revision.",
       );
+    const job = jobInputSchema.strip().parse(json<JobInput>(row, "job_data"));
     return {
-      job: jobInputSchema.strip().parse(json<JobInput>(row, "job_data")),
+      job,
       profile: candidate.profile,
       assessment,
       authorization: candidate.authorization,
-      approvedAnswers: candidate.answers as ApprovedAnswer[],
+      // Scoped to this job. An answer approved for another employer, another
+      // country, an earlier date, or evidence that has since been revised must
+      // not reach this packet, because a filled control is already an answer
+      // given to that employer.
+      approvedAnswers: await new CandidateRepository(
+        this.db,
+        this.ownerId,
+        this.clock,
+      ).scopedAnswers({
+        employerId: String(row.employer_id),
+        ...(job.countryCode ? { country: job.countryCode } : {}),
+        asOf,
+      }),
       requestedAnswers,
       asOf,
       generatedAt: this.now(),
