@@ -771,6 +771,105 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await queue.complete(task);
       });
 
+      it("correlates a Greenhouse receipt to its exact board and posting", async () => {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+        const clock = () => new Date("2026-09-28T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        const packet = await documents.savePacket(built);
+        const result = readyBrowserResult(packet);
+        result.snapshots = [result.snapshots[0] as (typeof result.snapshots)[number]];
+        result.plans = [result.plans[0] as (typeof result.plans)[number]];
+        result.reports = [result.reports[0] as (typeof result.reports)[number]];
+        result.adapter = {
+          id: "greenhouse",
+          version: "greenhouse-hosted-v1",
+          targetFingerprint: "e".repeat(64),
+        };
+        const snapshot = result.snapshots[0];
+        const report = result.reports[0];
+        if (!snapshot || !report) throw new Error("Expected a Greenhouse preparation step.");
+        snapshot.url = "https://job-boards.greenhouse.io/synthetic-board/jobs/123456";
+        snapshot.origin = "https://job-boards.greenhouse.io";
+        report.snapshot = snapshot;
+        report.uploadStatus = "selected";
+        const preparation = await new BrowserRepository(db, owner, clock).save(result);
+        await queue.enqueue({
+          type: "submit",
+          dedupeKey: `submit:${packet.manifest.applicationId}`,
+          applicationId: packet.manifest.applicationId,
+          domain: "greenhouse",
+        });
+        const task = await queue.claim("synthetic-worker", ["submit"]);
+        if (!task) throw new Error("Expected a leased Greenhouse task.");
+        const app = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ])
+        )[0];
+        const submissions = new SubmissionRepository(db, owner, clock);
+        const handle = await submissions.begin(task, {
+          packetId: packet.manifest.id,
+          preparationId: preparation.id,
+          expectedRevision: Number(app?.revision),
+        });
+        await submissions.authorizeDispatch(task, handle);
+        const externalReceiptId = "00000000-0000-4000-8000-000000000456";
+        const evidence = {
+          kind: "greenhouse" as const,
+          receiptId: externalReceiptId,
+          board: "synthetic-board",
+          postingId: "123456",
+          jobId: packet.manifest.jobId,
+          receiptUrl: `https://job-boards.greenhouse.io/synthetic-board/jobs/123456?receipt=${externalReceiptId}`,
+          receivedAt: clock().toISOString(),
+          emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+        };
+        await expect(
+          submissions.confirmGreenhouseReceipt(task, handle, {
+            ...evidence,
+            postingId: "654321",
+          }),
+        ).rejects.toMatchObject({ code: "RECEIPT_UNCORRELATED" });
+        const receiptId = await submissions.confirmReceipt(task, handle, evidence);
+        expect(receiptId).toBeTruthy();
+        expect(
+          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ]),
+        ).toEqual([{ state: "CONFIRMED" }]);
+        expect(
+          await db.query("SELECT evidence FROM receipts WHERE owner_id=$1 AND id=$2", [
+            owner,
+            receiptId,
+          ]),
+        ).toEqual([{ evidence: JSON.stringify(evidence) }]);
+        await queue.complete(task);
+      });
+
       it("revocation after intent prevents dispatch and preserves an uncertain attempt", async () => {
         for (const fact of documentFacts) {
           await db.query(

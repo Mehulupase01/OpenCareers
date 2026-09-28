@@ -37,7 +37,7 @@ export async function installGreenhouseReadOnlyRoutes(
   onBlockedWrite: () => void,
 ) {
   await context.route("**/*", async (route) => {
-    if (["GET", "HEAD"].includes(route.request().method())) return route.continue();
+    if (["GET", "HEAD"].includes(route.request().method())) return route.fallback();
     onBlockedWrite();
     return route.fulfill({ status: 409, body: "Read-only preparation blocked this request." });
   });
@@ -61,7 +61,9 @@ export function greenhousePreparationResult(
     ...(snapshot.blocker === "unsupported" ? ["Form variant is unsupported."] : []),
     ...(blockedWriteCount ? ["The form attempted a write during read-only preparation."] : []),
     ...(fillReport?.issues ?? []),
-    "Hosted CV upload and final receipt verification are not yet supported.",
+    ...(target.formFingerprint !== snapshot.fingerprint
+      ? ["The inspected form fingerprint is not explicitly supported."]
+      : []),
   ];
   const status =
     snapshot.blocker === "challenge"
@@ -72,7 +74,11 @@ export function greenhousePreparationResult(
           ? "unsupported"
           : plan.unresolved.length
             ? "needs_input"
-            : "unsupported";
+            : target.formFingerprint !== snapshot.fingerprint || !fillReport
+              ? "unsupported"
+              : fillReport.issues.length || fillReport.readBack.some((entry) => !entry.matches)
+                ? "unsupported"
+                : "ready";
   return dryRunResultSchema.parse({
     adapter: {
       id: "greenhouse",
@@ -204,7 +210,7 @@ export async function fillGreenhouseForm(
     issues.push("Greenhouse form changed during filling.");
   return fillReportSchema.parse({
     snapshot,
-    status: uploadStatus === "failed" ? "upload_failed" : "unsupported",
+    status: uploadStatus === "failed" ? "upload_failed" : issues.length ? "unsupported" : "ready",
     readBack,
     uploadStatus,
     issues,
@@ -216,6 +222,7 @@ export async function prepareGreenhousePacket(
   packet: PacketSnapshot,
   cvPdf: Buffer,
   approvedValues: Record<string, string | boolean>,
+  configureContext?: (context: BrowserContext) => Promise<void>,
 ): Promise<DryRunResult> {
   packetCv(target, packet, cvPdf);
   const url = greenhouseUrl(target);
@@ -230,6 +237,7 @@ export async function prepareGreenhousePacket(
     });
     context.setDefaultTimeout(10000);
     context.setDefaultNavigationTimeout(20000);
+    await configureContext?.(context);
     await installGreenhouseReadOnlyRoutes(context, () => {
       blockedWriteCount++;
     });

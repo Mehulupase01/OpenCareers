@@ -90,6 +90,7 @@ export const formDriftReasonSchema = z.enum([
   "ADAPTER_IDENTITY_CHANGED",
   "MOCK_FORM_CHANGED",
   "RECRUITEE_FIELDS_CHANGED",
+  "GREENHOUSE_FORM_CHANGED",
   "OTHER_FORM_CHANGED",
 ]);
 export type FormDriftReason = z.infer<typeof formDriftReasonSchema>;

@@ -9,6 +9,7 @@ import {
 export interface GreenhouseTarget {
   board: string;
   postingId: string;
+  formFingerprint?: string;
 }
 
 const boardPattern = /^[a-zA-Z0-9_-]{1,100}$/;

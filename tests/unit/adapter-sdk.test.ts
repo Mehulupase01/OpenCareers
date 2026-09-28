@@ -64,6 +64,7 @@ describe("submission adapter SDK", () => {
     expect(registry.support()).toEqual([
       { id: "mock-ats", version: "mock-ats-v1" },
       { id: "recruitee", version: "recruitee-careers-v1" },
+      { id: "greenhouse", version: "greenhouse-hosted-v1" },
     ]);
     const adapter = registry.get("mock-ats");
     const target = adapter.parseTarget({ fixture: "standard", ignoredTaskField: "stripped" });

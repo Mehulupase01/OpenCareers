@@ -93,7 +93,7 @@ describe("Greenhouse synthetic fill", () => {
     const snapshot = await inspectGreenhouseForm(page, target);
     const plan = planGreenhouseFields(snapshot, packet, approved);
     const report = await fillGreenhouseForm(page, target, snapshot, plan, packet, cvPdf);
-    expect(report.status).toBe("unsupported");
+    expect(report.status).toBe("ready");
     expect(report.uploadStatus).toBe("selected");
     expect(report.readBack.map((field) => field.name)).toEqual(
       plan.entries.map((entry) => entry.name),

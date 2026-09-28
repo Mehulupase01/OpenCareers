@@ -71,10 +71,23 @@ export class BrowserRepository extends Repository {
       }) &&
       result.reports[0]?.uploadStatus ===
         (result.snapshots[0]?.fields.some((field) => field.name === "cv") ? "selected" : "idle");
+    const greenhouseShape =
+      result.adapter?.id === "greenhouse" &&
+      result.snapshots.length === 1 &&
+      result.snapshots.every((snapshot) => {
+        const url = new URL(snapshot.url);
+        return (
+          url.origin === "https://job-boards.greenhouse.io" &&
+          /^\/[a-zA-Z0-9_-]{1,100}\/jobs\/[0-9]{1,20}$/.test(url.pathname) &&
+          snapshot.origin === url.origin &&
+          result.adapter?.targetFingerprint.length === 64
+        );
+      }) &&
+      result.reports[0]?.uploadStatus === "selected";
     if (
       result.serverApplicationCount !== 0 ||
       (ready &&
-        ((!mockShape && !recruiteeShape) ||
+        ((!mockShape && !recruiteeShape && !greenhouseShape) ||
           result.plans.length !== result.snapshots.length ||
           result.reports.length !== result.snapshots.length ||
           !completeReadBack ||

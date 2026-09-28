@@ -7,6 +7,13 @@ import { DomainError, FormDriftError } from "../../contracts/src/index.js";
 import type { ReceiptEvidence } from "../../contracts/src/submission.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
 import { commitPreparedMockPacket, DefinitiveMockRejection } from "./commit-mock.js";
+import {
+  commitGreenhousePacket,
+  type GreenhouseCommitOptions,
+  GreenhouseDefinitiveRejection,
+} from "./greenhouse-commit.js";
+import type { GreenhouseTarget } from "./greenhouse-inspect.js";
+import { prepareGreenhousePacket } from "./greenhouse-prepare.js";
 import { observeMockReceipt } from "./observe-mock.js";
 import { prepareMockPacket } from "./prepare.js";
 import {
@@ -40,7 +47,16 @@ const recruiteeTargetSchema = z.object({
   offerSlug: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/),
 });
 
-export type DefinitiveReason = "MOCK_VALIDATION_REJECTED" | "RECRUITEE_VALIDATION_REJECTED";
+const greenhouseTargetSchema = z.object({
+  board: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
+  postingId: z.string().regex(/^[0-9]{1,20}$/),
+  formFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export type DefinitiveReason =
+  | "MOCK_VALIDATION_REJECTED"
+  | "RECRUITEE_VALIDATION_REJECTED"
+  | "GREENHOUSE_VALIDATION_REJECTED";
 
 export type AdapterCommitOutcome =
   | { status: "confirmed"; evidence: ReceiptEvidence }
@@ -208,6 +224,50 @@ class RecruiteeSubmissionAdapter implements SubmissionAdapter {
   }
 }
 
+class GreenhouseSubmissionAdapter implements SubmissionAdapter {
+  readonly id = "greenhouse";
+  readonly version = "greenhouse-hosted-v1";
+
+  constructor(private readonly commitOptions: GreenhouseCommitOptions = {}) {}
+
+  parseTarget(input: unknown): GreenhouseTarget {
+    return greenhouseTargetSchema.parse(input);
+  }
+
+  async prepare(input: AdapterPrepareInput) {
+    return prepareGreenhousePacket(
+      this.parseTarget(input.target),
+      input.packet,
+      input.cvPdf,
+      input.approvedValues,
+      this.commitOptions.configureContext,
+    );
+  }
+
+  async commit(input: AdapterCommitInput): Promise<AdapterCommitOutcome> {
+    const target = this.parseTarget(input.target);
+    assertPreparation(this, input.preparation, target);
+    try {
+      const evidence = await commitGreenhousePacket(
+        target,
+        input.packet,
+        input.cvPdf,
+        input.preparation,
+        input.authorizeDispatch,
+        this.commitOptions,
+      );
+      return { status: "confirmed", evidence };
+    } catch (error) {
+      if (!(error instanceof GreenhouseDefinitiveRejection)) throw error;
+      return { status: "definitive_failure", reason: "GREENHOUSE_VALIDATION_REJECTED" };
+    }
+  }
+
+  async reconcile(_input: AdapterReconcileInput) {
+    return null;
+  }
+}
+
 export class AdapterRegistry {
   private readonly adapters: Map<string, SubmissionAdapter>;
 
@@ -230,10 +290,14 @@ export class AdapterRegistry {
 
 export function createAdapterRegistry(
   dataDir: string,
-  options: { recruiteeRequest?: RecruiteeRequest } = {},
+  options: {
+    recruiteeRequest?: RecruiteeRequest;
+    greenhouseCommit?: GreenhouseCommitOptions;
+  } = {},
 ) {
   return new AdapterRegistry([
     new MockSubmissionAdapter(dataDir),
     new RecruiteeSubmissionAdapter(options.recruiteeRequest ?? fetch),
+    new GreenhouseSubmissionAdapter(options.greenhouseCommit),
   ]);
 }

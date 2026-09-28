@@ -7,6 +7,8 @@ import {
 } from "../../contracts/src/documents.js";
 import { DomainError, type FormDriftReason, type Task } from "../../contracts/src/index.js";
 import {
+  type GreenhouseReceiptEvidence,
+  greenhouseReceiptEvidenceSchema,
   type MockReceiptEvidence,
   mockReceiptEvidenceSchema,
   type ReceiptEvidence,
@@ -396,7 +398,9 @@ export class SubmissionRepository extends Repository {
     const evidence = receiptEvidenceSchema.parse(evidenceInput);
     return evidence.kind === "mock_ats"
       ? this.confirmMockReceipt(task, handle, evidence)
-      : this.confirmRecruiteeReceipt(task, handle, evidence);
+      : evidence.kind === "recruitee"
+        ? this.confirmRecruiteeReceipt(task, handle, evidence)
+        : this.confirmGreenhouseReceipt(task, handle, evidence);
   }
 
   async recordDefinitiveMockRejection(task: Task, handle: CommitHandle): Promise<void> {
@@ -485,10 +489,94 @@ export class SubmissionRepository extends Repository {
     });
   }
 
+  async confirmGreenhouseReceipt(
+    task: Task,
+    handle: CommitHandle,
+    evidenceInput: GreenhouseReceiptEvidence,
+  ): Promise<string> {
+    const evidence = greenhouseReceiptEvidenceSchema.parse(evidenceInput);
+    if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
+      throw new DomainError("LEASE_STALE", "Receipt handle does not match the leased task.");
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertLease(tx, task);
+      const row = (
+        await tx.query(
+          "SELECT a.state,a.commit_fence,t.state AS attempt_state,t.dispatch_started_at,i.snapshot,i.sha256,c.content FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE t.owner_id=$1 AND t.id=$2 AND t.intent_id=$3 AND t.application_id=$4",
+          [this.ownerId, handle.attemptId, handle.intentId, handle.applicationId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.attempt_state !== "IN_FLIGHT" ||
+        !row.dispatch_started_at ||
+        Number(row.commit_fence) !== handle.fence
+      )
+        throw new DomainError("STATE_INVALID", "A dispatched in-flight attempt is required.");
+      const snapshot = JSON.parse(String(row.snapshot)) as { jobId: string; formUrls: string[] };
+      const content = packetContentSchema.parse(JSON.parse(String(row.content)));
+      const receiptUrl = new URL(evidence.receiptUrl);
+      const expectedPath = `/${evidence.board}/jobs/${evidence.postingId}`;
+      const expectedFormUrl = `https://job-boards.greenhouse.io${expectedPath}`;
+      if (
+        digest(snapshot) !== row.sha256 ||
+        evidence.jobId !== snapshot.jobId ||
+        content.job.id !== evidence.jobId ||
+        evidence.emailHash !== digestEmail(content.cv.identity.email) ||
+        !snapshot.formUrls?.some((url) => new URL(url).pathname === expectedPath) ||
+        !snapshot.formUrls?.some(
+          (url) => new URL(url).origin === new URL(expectedFormUrl).origin,
+        ) ||
+        receiptUrl.origin !== "https://job-boards.greenhouse.io" ||
+        receiptUrl.pathname !== expectedPath ||
+        receiptUrl.searchParams.get("receipt") !== evidence.receiptId
+      )
+        throw new DomainError(
+          "RECEIPT_UNCORRELATED",
+          "Greenhouse receipt does not match the intent and packet.",
+        );
+      assertTransition("IN_FLIGHT", "CONFIRMED");
+      const receiptId = randomUUID();
+      await tx.query(
+        "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          receiptId,
+          this.ownerId,
+          handle.applicationId,
+          handle.attemptId,
+          JSON.stringify(evidence),
+          digest(evidence),
+          this.now(),
+        ],
+      );
+      await tx.query(
+        "UPDATE attempts SET state='CONFIRMED',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT'",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      const updated = await tx.query(
+        "UPDATE applications SET state='CONFIRMED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='IN_FLIGHT' AND commit_fence=$4 RETURNING revision",
+        [this.now(), this.ownerId, handle.applicationId, handle.fence],
+      );
+      if (!updated[0])
+        throw new DomainError("REVISION_STALE", "Application changed before confirmation.");
+      await this.audit(
+        tx,
+        handle.applicationId,
+        "submission.confirmed",
+        Number(updated[0].revision),
+        { receiptId, provider: "greenhouse", externalReceiptId: evidence.receiptId },
+      );
+      return receiptId;
+    });
+  }
+
   async recordDefinitiveRejection(
     task: Task,
     handle: CommitHandle,
-    reason: "MOCK_VALIDATION_REJECTED" | "RECRUITEE_VALIDATION_REJECTED",
+    reason:
+      | "MOCK_VALIDATION_REJECTED"
+      | "RECRUITEE_VALIDATION_REJECTED"
+      | "GREENHOUSE_VALIDATION_REJECTED",
   ): Promise<void> {
     if (task.applicationId !== handle.applicationId || task.fence !== handle.fence)
       throw new DomainError("LEASE_STALE", "Rejection handle does not match the leased task.");

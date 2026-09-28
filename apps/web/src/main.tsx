@@ -47,6 +47,7 @@ const driftLabels = {
   ADAPTER_IDENTITY_CHANGED: "Adapter target or version changed",
   MOCK_FORM_CHANGED: "Mock form changed",
   RECRUITEE_FIELDS_CHANGED: "Recruitee offer fields changed",
+  GREENHOUSE_FORM_CHANGED: "Greenhouse form changed",
   OTHER_FORM_CHANGED: "Form changed before submission",
 } as const;
 
