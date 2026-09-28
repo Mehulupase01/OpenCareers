@@ -5,6 +5,7 @@ import cookie from "@fastify/cookie";
 import staticFiles from "@fastify/static";
 import Fastify from "fastify";
 import { z } from "zod";
+import type { HandoffBrokerPort } from "../../../packages/browser/src/handoff-broker.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
@@ -12,9 +13,14 @@ import { browserRoutes } from "./browser.js";
 import { candidateRoutes } from "./candidate.js";
 import { discoveryRoutes } from "./discovery.js";
 import { documentRoutes } from "./documents.js";
+import { handoffRoutes } from "./handoff.js";
 import { matchingRoutes } from "./matching.js";
 
-export async function buildServer(config: Config, repository: Repository) {
+export async function buildServer(
+  config: Config,
+  repository: Repository,
+  dependencies: { handoffBroker?: HandoffBrokerPort } = {},
+) {
   const app = Fastify({
     logger: false,
     bodyLimit: 128 * 1024,
@@ -187,6 +193,7 @@ export async function buildServer(config: Config, repository: Repository) {
   await matchingRoutes(app, config, repository);
   await documentRoutes(app, config, repository);
   await browserRoutes(app, config, repository);
+  await handoffRoutes(app, repository, dependencies.handoffBroker);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

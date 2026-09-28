@@ -1,9 +1,12 @@
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
+import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { loadConfig } from "../../packages/config/src/index.js";
+import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
@@ -43,6 +46,7 @@ describe("API trust boundary", () => {
       "/v1/candidate",
       "/v1/candidate/sources/unknown",
       "/v1/candidate/authorization/export",
+      "/v1/handoffs",
     ])
       expect((await app.inject({ url, headers })).statusCode).toBe(401);
     expect(
@@ -51,6 +55,7 @@ describe("API trust boundary", () => {
     ).toBe(401);
     const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
     const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    expect((await app.inject({ url: "/v1/handoffs", headers: authenticated })).json()).toEqual([]);
     expect(
       (
         await app.inject({
@@ -289,5 +294,125 @@ describe("API trust boundary", () => {
     expect((await app.inject({ url: "/health/ready", headers })).statusCode).toBe(200);
     await db.query("DROP TABLE schema_migrations");
     expect((await app.inject({ url: "/health/ready", headers })).statusCode).toBe(503);
+  });
+  it("runs an authenticated challenge handoff without allowing a final action", async () => {
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "opencareers-api-handoff-")));
+    cleanup.push(() => rm(dataDir, { recursive: true, force: true }));
+    const db = await openSqlite(":memory:");
+    cleanup.push(() => db.close());
+    await migrate(db);
+    const repository = new Repository(db, "synthetic-owner");
+    await repository.initialize();
+    const applicationId = randomUUID();
+    const preparationId = randomUUID();
+    const candidateId = randomUUID();
+    const jobId = randomUUID();
+    const packetId = randomUUID();
+    const targetFingerprint = createHash("sha256")
+      .update(JSON.stringify({ fixture: "challenge" }))
+      .digest("hex");
+    const snapshot = {
+      url: "http://127.0.0.1:4320/jobs/challenge",
+      origin: "http://127.0.0.1:4320",
+      jobId: "synthetic-job",
+      step: 1,
+      fields: [],
+      fingerprint: "a".repeat(64),
+      blocker: "challenge" as const,
+    };
+    const result = dryRunResultSchema.parse({
+      adapter: { id: "mock-ats", version: "mock-ats-v1", targetFingerprint },
+      packetId,
+      applicationId,
+      status: "challenge",
+      snapshots: [snapshot],
+      plans: [{ fingerprint: snapshot.fingerprint, entries: [], unresolved: [] }],
+      reports: [
+        {
+          snapshot,
+          status: "challenge",
+          readBack: [],
+          uploadStatus: "idle",
+          issues: ["Verification challenge requires owner action."],
+        },
+      ],
+      issues: ["Verification challenge requires owner action."],
+      blockedFinalActions: 0,
+      serverApplicationCount: 0,
+      preparedAt: "2026-09-28T20:00:00.000Z",
+    });
+    await db.query("INSERT INTO candidates(owner_id,id) VALUES($1,$2)", [
+      "synthetic-owner",
+      candidateId,
+    ]);
+    await db.query(
+      "INSERT INTO jobs(owner_id,id,employer_id,requisition_id,data,created_at,last_seen_at) VALUES($1,$2,'synthetic-employer','req','{}',$3,$3)",
+      ["synthetic-owner", jobId, "2026-09-28T20:00:00.000Z"],
+    );
+    await db.query(
+      "INSERT INTO applications(owner_id,id,candidate_id,job_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,'CHALLENGE_REQUIRED',$5,$5)",
+      ["synthetic-owner", applicationId, candidateId, jobId, "2026-09-28T20:00:00.000Z"],
+    );
+    await db.query(
+      "INSERT INTO packets(owner_id,id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,'{}',$4,$5)",
+      ["synthetic-owner", packetId, applicationId, "b".repeat(64), "2026-09-28T20:00:00.000Z"],
+    );
+    await db.query(
+      "INSERT INTO browser_preparations(owner_id,id,application_id,packet_id,status,form_fingerprint,result,created_at,expires_at) VALUES($1,$2,$3,$4,'challenge',$5,$6,$7,$8)",
+      [
+        "synthetic-owner",
+        preparationId,
+        applicationId,
+        packetId,
+        snapshot.fingerprint,
+        JSON.stringify(result),
+        "2026-09-28T20:00:00.000Z",
+        "2099-09-28T20:15:00.000Z",
+      ],
+    );
+    const broker = new VisibleHandoffBroker({
+      visible: false,
+      onOpened: async (page) => page.getByRole("button", { name: "Continue" }).click(),
+    });
+    const app = await buildServer({ ...loadConfig({}), dataDir }, repository, {
+      handoffBroker: broker,
+    });
+    cleanup.push(() => app.close());
+    const headers = { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4318" };
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/handoffs",
+      headers: authenticated,
+      payload: {
+        applicationId,
+        preparationId,
+        adapterId: "mock-ats",
+        targetFingerprint,
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const handle = created.json() as { session: { id: string }; token: string };
+    const opened = await app.inject({
+      method: "POST",
+      url: `/v1/handoffs/${handle.session.id}/open`,
+      headers: authenticated,
+      payload: { token: handle.token },
+    });
+    expect(opened.json()).toMatchObject({ state: "claimed", generation: 1 });
+    const completed = await app.inject({
+      method: "POST",
+      url: `/v1/handoffs/${handle.session.id}/complete`,
+      headers: authenticated,
+      payload: { generation: 1 },
+    });
+    expect(completed.json()).toMatchObject({ state: "rebuilding", generation: 2 });
+    expect(
+      await db.query("SELECT token_hash FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
+        "synthetic-owner",
+        handle.session.id,
+      ]),
+    ).not.toEqual([expect.objectContaining({ token_hash: handle.token })]);
   });
 });

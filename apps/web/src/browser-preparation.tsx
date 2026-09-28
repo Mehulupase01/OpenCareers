@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, Play, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { BrowserPreparation } from "../../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../../packages/contracts/src/documents.js";
+import type { HandoffSession } from "../../../packages/contracts/src/handoff.js";
 import { request } from "./api.js";
 
 export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) {
@@ -13,11 +14,17 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
   const [remote, setRemote] = useState("");
   const [attested, setAttested] = useState(false);
   const [history, setHistory] = useState<BrowserPreparation[]>([]);
+  const [handoffs, setHandoffs] = useState<HandoffSession[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     try {
-      setHistory(await request<BrowserPreparation[]>("/v1/browser"));
+      const [preparations, sessions] = await Promise.all([
+        request<BrowserPreparation[]>("/v1/browser"),
+        request<HandoffSession[]>("/v1/handoffs"),
+      ]);
+      setHistory(preparations);
+      setHandoffs(sessions);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Browser preparations are unavailable.");
@@ -27,6 +34,13 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
     void refresh();
   }, [refresh]);
   const latest = history.find((item) => item.result.packetId === packet.manifest.id);
+  const handoff = latest
+    ? handoffs.find(
+        (item) =>
+          item.preparationId === latest.id &&
+          ["open", "claimed", "rebuilding"].includes(item.state),
+      )
+    : undefined;
   const run = async () => {
     setBusy(true);
     try {
@@ -43,6 +57,40 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Browser preparation failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const openHandoff = async () => {
+    if (!latest?.result.adapter) return;
+    setBusy(true);
+    try {
+      const created = await request<{ session: HandoffSession; token: string }>("/v1/handoffs", {
+        applicationId: latest.result.applicationId,
+        preparationId: latest.id,
+        adapterId: latest.result.adapter.id,
+        targetFingerprint: latest.result.adapter.targetFingerprint,
+      });
+      await request<HandoffSession>(`/v1/handoffs/${created.session.id}/open`, {
+        token: created.token,
+      });
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Verification handoff failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const completeHandoff = async () => {
+    if (!handoff) return;
+    setBusy(true);
+    try {
+      await request<HandoffSession>(`/v1/handoffs/${handoff.id}/complete`, {
+        generation: handoff.generation,
+      });
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Verification is not complete.");
     } finally {
       setBusy(false);
     }
@@ -153,6 +201,21 @@ export function BrowserPreparationPanel({ packet }: { packet: PacketSnapshot }) 
                 <li key={issue}>{issue}</li>
               ))}
             </ul>
+          )}
+          {latest.status === "challenge" && !handoff && (
+            <button type="button" disabled={busy} onClick={() => void openHandoff()}>
+              <Play size={16} /> Open verification
+            </button>
+          )}
+          {handoff?.state === "claimed" && (
+            <button type="button" disabled={busy} onClick={() => void completeHandoff()}>
+              <CheckCircle2 size={16} /> Verification complete
+            </button>
+          )}
+          {handoff?.state === "rebuilding" && (
+            <span className="packet-state valid">
+              <CheckCircle2 size={14} /> Rebuilding
+            </span>
           )}
           <details>
             <summary>Form evidence</summary>

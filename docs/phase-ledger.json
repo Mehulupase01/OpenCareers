@@ -793,20 +793,32 @@
         {
           "id": "P10-G3",
           "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/handoff.test.ts",
+            "tests/e2e/handoff-broker.spec.ts"
+          ]
         },
         {
           "id": "P10-G4",
           "requirement": "Handoff URLs/handles expire, are owner-bound, and cannot control another session.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/api.test.ts",
+            "tests/integration/handoff.test.ts"
+          ]
         },
         {
           "id": "P10-G5",
           "requirement": "User interaction and automation cannot race the final submit.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/e2e/handoff-broker.spec.ts",
+            "tests/integration/documents.test.ts"
+          ]
         },
         {
           "id": "P10-G6",

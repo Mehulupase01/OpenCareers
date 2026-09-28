@@ -111,6 +111,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
           adapterId: "mock-ats",
           targetFingerprint,
         });
+        expect((await repo.target(created.session.id)).result.applicationId).toBe(applicationId);
         expect(created.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
         expect(JSON.stringify(await repo.snapshot())).not.toContain(created.token);
         await expect(
@@ -129,6 +130,12 @@ for (const engine of ["sqlite", "postgres"] as const) {
           ),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
         const claimed = await repo.claimHandoff(created.session.id, created.token, "browser-a");
+        const queue = new Repository(db, owner, () => new Date(now));
+        await queue.enqueue({ type: "demo_probe", domain: "unrelated", dedupeKey: randomUUID() });
+        expect(await queue.claim("unrelated-worker", ["demo_probe"])).toMatchObject({
+          domain: "unrelated",
+          state: "leased",
+        });
         await expect(
           repo.claimHandoff(created.session.id, created.token, "browser-b"),
         ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
@@ -181,6 +188,28 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(await repo.snapshot()).toEqual([
           expect.objectContaining({ id: second.session.id, state: "open" }),
           expect.objectContaining({ id: first.session.id, state: "expired" }),
+        ]);
+      });
+
+      it("cancels only the exact claimed browser generation", async () => {
+        const repo = new HandoffRepository(db, owner, () => new Date(now));
+        const created = await repo.create({
+          applicationId,
+          preparationId,
+          adapterId: "mock-ats",
+          targetFingerprint,
+        });
+        const claimed = await repo.claimHandoff(created.session.id, created.token, "browser-a");
+        await expect(
+          repo.cancelClaim(claimed.id, "browser-b", claimed.generation),
+        ).rejects.toMatchObject({ code: "LEASE_STALE" });
+        await repo.cancelClaim(claimed.id, "browser-a", claimed.generation);
+        expect(await repo.snapshot()).toEqual([
+          expect.objectContaining({
+            id: claimed.id,
+            state: "cancelled",
+            generation: claimed.generation + 1,
+          }),
         ]);
       });
     },

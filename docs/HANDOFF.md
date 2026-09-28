@@ -292,9 +292,24 @@ cannot be replayed into a second account. GitHub Actions run `36457888701`
 passed Windows, Ubuntu and PostgreSQL. This is synthetic fixture verification;
 no employer account was created.
 
-The next P10 checkpoint adds owner-bound challenge handoff persistence. Tokens
+The P10 handoff foundation checkpoint adds owner-bound challenge persistence. Tokens
 are returned once and stored only as hashes; exact preparation/target binding,
 exclusive browser leases, generation fencing, expiry replacement and the
 submission interlock have SQLite/PostgreSQL integration coverage. The visible
 loopback broker and exception UI are still pending, so P10-G3 through P10-G5
 remain open. See `docs/evidence/P10-security-checkpoints.md`.
+
+P10 visible-handoff work now adds authenticated create/list/open/complete API
+routes and an owned synthetic ATS broker. It launches a dedicated visible
+Chromium context, closes it on absolute expiry, verifies that the challenge was
+cleared, and rejects completion if an application action was attempted. API and
+desktop/mobile Playwright tests cover the full bounded flow; unrelated queue
+work remains claimable. External-adapter policies, exception resolution and the
+fresh automation rebuild are still pending.
+
+Latest local verification for the visible-handoff checkpoint passed 172 tests
+with 67 PostgreSQL-only skips and all 36 desktop/mobile browser workflows, plus
+lint, typecheck, production build, public-source scan and dependency audit. The
+private local service was restored on the updated code at manager PID `27636`;
+API `4317` and UI `4318` are healthy. Revalidate process identities before
+stopping it.

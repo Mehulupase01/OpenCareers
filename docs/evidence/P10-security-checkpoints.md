@@ -1,8 +1,7 @@
 # P10 Security Checkpoints
 
 P10 remains in progress. This file records verified increments without claiming
-that visible challenge handoffs, exception resolution, or safe form rebuilding
-are complete.
+that exception resolution or safe form rebuilding are complete.
 
 ## Account Vault And Signup
 
@@ -33,8 +32,34 @@ are complete.
 - SQLite and PostgreSQL integration coverage exercises owner isolation, invalid
   tokens, competing claims, stale lease completion, target drift, preparation
   expiry, replacement after expiry, and the final-action interlock.
+- GitHub Actions run `36459028331` passed Windows, Ubuntu, and PostgreSQL at
+  commit `678c85c`.
+
+## Visible Challenge Broker
+
+- Authenticated loopback API routes create, claim, list, and complete handoffs.
+  Creation returns the opaque token once; list responses contain no token.
+- The owned synthetic ATS opens in a dedicated visible Chromium context. Its
+  network policy permits the scoped challenge while blocking the application
+  endpoint. Completion independently verifies that the challenge disappeared
+  and that no final request was attempted.
+- Browser ownership is held by one random internal lease identity and one
+  generation. The context closes on completion, server shutdown, launch error,
+  or absolute handoff expiry.
+- The owner UI exposes bounded open/complete controls only for challenge
+  preparations. Completion moves the record to `rebuilding`; it does not make
+  the human browser eligible to submit.
+- Authenticated API integration covers the full create/open/complete sequence.
+  Playwright covers successful challenge handling, stale-generation rejection,
+  and forced final-action blocking on desktop and mobile projects. Repository
+  integration proves unrelated queue work can still be leased.
+- External adapters are not yet enabled in this broker. They require explicit
+  per-adapter resource and final-action policies; arbitrary browsing is rejected.
+- Full local verification passed 172 tests with 67 PostgreSQL-only skips, all 36
+  desktop/mobile Playwright workflows, lint, typecheck, production build,
+  public-source credential scan, and production dependency audit.
 
 No CAPTCHA solving, MFA interception, anti-bot evasion, proxy rotation,
 restricted scraping, employer account creation, or employer application write
-was performed by these checks. The loopback API, visible browser broker,
-exception inbox, and fresh post-handoff rebuild remain pending.
+was performed by these checks. The exception inbox, external-adapter handoff
+policies, and fresh post-handoff rebuild remain pending.

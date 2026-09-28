@@ -201,12 +201,54 @@ export class HandoffRepository extends Repository {
     });
   }
 
-  async snapshot(): Promise<HandoffSession[]> {
-    return (
+  async cancelClaim(id: string, leaseOwner: string, generation: number): Promise<void> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const rows = await tx.query(
+        "UPDATE handoff_sessions SET state='cancelled',generation=generation+1,lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND id=$2 AND state='claimed' AND lease_owner=$3 AND generation=$4 RETURNING generation",
+        [this.ownerId, id, leaseOwner, generation],
+      );
+      if (!rows[0]) throw new DomainError("LEASE_STALE", "Handoff lease is stale.");
+      await this.audit(tx, id, "handoff.cancelled", Number(rows[0].generation), {});
+    });
+  }
+
+  async target(
+    id: string,
+  ): Promise<{ session: HandoffSession; result: ReturnType<typeof dryRunResultSchema.parse> }> {
+    const row = (
       await this.db.query(
-        "SELECT * FROM handoff_sessions WHERE owner_id=$1 ORDER BY created_at DESC,id DESC",
-        [this.ownerId],
+        "SELECT h.*,b.result FROM handoff_sessions h JOIN browser_preparations b ON b.owner_id=h.owner_id AND b.id=h.preparation_id WHERE h.owner_id=$1 AND h.id=$2",
+        [this.ownerId, id],
       )
-    ).map(sessionFrom);
+    )[0];
+    if (!row) throw new DomainError("NOT_FOUND", "Handoff session was not found.");
+    const session = sessionFrom(row);
+    const result = dryRunResultSchema.parse(JSON.parse(String(row.result)));
+    if (
+      result.adapter?.id !== session.adapterId ||
+      result.adapter.targetFingerprint !== session.targetFingerprint ||
+      result.applicationId !== session.applicationId
+    )
+      throw new DomainError("FORM_CHANGED", "Handoff target no longer matches its preparation.");
+    return { session, result };
+  }
+
+  async snapshot(): Promise<HandoffSession[]> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const expired = await tx.query(
+        "UPDATE handoff_sessions SET state='expired',lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND state IN ('open','claimed','rebuilding') AND expires_at<=$2 RETURNING id,generation",
+        [this.ownerId, this.now()],
+      );
+      for (const stale of expired)
+        await this.audit(tx, String(stale.id), "handoff.expired", Number(stale.generation), {});
+      return (
+        await tx.query(
+          "SELECT * FROM handoff_sessions WHERE owner_id=$1 ORDER BY created_at DESC,id DESC",
+          [this.ownerId],
+        )
+      ).map(sessionFrom);
+    });
   }
 }

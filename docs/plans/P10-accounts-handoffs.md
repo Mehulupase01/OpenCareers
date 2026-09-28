@@ -70,8 +70,12 @@ passed Windows, Ubuntu, and PostgreSQL at `8b2a40b`.
 
 Checkpoint 3 implemented: hashed handoff tokens, exact preparation/target
 binding, exclusive leases, generation fencing, stale-expiry retirement, and a
-transactional final-action interlock. The loopback API, visible browser broker,
-exception UI, and fresh rebuild remain in progress. See
+transactional final-action interlock.
+
+Checkpoint 4 implemented: authenticated loopback routes, synthetic visible
+Chromium handoff, absolute-expiry cleanup, challenge-clear verification,
+human-context final-action blocking, and owner UI controls. External adapters,
+the exception UI, and fresh rebuild remain in progress. See
 `docs/evidence/P10-security-checkpoints.md`.
 
 ## Acceptance Mapping
