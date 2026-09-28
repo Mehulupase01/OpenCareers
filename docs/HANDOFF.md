@@ -270,3 +270,10 @@ receipt evidence and transactional receipt correlation. Synthetic success,
 target/form drift, validation rejection and ambiguous-response cases pass.
 Public Greenhouse forms are still read-only evidence; no employer write or real
 submission occurred. See `docs/evidence/P09-greenhouse-lifecycle.md`.
+
+P10 planning started after P09 closure. The accepted design uses an encrypted
+credential vault, one-action signup attempts, hashed one-time handoff tokens and
+exclusive browser-generation leases. Human challenge handling can complete only
+CAPTCHA/MFA or login steps; final application actions stay blocked until a fresh
+automation-owned rebuild. Answer propagation remains exact and evidence-bound.
+See `docs/plans/P10-accounts-handoffs.md`.

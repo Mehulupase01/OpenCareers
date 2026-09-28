@@ -744,7 +744,7 @@
     {
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P09"],
       "tickets": [
         [
