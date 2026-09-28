@@ -1,8 +1,13 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { type EmployerAccount, employerAccountSchema } from "../../contracts/src/account.js";
+import {
+  type EmployerAccount,
+  employerAccountSchema,
+  type SignupReceiptEvidence,
+  signupReceiptEvidenceSchema,
+} from "../../contracts/src/account.js";
 import { DomainError } from "../../contracts/src/index.js";
 import { VaultCipher, vaultEnvelopeSchema } from "../../security/src/vault.js";
-import type { Database, Row } from "./database.js";
+import type { Database, Row, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
 
 function exactOrigin(input: string): string {
@@ -153,5 +158,178 @@ export class AccountRepository extends Repository {
         [this.ownerId],
       )
     ).map(accountFrom);
+  }
+
+  private async assertAccountPolicy(tx: SqlExecutor, candidateId: string) {
+    const row = (
+      await tx.query(
+        "SELECT c.active_authorization_id,a.data,a.effective_at,a.expires_at,a.revoked_at FROM candidates c JOIN authorizations a ON a.owner_id=c.owner_id AND a.id=c.active_authorization_id WHERE c.owner_id=$1 AND c.id=$2",
+        [this.ownerId, candidateId],
+      )
+    )[0];
+    const policy = row?.data ? (JSON.parse(String(row.data)) as Record<string, unknown>) : null;
+    if (
+      !policy?.allowAccountCreation ||
+      row?.revoked_at ||
+      String(row?.effective_at) > this.now() ||
+      String(row?.expires_at) <= this.now()
+    )
+      throw new DomainError("POLICY_REVOKED", "Account creation is not currently authorized.");
+  }
+
+  async beginSignup(accountId: string): Promise<{
+    attemptId: string;
+    accountId: string;
+    fence: number;
+    intentSha256: string;
+  }> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const account = (
+        await tx.query("SELECT * FROM employer_accounts WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          accountId,
+        ])
+      )[0];
+      if (!account) throw new DomainError("NOT_FOUND", "Employer account was not found.");
+      await this.assertAccountPolicy(tx, String(account.candidate_id));
+      if (account.state !== "prepared")
+        throw new DomainError("DUPLICATE_SUSPECTED", "Account signup is not safe to repeat.");
+      const prior = await tx.query(
+        "SELECT id FROM signup_attempts WHERE owner_id=$1 AND account_id=$2 LIMIT 1",
+        [this.ownerId, accountId],
+      );
+      if (prior.length)
+        throw new DomainError("DUPLICATE_SUSPECTED", "A prior signup attempt already exists.");
+      const fenceRow = (
+        await tx.query(
+          "UPDATE owners SET next_fence=next_fence+1 WHERE id=$1 RETURNING next_fence",
+          [this.ownerId],
+        )
+      )[0];
+      const fence = Number(fenceRow?.next_fence);
+      const attemptId = randomUUID();
+      const intentSha256 = createHash("sha256")
+        .update(
+          JSON.stringify({
+            accountId,
+            adapterId: account.adapter_id,
+            employerOrigin: account.employer_origin,
+            fence,
+            identityEmailHash: account.identity_email_hash,
+          }),
+        )
+        .digest("hex");
+      await tx.query(
+        "INSERT INTO signup_attempts(owner_id,id,account_id,state,intent_sha256,fence,started_at) VALUES($1,$2,$3,'INTENT_RECORDED',$4,$5,$6)",
+        [this.ownerId, attemptId, accountId, intentSha256, fence, this.now()],
+      );
+      await this.audit(tx, accountId, "account.signup_intent_recorded", fence, { attemptId });
+      return { attemptId, accountId, fence, intentSha256 };
+    });
+  }
+
+  async authorizeSignup(handle: {
+    attemptId: string;
+    accountId: string;
+    fence: number;
+    intentSha256: string;
+  }): Promise<{ expiresAt: string }> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = (
+        await tx.query(
+          "SELECT s.*,a.candidate_id,a.state AS account_state FROM signup_attempts s JOIN employer_accounts a ON a.owner_id=s.owner_id AND a.id=s.account_id WHERE s.owner_id=$1 AND s.id=$2 AND s.account_id=$3",
+          [this.ownerId, handle.attemptId, handle.accountId],
+        )
+      )[0];
+      if (
+        row?.state !== "INTENT_RECORDED" ||
+        row.account_state !== "prepared" ||
+        Number(row.fence) !== handle.fence ||
+        row.intent_sha256 !== handle.intentSha256 ||
+        row.dispatch_started_at
+      )
+        throw new DomainError("LEASE_STALE", "Signup dispatch capability is stale.");
+      await this.assertAccountPolicy(tx, String(row.candidate_id));
+      await tx.query(
+        "UPDATE signup_attempts SET state='IN_FLIGHT',dispatch_started_at=$1 WHERE owner_id=$2 AND id=$3 AND state='INTENT_RECORDED'",
+        [this.now(), this.ownerId, handle.attemptId],
+      );
+      await tx.query(
+        "UPDATE employer_accounts SET state='signup_in_flight',updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state='prepared'",
+        [this.now(), this.ownerId, handle.accountId],
+      );
+      await this.audit(tx, handle.accountId, "account.signup_dispatch_started", handle.fence, {
+        attemptId: handle.attemptId,
+      });
+      return { expiresAt: new Date(this.clock().getTime() + 10000).toISOString() };
+    });
+  }
+
+  async confirmSignup(
+    handle: { attemptId: string; accountId: string; fence: number; intentSha256: string },
+    evidenceInput: SignupReceiptEvidence,
+  ): Promise<void> {
+    const evidence = signupReceiptEvidenceSchema.parse(evidenceInput);
+    await this.finishSignup(handle, "active", "CONFIRMED", evidence);
+  }
+
+  async markSignupUnknown(handle: {
+    attemptId: string;
+    accountId: string;
+    fence: number;
+    intentSha256: string;
+  }): Promise<void> {
+    await this.finishSignup(handle, "unknown", "UNKNOWN", null);
+  }
+
+  private async finishSignup(
+    handle: { attemptId: string; accountId: string; fence: number; intentSha256: string },
+    accountState: "active" | "unknown",
+    attemptState: "CONFIRMED" | "UNKNOWN",
+    evidence: SignupReceiptEvidence | null,
+  ) {
+    await this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = (
+        await tx.query(
+          "SELECT s.*,a.employer_origin,a.adapter_id,a.identity_email_hash,a.state AS account_state FROM signup_attempts s JOIN employer_accounts a ON a.owner_id=s.owner_id AND a.id=s.account_id WHERE s.owner_id=$1 AND s.id=$2 AND s.account_id=$3",
+          [this.ownerId, handle.attemptId, handle.accountId],
+        )
+      )[0];
+      if (
+        row?.state !== "IN_FLIGHT" ||
+        row.account_state !== "signup_in_flight" ||
+        !row.dispatch_started_at ||
+        Number(row.fence) !== handle.fence ||
+        row.intent_sha256 !== handle.intentSha256
+      )
+        throw new DomainError("STATE_INVALID", "A dispatched signup attempt is required.");
+      if (
+        evidence &&
+        (evidence.employerOrigin !== row.employer_origin ||
+          evidence.adapterId !== row.adapter_id ||
+          evidence.identityEmailHash !== row.identity_email_hash)
+      )
+        throw new DomainError("RECEIPT_UNCORRELATED", "Signup receipt is not correlated.");
+      await tx.query(
+        "UPDATE signup_attempts SET state=$1,evidence=$2,ended_at=$3 WHERE owner_id=$4 AND id=$5 AND state='IN_FLIGHT'",
+        [
+          attemptState,
+          evidence ? JSON.stringify(evidence) : null,
+          this.now(),
+          this.ownerId,
+          handle.attemptId,
+        ],
+      );
+      await tx.query(
+        "UPDATE employer_accounts SET state=$1,updated_at=$2 WHERE owner_id=$3 AND id=$4 AND state='signup_in_flight'",
+        [accountState, this.now(), this.ownerId, handle.accountId],
+      );
+      await this.audit(tx, handle.accountId, `account.signup_${accountState}`, handle.fence, {
+        attemptId: handle.attemptId,
+      });
+    });
   }
 }

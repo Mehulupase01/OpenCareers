@@ -25,3 +25,14 @@ export const employerAccountSchema = z
   })
   .strict();
 export type EmployerAccount = z.infer<typeof employerAccountSchema>;
+
+export const signupReceiptEvidenceSchema = z
+  .object({
+    providerAccountId: z.string().min(1).max(180),
+    employerOrigin: z.url(),
+    adapterId: z.string().regex(/^[a-z][a-z0-9-]{0,79}$/),
+    identityEmailHash: z.string().regex(/^[a-f0-9]{64}$/),
+    receivedAt: z.iso.datetime(),
+  })
+  .strict();
+export type SignupReceiptEvidence = z.infer<typeof signupReceiptEvidenceSchema>;
