@@ -772,14 +772,23 @@
         {
           "id": "P10-G1",
           "requirement": "Supported signup stores credentials safely and never exposes them to model prompts or logs.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/accounts.test.ts",
+            "tests/unit/vault.test.ts",
+            "GitHub Actions 36457888701"
+          ]
         },
         {
           "id": "P10-G2",
           "requirement": "A lost signup response does not automatically create a second account.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/unit/signup.test.ts",
+            "GitHub Actions 36457888701"
+          ]
         },
         {
           "id": "P10-G3",

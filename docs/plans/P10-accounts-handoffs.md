@@ -62,8 +62,17 @@ verification remains independent and does not block synthetic P10 engineering.
    mobile, secret-scan and dependency-audit gates.
 
 Checkpoint 1 implemented: vault configuration and authenticated encryption,
-migration v9 storage, and the redacted account repository. Signup dispatch,
-handoff brokering and exception UI remain in progress.
+migration v9 storage, and the redacted account repository.
+
+Checkpoint 2 implemented: one-action signup intent/permit/receipt handling,
+including unknown-response replay suppression. GitHub Actions run `36457888701`
+passed Windows, Ubuntu, and PostgreSQL at `8b2a40b`.
+
+Checkpoint 3 implemented: hashed handoff tokens, exact preparation/target
+binding, exclusive leases, generation fencing, stale-expiry retirement, and a
+transactional final-action interlock. The loopback API, visible browser broker,
+exception UI, and fresh rebuild remain in progress. See
+`docs/evidence/P10-security-checkpoints.md`.
 
 ## Acceptance Mapping
 

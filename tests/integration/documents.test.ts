@@ -830,6 +830,31 @@ for (const engine of ["sqlite", "postgres"] as const) {
           ])
         )[0];
         const submissions = new SubmissionRepository(db, owner, clock);
+        const handoffId = randomUUID();
+        await db.query(
+          "INSERT INTO handoff_sessions(owner_id,id,application_id,preparation_id,adapter_id,target_fingerprint,token_hash,state,generation,expires_at,created_at) VALUES($1,$2,$3,$4,'greenhouse',$5,$6,'open',1,$7,$8)",
+          [
+            owner,
+            handoffId,
+            packet.manifest.applicationId,
+            preparation.id,
+            result.adapter?.targetFingerprint ?? "e".repeat(64),
+            "f".repeat(64),
+            "2026-09-28T09:10:00.000Z",
+            clock().toISOString(),
+          ],
+        );
+        await expect(
+          submissions.begin(task, {
+            packetId: packet.manifest.id,
+            preparationId: preparation.id,
+            expectedRevision: Number(app?.revision),
+          }),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await db.query("DELETE FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
+          owner,
+          handoffId,
+        ]);
         const handle = await submissions.begin(task, {
           packetId: packet.manifest.id,
           preparationId: preparation.id,

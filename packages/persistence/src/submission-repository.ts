@@ -81,6 +81,12 @@ export class SubmissionRepository extends Repository {
       )[0];
       if (app?.state !== "READY")
         throw new DomainError("STATE_INVALID", "Application is not ready for a final action.");
+      const activeHandoff = await tx.query(
+        "SELECT id FROM handoff_sessions WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding') AND expires_at>$3 LIMIT 1",
+        [this.ownerId, applicationId, this.now()],
+      );
+      if (activeHandoff.length)
+        throw new DomainError("STATE_INVALID", "An active human handoff blocks final action.");
       if (Number(app.revision) !== input.expectedRevision)
         throw new DomainError("REVISION_STALE", "Application revision changed.");
       if (Number(app.commit_fence) !== task.fence)

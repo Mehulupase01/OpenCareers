@@ -283,5 +283,18 @@ P10 vault checkpoint: configuration accepts only canonical base64 for a random
 version as authenticated data. Migration v9 adds encrypted secrets, employer
 accounts, signup attempts and fenced handoff-session storage. The account
 repository returns redacted metadata, deduplicates preparation, and releases a
-credential only for the exact owner, origin and adapter. Signup dispatch and
-external account creation are not implemented at this checkpoint.
+credential only for the exact owner, origin and adapter. At that checkpoint,
+signup dispatch and external account creation were not implemented.
+
+P10 signup checkpoint `8b2a40b` implements one-action signup intent, dispatch
+permit and correlated receipt handling. Lost responses become unknown and
+cannot be replayed into a second account. GitHub Actions run `36457888701`
+passed Windows, Ubuntu and PostgreSQL. This is synthetic fixture verification;
+no employer account was created.
+
+The next P10 checkpoint adds owner-bound challenge handoff persistence. Tokens
+are returned once and stored only as hashes; exact preparation/target binding,
+exclusive browser leases, generation fencing, expiry replacement and the
+submission interlock have SQLite/PostgreSQL integration coverage. The visible
+loopback broker and exception UI are still pending, so P10-G3 through P10-G5
+remain open. See `docs/evidence/P10-security-checkpoints.md`.
