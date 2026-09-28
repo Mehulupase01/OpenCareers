@@ -8,6 +8,11 @@ const targetFingerprint = createHash("sha256")
   .update(JSON.stringify({ fixture: "challenge" }))
   .digest("hex");
 
+// The broker enforces absolute expiry, so these instants must be derived from the
+// clock. A hardcoded date made this suite fail on any run after that instant,
+// which is a test that rots rather than a behaviour that regressed.
+const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
+
 const session = handoffSessionSchema.parse({
   id: randomUUID(),
   applicationId: randomUUID(),
@@ -16,9 +21,9 @@ const session = handoffSessionSchema.parse({
   targetFingerprint,
   state: "claimed",
   generation: 1,
-  leaseUntil: "2026-09-28T20:05:00.000Z",
-  expiresAt: "2026-09-28T20:10:00.000Z",
-  createdAt: "2026-09-28T20:00:00.000Z",
+  leaseUntil: at(5 * 60_000),
+  expiresAt: at(10 * 60_000),
+  createdAt: at(0),
   completedAt: null,
 });
 
@@ -59,7 +64,7 @@ const result = dryRunResultSchema.parse({
   issues: ["Verification challenge requires owner action."],
   blockedFinalActions: 0,
   serverApplicationCount: 0,
-  preparedAt: "2026-09-28T20:00:00.000Z",
+  preparedAt: at(0),
 });
 
 test("broker accepts the scoped challenge action and verifies the fenced generation", async () => {

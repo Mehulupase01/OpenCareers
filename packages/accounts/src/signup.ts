@@ -16,6 +16,7 @@ const responseSchema = z
   .object({
     accountId: z.string().min(1).max(180),
     identityEmailHash: z.string().regex(/^[a-f0-9]{64}$/),
+    verificationRequired: z.boolean().default(false),
   })
   .strict();
 
@@ -59,6 +60,7 @@ export async function commitSignup(
       adapterId: account.adapterId,
       identityEmailHash: body.identityEmailHash,
       receivedAt: clock().toISOString(),
+      verificationRequired: body.verificationRequired,
     });
   } finally {
     credential.fill(0);

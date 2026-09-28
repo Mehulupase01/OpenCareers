@@ -150,6 +150,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
         "AUTOPILOT_VAULT_KEY must be canonical base64 for exactly 32 random bytes.",
       );
   }
+  // A private profile without a vault key cannot run account workflows, but it
+  // must still boot so the owner can be told what is missing. A demo profile is
+  // synthetic by construction and gets a published constant key so the account
+  // surfaces are demonstrable; it can only ever reach the bundled mock ATS.
+  const vaultKey =
+    e.AUTOPILOT_VAULT_KEY ??
+    (profile === "demo" ? Buffer.alloc(32, 0x64).toString("base64") : undefined);
   return {
     profile,
     dataDir,
@@ -157,7 +164,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     port: e.AUTOPILOT_PORT,
     ownerId: profile === "demo" ? "synthetic-owner" : e.AUTOPILOT_OWNER_ID,
     ownerToken: e.AUTOPILOT_OWNER_TOKEN,
-    vaultKey: e.AUTOPILOT_VAULT_KEY,
+    vaultKey,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
     inference: {

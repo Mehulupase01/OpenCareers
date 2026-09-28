@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PacketSnapshot } from "../../../packages/contracts/src/documents.js";
 import type { Job } from "../../../packages/contracts/src/index.js";
 import type { MatchingSnapshot } from "../../../packages/contracts/src/matching.js";
+import { AccountsPanel } from "./accounts.js";
 import { request } from "./api.js";
 import { BrowserPreparationPanel } from "./browser-preparation.js";
 import { PdfPreview } from "./pdf-preview.js";
@@ -115,6 +116,8 @@ export function DocumentsWorkspace({ jobs, demo }: { jobs: Job[]; demo: boolean 
           </button>
         </div>
       </div>
+
+      <AccountsPanel />
 
       <div className="document-layout">
         <div className="packet-index data-section">

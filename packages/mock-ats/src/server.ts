@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import multipart from "@fastify/multipart";
@@ -17,6 +17,17 @@ const fixtures = new Set([
   "response-loss",
   "validation-reject",
 ]);
+
+const signupFixtures = new Set([
+  "success",
+  "validation-reject",
+  "response-loss",
+  "duplicate",
+  "verification-required",
+]);
+
+const emailHash = (email: string) =>
+  createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 
 export interface MockApplication {
   id: string;
@@ -94,7 +105,12 @@ export async function buildMockAts(recordDir?: string) {
       );
     }
   }
-  const accounts: Array<{ id: string; email: string }> = [];
+  const accounts: Array<{
+    id: string;
+    email: string;
+    identityEmailHash?: string;
+    verificationRequired?: boolean;
+  }> = [];
   const uploads = new Map<string, { accepted: boolean; filename: string }>();
   app.get("/jobs/:fixture", async (request, reply) => {
     const fixture = (request.params as { fixture: string }).fixture;
@@ -166,6 +182,37 @@ export async function buildMockAts(recordDir?: string) {
     accounts.push(account);
     return reply.code(201).send(account);
   });
+  app.post("/signup", async (request, reply) => {
+    const fixture = (request.query as { fixture?: string }).fixture ?? "success";
+    if (!signupFixtures.has(fixture))
+      return reply.code(400).send({ error: "Unknown synthetic signup fixture" });
+    const body = (request.body ?? {}) as { email?: string; password?: string };
+    if (
+      !body.email ||
+      !/^\S+@\S+\.\S+$/.test(body.email) ||
+      !body.password ||
+      body.password.length < 16
+    )
+      return reply.code(422).send({ error: "Synthetic signup validation rejection" });
+    if (fixture === "validation-reject")
+      return reply.code(422).send({ error: "Synthetic definitive signup rejection" });
+    if (accounts.some((account) => account.email === body.email!.toLowerCase()))
+      return reply.code(422).send({ error: "Synthetic duplicate account" });
+    const account = {
+      id: randomUUID(),
+      email: body.email.toLowerCase(),
+      identityEmailHash: emailHash(body.email),
+      verificationRequired: fixture === "verification-required",
+    };
+    accounts.push(account);
+    if (fixture === "response-loss")
+      return reply.code(503).send({ error: "Synthetic signup response lost after acceptance" });
+    return reply.code(201).send({
+      accountId: account.id,
+      identityEmailHash: account.identityEmailHash,
+      verificationRequired: account.verificationRequired,
+    });
+  });
   app.get("/receipts/:id", async (request, reply) => {
     const id = (request.params as { id: string }).id;
     const record = submissions.find((item) => item.id === id);
@@ -180,6 +227,7 @@ export async function buildMockAts(recordDir?: string) {
     count: submissions.length,
     records: [...submissions],
     accountCount: accounts.length,
+    signupCount: accounts.filter((account) => account.identityEmailHash).length,
   }));
   return app;
 }

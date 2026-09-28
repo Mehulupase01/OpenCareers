@@ -9,6 +9,7 @@ import type { HandoffBrokerPort } from "../../../packages/browser/src/handoff-br
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { accountRoutes } from "./account.js";
 import { browserRoutes } from "./browser.js";
 import { candidateRoutes } from "./candidate.js";
 import { discoveryRoutes } from "./discovery.js";
@@ -19,7 +20,10 @@ import { matchingRoutes } from "./matching.js";
 export async function buildServer(
   config: Config,
   repository: Repository,
-  dependencies: { handoffBroker?: HandoffBrokerPort } = {},
+  dependencies: {
+    handoffBroker?: HandoffBrokerPort;
+    signupRequest?: (input: string, init: RequestInit) => Promise<Response>;
+  } = {},
 ) {
   const app = Fastify({
     logger: false,
@@ -194,6 +198,7 @@ export async function buildServer(
   await documentRoutes(app, config, repository);
   await browserRoutes(app, config, repository);
   await handoffRoutes(app, repository, dependencies.handoffBroker);
+  await accountRoutes(app, config, repository, dependencies.signupRequest);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

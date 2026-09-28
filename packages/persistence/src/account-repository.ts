@@ -272,7 +272,15 @@ export class AccountRepository extends Repository {
     evidenceInput: SignupReceiptEvidence,
   ): Promise<void> {
     const evidence = signupReceiptEvidenceSchema.parse(evidenceInput);
-    await this.finishSignup(handle, "active", "CONFIRMED", evidence);
+    // An account the employer created but still gates behind an emailed
+    // verification is recorded as needing it. Treating it as `active` would let
+    // a dependent workflow assume the session works before it does.
+    await this.finishSignup(
+      handle,
+      evidence.verificationRequired ? "needs_verification" : "active",
+      "CONFIRMED",
+      evidence,
+    );
   }
 
   async markSignupUnknown(handle: {
@@ -286,7 +294,7 @@ export class AccountRepository extends Repository {
 
   private async finishSignup(
     handle: { attemptId: string; accountId: string; fence: number; intentSha256: string },
-    accountState: "active" | "unknown",
+    accountState: "active" | "unknown" | "needs_verification",
     attemptState: "CONFIRMED" | "UNKNOWN",
     evidence: SignupReceiptEvidence | null,
   ) {

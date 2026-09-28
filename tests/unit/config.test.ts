@@ -12,6 +12,29 @@ describe("configuration fails closed", () => {
       ownerId: "synthetic-owner",
     });
   });
+  it("gives a synthetic demo vault key but never a private one", () => {
+    const demo = loadConfig({});
+    expect(demo.vaultKey).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(Buffer.from(String(demo.vaultKey), "base64")).toHaveLength(32);
+    expect(loadConfig({}).vaultKey).toBe(demo.vaultKey);
+    expect(
+      loadConfig({
+        AUTOPILOT_PROFILE: "local",
+        AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-submit-test"),
+        AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+      }).vaultKey,
+    ).toBeUndefined();
+  });
+  it("rejects a vault key that is not canonical base64 for 32 bytes", () => {
+    const base = {
+      AUTOPILOT_PROFILE: "local",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-submit-test"),
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+    };
+    for (const key of [Buffer.alloc(16).toString("base64"), "not base64 at all!!"]) {
+      expect(() => loadConfig({ ...base, AUTOPILOT_VAULT_KEY: key })).toThrow(/canonical base64/);
+    }
+  });
   it("rejects invalid profiles, ports and public local listeners", () => {
     for (const env of [
       { AUTOPILOT_PROFILE: "prod" },
