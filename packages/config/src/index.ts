@@ -12,6 +12,7 @@ const envSchema = z.object({
     .regex(/^[a-zA-Z0-9_.:-]+$/)
     .default("local-owner"),
   AUTOPILOT_OWNER_TOKEN: z.string().min(32).optional(),
+  AUTOPILOT_VAULT_KEY: z.string().optional(),
   AUTOPILOT_DATABASE_URL: z.string().optional(),
   AUTOPILOT_ALLOWED_ORIGINS: z.string().optional(),
   AUTOPILOT_OPENROUTER_API_KEY: z.string().min(20).max(512).optional(),
@@ -28,6 +29,7 @@ export interface Config {
   dataDir: string;
   ownerId: string;
   ownerToken: string | undefined;
+  vaultKey: string | undefined;
   databaseUrl: string | undefined;
   allowedOrigins: string[];
   inference: {
@@ -140,6 +142,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     );
   if (!e.AUTOPILOT_OPENROUTER_API_KEY && (modelAllowlist.length || providerAllowlist.length))
     throw new DomainError("CONFIG_INVALID", "Inference allowlists require an OpenRouter API key.");
+  if (e.AUTOPILOT_VAULT_KEY) {
+    const decoded = Buffer.from(e.AUTOPILOT_VAULT_KEY, "base64");
+    if (decoded.length !== 32 || decoded.toString("base64") !== e.AUTOPILOT_VAULT_KEY)
+      throw new DomainError(
+        "CONFIG_INVALID",
+        "AUTOPILOT_VAULT_KEY must be canonical base64 for exactly 32 random bytes.",
+      );
+  }
   return {
     profile,
     dataDir,
@@ -147,6 +157,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     port: e.AUTOPILOT_PORT,
     ownerId: profile === "demo" ? "synthetic-owner" : e.AUTOPILOT_OWNER_ID,
     ownerToken: e.AUTOPILOT_OWNER_TOKEN,
+    vaultKey: e.AUTOPILOT_VAULT_KEY,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
     inference: {

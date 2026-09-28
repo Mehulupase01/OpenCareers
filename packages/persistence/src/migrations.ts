@@ -81,6 +81,15 @@ const migrations = [
     "CREATE INDEX browser_preparation_history ON browser_preparations(owner_id,application_id,created_at,id)",
   ],
   ["ALTER TABLE attempts ADD COLUMN dispatch_started_at TEXT"],
+  [
+    "CREATE TABLE vault_secrets (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, purpose TEXT NOT NULL, key_version INTEGER NOT NULL, envelope TEXT NOT NULL, created_at TEXT NOT NULL, rotated_at TEXT, PRIMARY KEY(owner_id,id))",
+    "CREATE TABLE employer_accounts (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, candidate_id TEXT NOT NULL, employer_origin TEXT NOT NULL, adapter_id TEXT NOT NULL, identity_email_hash TEXT NOT NULL, state TEXT NOT NULL, secret_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,candidate_id,employer_origin,adapter_id), FOREIGN KEY(owner_id,candidate_id) REFERENCES candidates(owner_id,id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id))",
+    "CREATE TABLE signup_attempts (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, account_id TEXT NOT NULL, state TEXT NOT NULL, intent_sha256 TEXT NOT NULL, fence INTEGER NOT NULL, dispatch_started_at TEXT, evidence TEXT, started_at TEXT NOT NULL, ended_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,account_id) REFERENCES employer_accounts(owner_id,id))",
+    "CREATE UNIQUE INDEX one_active_signup ON signup_attempts(owner_id,account_id) WHERE state IN ('INTENT_RECORDED','IN_FLIGHT','UNKNOWN')",
+    "CREATE TABLE handoff_sessions (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, application_id TEXT NOT NULL, preparation_id TEXT NOT NULL, adapter_id TEXT NOT NULL, target_fingerprint TEXT NOT NULL, token_hash TEXT NOT NULL, state TEXT NOT NULL, generation INTEGER NOT NULL, lease_owner TEXT, lease_until TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,token_hash), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,preparation_id) REFERENCES browser_preparations(owner_id,id))",
+    "CREATE UNIQUE INDEX one_active_handoff ON handoff_sessions(owner_id,application_id) WHERE state IN ('open','claimed','rebuilding')",
+    "CREATE INDEX handoff_expiry ON handoff_sessions(owner_id,state,expires_at)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

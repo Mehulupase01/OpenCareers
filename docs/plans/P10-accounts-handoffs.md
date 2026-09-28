@@ -61,6 +61,10 @@ verification remains independent and does not block synthetic P10 engineering.
 7. Publish support/evidence and run local, Windows, Linux, PostgreSQL, desktop,
    mobile, secret-scan and dependency-audit gates.
 
+Checkpoint 1 implemented: vault configuration and authenticated encryption,
+migration v9 storage, and the redacted account repository. Signup dispatch,
+handoff brokering and exception UI remain in progress.
+
 ## Acceptance Mapping
 
 - P10-G1/G2: encrypted vault plus one-action signup and unknown-outcome tests.

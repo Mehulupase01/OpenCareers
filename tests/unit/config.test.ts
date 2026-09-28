@@ -53,6 +53,22 @@ describe("configuration fails closed", () => {
     for (const v of ["3.51.3", "3.53.0", "3.50.7", "3.44.6"])
       expect(sqliteVersionSafe(v)).toBe(true);
   });
+  it("accepts only a canonical 256-bit vault key", () => {
+    const privateEnv = {
+      AUTOPILOT_PROFILE: "local",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-vault-test"),
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+    };
+    expect(() => loadConfig({ ...privateEnv, AUTOPILOT_VAULT_KEY: "not-base64" })).toThrow(
+      /32 random bytes/,
+    );
+    expect(() =>
+      loadConfig({
+        ...privateEnv,
+        AUTOPILOT_VAULT_KEY: Buffer.alloc(32, 7).toString("base64"),
+      }),
+    ).not.toThrow();
+  });
   it("rejects paid, ambiguous and demo inference configuration", () => {
     const privateEnv = {
       AUTOPILOT_PROFILE: "local",

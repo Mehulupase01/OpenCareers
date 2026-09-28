@@ -277,3 +277,11 @@ exclusive browser-generation leases. Human challenge handling can complete only
 CAPTCHA/MFA or login steps; final application actions stay blocked until a fresh
 automation-owned rebuild. Answer propagation remains exact and evidence-bound.
 See `docs/plans/P10-accounts-handoffs.md`.
+
+P10 vault checkpoint: configuration accepts only canonical base64 for a random
+32-byte vault key. AES-256-GCM envelopes bind owner, secret ID, purpose and key
+version as authenticated data. Migration v9 adds encrypted secrets, employer
+accounts, signup attempts and fenced handoff-session storage. The account
+repository returns redacted metadata, deduplicates preparation, and releases a
+credential only for the exact owner, origin and adapter. Signup dispatch and
+external account creation are not implemented at this checkpoint.
