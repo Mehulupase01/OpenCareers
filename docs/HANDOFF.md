@@ -313,3 +313,66 @@ lint, typecheck, production build, public-source scan and dependency audit. The
 private local service was restored on the updated code at manager PID `27636`;
 API `4317` and UI `4318` are healthy. Revalidate process identities before
 stopping it.
+
+The owner supplied the masterplan as a local `.md` on 2026-09-28. It is still
+excluded from Git because it embeds a private candidate-policy section. Read
+`docs/masterplan-traceability.md` before resuming: it maps R01-R12 and every
+Appx.B scenario T01-T32 to the tests that actually assert them. Honest totals
+are 15 covered, 11 partial and 6 missing (T23, T24, T26, T27, T28, T32). The
+Appendices are not in the repository, so conformance to them was previously
+unknown; it is now recorded, not assumed.
+
+Stage 0 groundwork is committed at `497ca21` and `27221e5`. The phase ledger is
+migrated to the masterplan Appendix D format at `schemaVersion 2`: tickets are
+objects with their own status, evidence and nextAction, the six-value status
+vocabulary is in use, P08 is `code_complete_verification_pending` with P08-G6
+`blocked_external`, phase P18 records the owner-added portal breadth, and
+`scripts/validate-ledger.ts` now runs inside `pnpm check` so the ledger cannot
+silently rot again. It found nine real problems on its first run. Decision-
+complete plans now exist for P10 closeout and for P11 through P18.
+`docs/amendments.md` items 6-12 record the owner's 2026-09-28 scope instructions
+and the precedence rule that conversation authority overrides the older
+masterplan.
+
+P10 closeout is in progress. Three increments are committed and pushed:
+`b9bb03c` adds the employer account HTTP surface and an owned mock-ATS signup
+fixture with all five outcomes; `17036b8` allows a challenge handoff on
+external portal adapters, replacing the mock-only restriction with a
+prepared-URL policy; `5fa7cd5` scopes packet answers to the job and closes
+P10-G6. P10-G1 through G10-G6 are complete on named evidence and P10-G7 is not.
+Remaining P10 work: the exception inbox, which does not exist in any form and
+whose resolution primitive is currently unreachable from any route; the safe
+rebuild path with reconciliation-first; and the account-exception mapping for
+an expired portal session, which is T32. Next action recorded in the ledger is
+`P10-04`.
+
+Two defects worth remembering. Browser tests were running against the owner's
+private database: the Playwright web server invoked the dev supervisor, which
+loads the private `.env`, and `reuseExistingServer` attached to a running
+private instance without complaint. The web server now refuses to reuse a
+listener, forces the demo profile with the env file skipped, and a global setup
+refuses to run unless the server reports profile `demo`. The handoff broker
+browser test also hardcoded an absolute session expiry, so it began failing on
+any run after that instant; it now derives timestamps from the clock.
+
+Browser tests require ports 4317 and 4318, so the private local service must be
+stopped before running `pnpm test:e2e` and restarted afterwards. The suite is
+not hermetic: specs share one demo database and one worker, and repeated full
+runs on a freshly reset workspace failed different specs on different runs. The
+last full run passed 40 of 40, but per-spec isolation is real outstanding work.
+
+The private local service is running again on the updated code: API `4317` (PID
+`5840`) and UI `4318` (PID `16364`), profile `local`, readiness confirmed.
+Revalidate process identities before stopping it.
+
+B1 is the next unblocked increment and it is the hardest remaining dependency:
+owner amendment 5 requires an LLM-drafted cover letter for any real auto-submit
+packet, and the central commit gate rejects deterministic letters for external
+adapters. A live catalogue read on 2026-09-28 found 20 free models, 5 with
+structured outputs, including `nvidia/nemotron-3-super-120b-a12b:free` at zero
+price in both dimensions with `structured_outputs`, while
+`nvidia/nemotron-3-ultra-550b-a55b:free` is zero-priced without them. Per-route
+zero-data-retention provider eligibility is still unprobed and is the only
+remaining hard blocker. The owner must also rotate the OpenRouter key pasted
+into chat before any live route work.
+
