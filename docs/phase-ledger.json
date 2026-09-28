@@ -1,6 +1,16 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reference": "Job Autopilot Production Masterplan v2.0 (2026-09-16)",
+  "statusVocabulary": [
+    "not_started",
+    "in_progress",
+    "code_complete_verification_pending",
+    "blocked_external",
+    "failed_gate",
+    "complete"
+  ],
+  "migratedAt": "2026-09-28",
+  "traceability": "docs/masterplan-traceability.md",
   "phases": [
     {
       "id": "P00",
@@ -8,26 +18,46 @@
       "status": "complete",
       "dependsOn": [],
       "tickets": [
-        [
-          "P00-01",
-          "Inspect before changing. Read applicable repository instructions, inventory files, detect package managers"
-        ],
-        [
-          "P00-02",
-          "Record architecture decisions. Write ADRs for database-backed workflow, SQLite/PostgreSQL parity,"
-        ],
-        [
-          "P00-03",
-          "Establish the requirement ledger. Create records for R01-R12, every phase, and each acceptance gate."
-        ],
-        [
-          "P00-04",
-          "Define scope and support claims. Create an initial adapter matrix with mock-only, planned, fixture-tested,"
-        ],
-        [
-          "P00-05",
-          "Plan reference reuse. Record upstream commit and license, candidate files, modifications needed, and"
-        ]
+        {
+          "id": "P00-01",
+          "text": "Inspect before changing. Read applicable repository instructions, inventory files, detect package managers and runtimes, inspect Git status, and identify existing user changes.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P00-audit.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P00-02",
+          "text": "Record architecture decisions. Write ADRs for database-backed workflow, SQLite/PostgreSQL parity, browser-owned external commits, free-only inference, canonical candidate facts, and the deployment profiles.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P00-audit.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P00-03",
+          "text": "Establish the requirement ledger. Create records for R01-R12, every phase, and each acceptance gate with status, dependencies, evidence paths, last tested commit, and unresolved external prerequisites.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P00-audit.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P00-04",
+          "text": "Define scope and support claims. Create an initial adapter matrix with mock-only, planned, fixture-tested, dry-run-tested, and live-verified levels, separating discovery support from submission support.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P00-audit.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P00-05",
+          "text": "Plan reference reuse. Record upstream commit and license, candidate files, modifications needed, and tests required before import.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P00-audit.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -62,7 +92,14 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "0f9c4dad47b494e1cb214c39b07792e3e36bd5cc",
+      "remoteVerification": [],
+      "acceptanceTests": [],
+      "nextAction": null,
       "evidence": [
         "docs/evidence/P00-audit.md",
         "docs/architecture.md",
@@ -77,26 +114,46 @@
       "status": "complete",
       "dependsOn": ["P00"],
       "tickets": [
-        [
-          "P01-01",
-          "Scaffold boundaries. Create the apps and packages listed in chapter 05, but implement only the necessary"
-        ],
-        [
-          "P01-02",
-          "Define runtime profiles. Support explicit demo, local, and server configuration types. Default a public"
-        ],
-        [
-          "P01-03",
-          "Build health surfaces. Add version, liveness, readiness, and worker-heartbeat endpoints. Readiness must"
-        ],
-        [
-          "P01-04",
-          "Create the dashboard shell. Show source jobs, application stages, exceptions, workers, and settings using"
-        ],
-        [
-          "P01-05",
-          "Establish CI. Run formatting, linting, type checking, unit tests, dependency checks, and a production build."
-        ]
+        {
+          "id": "P01-01",
+          "text": "Scaffold boundaries. Create the apps and packages listed in chapter 05, implementing only necessary initial modules with shared schemas, typed errors, structured logging, and configuration validation.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P01-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P01-02",
+          "text": "Define runtime profiles. Support explicit demo, local, and server configuration types, and default a public clone to demo with synthetic data and external submission disabled.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P01-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P01-03",
+          "text": "Build health surfaces. Add version, liveness, readiness, and worker-heartbeat endpoints; readiness must fail for unavailable required persistence rather than returning HTTP 200.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P01-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P01-04",
+          "text": "Create the dashboard shell. Show source jobs, application stages, exceptions, workers, and settings using synthetic data with accessible keyboard navigation and clear empty, loading, and error states.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P01-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P01-05",
+          "text": "Establish CI. Run formatting, linting, type checking, unit tests, dependency checks, and a production build with deterministic fixtures and a pinned lockfile.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P01-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -137,7 +194,14 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "74b45165fe26dce1c63a02fee761f05cdcf550bc",
+      "remoteVerification": [],
+      "acceptanceTests": [],
+      "nextAction": null,
       "evidence": ["docs/evidence/P01-verification.md"]
     },
     {
@@ -146,26 +210,46 @@
       "status": "complete",
       "dependsOn": ["P01"],
       "tickets": [
-        [
-          "P02-01",
-          "Schema and migrations. Create owner, candidate version, source, job, application, task, attempt, artifact,"
-        ],
-        [
-          "P02-02",
-          "Repository interfaces. Implement transaction boundaries and typed query methods. Keep"
-        ],
-        [
-          "P02-03",
-          "Queue worker. Implement claim, heartbeat, lease renewal, retry-wait, cancellation, dead letter, and"
-        ],
-        [
-          "P02-04",
-          "Pure state machine. Reject invalid transitions and stale revisions. Distinguish retryable preparation from"
-        ],
-        [
-          "P02-05",
-          "Outbox and audit. Atomically persist state plus event, then deliver events idempotently. Redact sensitive"
-        ]
+        {
+          "id": "P02-01",
+          "text": "Schema and migrations. Create owner, candidate version, source, job, application, task, attempt, artifact, authorization, exception, and audit/outbox records with foreign keys, uniqueness constraints, timestamps, schema versions, and migration tests.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P02-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P02-02",
+          "text": "Repository interfaces. Implement transaction boundaries and typed query methods, keeping backend-specific lease SQL inside persistence.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P02-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P02-03",
+          "text": "Queue worker. Implement claim, heartbeat, lease renewal, retry-wait, cancellation, dead letter, and success acknowledgment with application-level and domain-level concurrency limits.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P02-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P02-04",
+          "text": "Pure state machine. Reject invalid transitions and stale revisions, distinguishing retryable preparation from externally ambiguous attempts.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P02-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P02-05",
+          "text": "Outbox and audit. Atomically persist state plus event, then deliver events idempotently, redacting sensitive fields by schema.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P02-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -212,7 +296,14 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "9084eb9baa25f87e53c4f54691795e514d203db2",
+      "remoteVerification": [],
+      "acceptanceTests": ["T16", "T18"],
+      "nextAction": null,
       "evidence": ["docs/evidence/P02-verification.md", "docs/persistence.md"]
     },
     {
@@ -221,26 +312,46 @@
       "status": "complete",
       "dependsOn": ["P02"],
       "tickets": [
-        [
-          "P03-01",
-          "Source ingestion. Import DOCX/PDF files without modifying originals. Extract text, tables, hyperlinks, and"
-        ],
-        [
-          "P03-02",
-          "Fact ledger. Create typed employment, education, skills, language, project, metric, availability, and"
-        ],
-        [
-          "P03-03",
-          "Chronology validation. Compute experience in non-overlapping months, track full-time/part-time"
-        ],
-        [
-          "P03-04",
-          "Owner policy. Build onboarding for role scope, location, sponsorship wording, salary answers, account"
-        ],
-        [
-          "P03-05",
-          "Answer memory. Store approved semantic answers with valid dates, scope, exact meaning, and evidence."
-        ]
+        {
+          "id": "P03-01",
+          "text": "Source ingestion. Import DOCX/PDF files without modifying originals; extract text, tables, hyperlinks, and source locators, and store file hashes and parsing quality.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P03-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P03-02",
+          "text": "Fact ledger. Create typed employment, education, skills, language, project, metric, availability, and work-authorization facts with explicit extracted, owner-asserted, verified, conflicting, or expired status.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P03-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P03-03",
+          "text": "Chronology validation. Compute experience in non-overlapping months, track full-time and part-time distinctions, and flag inconsistent dates or technologies assigned to implausible periods.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P03-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P03-04",
+          "text": "Owner policy. Build onboarding for role scope, location, sponsorship wording, salary answers, account creation, optional disclosures, blocked employers, and daily submission limit, with review-only, fill-only, and auto-submit modes.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P03-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P03-05",
+          "text": "Answer memory. Store approved semantic answers with valid dates, scope, exact meaning, and evidence, with a reusable review mechanism that resolves the same question across pending applications.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P03-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -287,7 +398,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": "857047c0b5c885fd3fa96db5d5bfce55b9ad32a3"
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": "857047c0b5c885fd3fa96db5d5bfce55b9ad32a3",
+      "remoteVerification": [],
+      "acceptanceTests": ["T07", "T08"],
+      "nextAction": null,
+      "evidence": ["docs/evidence/P03-verification.md"]
     },
     {
       "id": "P04",
@@ -295,26 +414,46 @@
       "status": "complete",
       "dependsOn": ["P03"],
       "tickets": [
-        [
-          "P04-01",
-          "Connector SDK. Implement source configuration, pagination, incremental polling, rate policy, raw"
-        ],
-        [
-          "P04-02",
-          "Initial connectors. Implement a small set of high-yield public ATS listing connectors and owner-added URL"
-        ],
-        [
-          "P04-03",
-          "Canonical identity. Resolve requisition IDs, application URLs, employers, source aliases, and likely"
-        ],
-        [
-          "P04-04",
-          "Historical import. Import existing application records and document-folder metadata. Preserve"
-        ],
-        [
-          "P04-05",
-          "Watchlist and freshness. Add Netherlands company lists, role aliases, first-seen/posted/updated times,"
-        ]
+        {
+          "id": "P04-01",
+          "text": "Connector SDK. Implement source configuration, pagination, incremental polling, rate policy, raw snapshots, normalized output, and health metrics, with fixture replay mode and robust timeout and error classes.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P04-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P04-02",
+          "text": "Initial connectors. Implement a small set of high-yield public ATS listing connectors and owner-added URL ingestion, verifying current live read-only samples with retained source attribution.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P04-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P04-03",
+          "text": "Canonical identity. Resolve requisition IDs, application URLs, employers, source aliases, and likely cross-postings, keeping suspected duplicates reversible.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P04-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P04-04",
+          "text": "Historical import. Import existing application records and document-folder metadata, preserving user-asserted submitted status separately from independent receipts.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P04-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P04-05",
+          "text": "Watchlist and freshness. Add Netherlands company lists, role aliases, first-seen, posted, and updated times, closure detection, and source-specific polling schedules.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P04-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -361,7 +500,14 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "fd9d3364fef509f2ebe3aacc0d67fbf072d5048d",
+      "remoteVerification": [],
+      "acceptanceTests": ["T01", "T02", "T03", "T29", "T31"],
+      "nextAction": null,
       "evidence": ["docs/evidence/P04-verification.md"]
     },
     {
@@ -370,26 +516,46 @@
       "status": "complete",
       "dependsOn": ["P04"],
       "tickets": [
-        [
-          "P05-01",
-          "Gateway policy. Implement model discovery, current price/capability checks, route allowlists, privacy"
-        ],
-        [
-          "P05-02",
-          "Resilience. Add schema validation, bounded repair, expiring model health, rate-limit backoff, daily-budget"
-        ],
-        [
-          "P05-03",
-          "Deterministic gates. Implement location, language, duplicate, closure, salary-feasibility, and explicit"
-        ],
-        [
-          "P05-04",
-          "Semantic assessment. Extract requirements with evidence spans and map them to candidate fact IDs."
-        ],
-        [
-          "P05-05",
-          "Evaluation dataset. Create at least 50 labeled, sanitized examples covering strong matches, adjacent roles,"
-        ]
+        {
+          "id": "P05-01",
+          "text": "Gateway policy. Implement model discovery, current price and capability checks, route allowlists, privacy settings, account-level budget reservation, timeout handling, and a no-paid-tools default.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P05-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P05-02",
+          "text": "Resilience. Add schema validation, bounded repair, expiring model health, rate-limit backoff, daily-budget exhaustion states, and redacted request logs.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P05-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P05-03",
+          "text": "Deterministic gates. Implement location, language, duplicate, closure, salary-feasibility, and explicit sponsorship restrictions from typed facts and requirements.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P05-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P05-04",
+          "text": "Semantic assessment. Extract requirements with evidence spans, map them to candidate fact IDs, and compute the final weighted score in code.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P05-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P05-05",
+          "text": "Evaluation dataset. Create at least 50 labeled, sanitized examples covering strong matches, adjacent roles, hard disqualifiers, ambiguous sponsorship, seniority mismatch, and misleading titles, with an untouched holdout subset.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P05-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -438,7 +604,14 @@
       "externalPrerequisites": [
         "Owner-provided private OpenRouter key and explicit free model/provider allowlists are required for an authenticated live inference probe."
       ],
+      "externalVerification": {
+        "status": "blocked_external",
+        "note": "Owner-provided private OpenRouter key and explicit free model/provider allowlists are required for an authenticated live inference probe."
+      },
       "lastVerifiedCommit": "89cff352a9488e57af9d46116b51fbe48507fa25",
+      "remoteVerification": [],
+      "acceptanceTests": ["T04", "T05", "T06", "T09", "T10", "T11", "T30"],
+      "nextAction": null,
       "evidence": ["docs/evidence/P05-verification.md"]
     },
     {
@@ -447,26 +620,46 @@
       "status": "complete",
       "dependsOn": ["P05"],
       "tickets": [
-        [
-          "P06-01",
-          "Content schemas. Define CV, letter, claim, and answer ASTs with fact references, length constraints, and"
-        ],
-        [
-          "P06-02",
-          "Generation. Implement professional-evidence-first bullet selection, role-specific summaries, concise"
-        ],
-        [
-          "P06-03",
-          "Validation. Check claim support, years-of-experience wording, company/role correctness, language"
-        ],
-        [
-          "P06-04",
-          "Rendering. Produce DOCX and PDF using the chosen pinned pipeline. Add extraction checks, layout"
-        ],
-        [
-          "P06-05",
-          "Packet store. Write immutable manifests and content-addressed artifacts; export user-readable copies"
-        ]
+        {
+          "id": "P06-01",
+          "text": "Content schemas. Define CV, letter, claim, and answer ASTs with fact references, length constraints, and template versions, with no executable model-authored markup.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P06-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P06-02",
+          "text": "Generation. Implement professional-evidence-first bullet selection, role-specific summaries, concise motivation letters, and semantic answer reuse, keeping dates, employers, degrees, and metrics immutable.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P06-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P06-03",
+          "text": "Validation. Check claim support, years-of-experience wording, company and role correctness, language requirements, tense and delivery status, and absence of placeholders or another employer's name.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P06-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P06-04",
+          "text": "Rendering. Produce DOCX and PDF from the pinned pipeline with extraction checks, layout bounds, page limits, visual golden tests, and upload-size constraints.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P06-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P06-05",
+          "text": "Packet store. Write immutable manifests and content-addressed artifacts, exporting user-readable copies without overwriting originals.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P06-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -513,7 +706,14 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "d1deed7361ae75433065fd125739ab7621dac607",
+      "remoteVerification": [],
+      "acceptanceTests": ["T07", "T08", "T09"],
+      "nextAction": null,
       "evidence": ["docs/evidence/P06-verification.md"]
     },
     {
@@ -522,26 +722,46 @@
       "status": "complete",
       "dependsOn": ["P06"],
       "tickets": [
-        [
-          "P07-01",
-          "Mock ATS server. Build synthetic job pages and forms with server-side application records, unique"
-        ],
-        [
-          "P07-02",
-          "Browser runtime. Launch owned browser contexts with resource limits, isolation, domain policies, trace"
-        ],
-        [
-          "P07-03",
-          "SDK. Implement the interfaces in chapter 10, including form snapshots, field plans, read-back validation,"
-        ],
-        [
-          "P07-04",
-          "Fill primitives. Support text, email, phone, textarea, select, radio, checkbox, date, file upload,"
-        ],
-        [
-          "P07-05",
-          "Challenge fixtures. Model CAPTCHA/MFA states with synthetic challenge screens, without implementing"
-        ]
+        {
+          "id": "P07-01",
+          "text": "Mock ATS server. Build synthetic job pages and forms with server-side application records, unique application IDs, configurable failure points, uploads, conditional questions, multi-step flow, and explicit receipt pages.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P07-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P07-02",
+          "text": "Browser runtime. Launch owned browser contexts with resource limits, isolation, domain policies, trace redaction, cancellation, safe session storage, and a visible local mode for owner observation.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P07-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P07-03",
+          "text": "SDK. Implement the chapter 10 interfaces including form snapshots, field plans, read-back validation, and receipt observations.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P07-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P07-04",
+          "text": "Fill primitives. Support text, email, phone, textarea, select, radio, checkbox, date, file upload, autocomplete, and character-limited answers, reporting unsupported controls explicitly.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P07-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P07-05",
+          "text": "Challenge fixtures. Model CAPTCHA and MFA states with synthetic challenge screens without implementing bypass, persisting exceptions while other jobs continue.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P07-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -588,35 +808,62 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "025eaea33b3c37bbd9540faa40ccbd42478dc5ef",
+      "remoteVerification": [],
+      "acceptanceTests": ["T13", "T14", "T15", "T21"],
+      "nextAction": null,
       "evidence": ["docs/evidence/P07-verification.md"]
     },
     {
       "id": "P08",
       "title": "Actual submission vertical slice",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": ["P07"],
       "tickets": [
-        [
-          "P08-01",
-          "Policy gate. Implement the complete precommit checklist and immutable intent binding. Verify profile,"
-        ],
-        [
-          "P08-02",
-          "Commit engine. Persist intent and in-flight attempt before the final action. Enforce exclusive commit"
-        ],
-        [
-          "P08-03",
-          "Receipt verification. Implement strong success, definitive validation failure, and unknown-outcome"
-        ],
-        [
-          "P08-04",
-          "Reconciliation. Recover from an in-flight record without replaying the final click. Read the mock ATS"
-        ],
-        [
-          "P08-05",
-          "First real adapter. Choose one high-yield portal family from current candidate opportunities. Implement"
-        ]
+        {
+          "id": "P08-01",
+          "text": "Policy gate. Implement the complete precommit checklist and immutable intent binding, verifying profile, policy, destination, form, answer, document, duplicate, and budget constraints.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P08-engineering-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P08-02",
+          "text": "Commit engine. Persist intent and in-flight attempt before the final action, enforcing exclusive commit ownership, cancellation checks, and exact adapter routing.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P08-engineering-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P08-03",
+          "text": "Receipt verification. Implement strong success, definitive validation failure, and unknown-outcome classification, storing evidence with job and application correlation.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P08-engineering-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P08-04",
+          "text": "Reconciliation. Recover from an in-flight record without replaying the final click, reading the mock ATS account and receipt record to resolve accepted versus unknown states.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P08-engineering-verification.md"],
+          "nextAction": null
+        },
+        {
+          "id": "P08-05",
+          "text": "First real adapter. Choose one high-yield portal family from current candidate opportunities, implement and test its actual final submission and receipt behavior, then run a genuine controlled application under the recorded policy.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": ["docs/evidence/P08-engineering-verification.md"],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -652,7 +899,7 @@
         {
           "id": "P08-G6",
           "requirement": "At least one genuine, appropriate live submission is receipt-verified before the adapter is labeled live-verified.",
-          "status": "not_started",
+          "status": "blocked_external",
           "evidence": []
         },
         {
@@ -665,7 +912,14 @@
       "externalPrerequisites": [
         "P08-G6 requires an explicitly reviewed private candidate profile, active matching standing authorization, appropriate live vacancy, and private correlated receipt."
       ],
+      "externalVerification": {
+        "status": "blocked_external",
+        "note": "P08-G6 requires an explicitly reviewed private candidate profile, active matching standing authorization, appropriate live vacancy, and private correlated receipt."
+      },
       "lastVerifiedCommit": "9c29659f8f06bc2aa8a66d5cfd7569ab8d318fd6",
+      "remoteVerification": [],
+      "acceptanceTests": ["T15", "T16", "T17", "T19", "T20"],
+      "nextAction": "close P08-G6",
       "evidence": ["docs/evidence/P08-engineering-verification.md"]
     },
     {
@@ -674,26 +928,66 @@
       "status": "complete",
       "dependsOn": ["P08"],
       "tickets": [
-        [
-          "P09-01",
-          "Coverage analysis. Group eligible jobs by portal family, employer-specific variant, account requirement,"
-        ],
-        [
-          "P09-02",
-          "Adapter increments. Add the next high-yield families, normally from Recruitee, Greenhouse, Lever, and"
-        ],
-        [
-          "P09-03",
-          "Variant fixtures. Capture sanitized real form structures and rebuild representative variants in the mock"
-        ],
-        [
-          "P09-04",
-          "Drift detection. Monitor structural fingerprints and missing expected controls. Pause only the affected"
-        ],
-        [
-          "P09-05",
-          "Support matrix. Publish discovery, inspection, fill, account, commit, receipt, and reconciliation coverage"
-        ]
+        {
+          "id": "P09-01",
+          "text": "Coverage analysis. Group eligible jobs by portal family, employer-specific variant, account requirement, and current failure reason, prioritizing adapters by expected additional suitable submissions per engineering effort.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P09-greenhouse-lifecycle.md",
+            "docs/evidence/P09-pre-dispatch-drift.md",
+            "docs/evidence/P09-coverage-verification.md"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P09-02",
+          "text": "Adapter increments. Add the next high-yield families, normally from Recruitee, Greenhouse, Lever, and Ashby browser forms, each with detection, field mapping, validation, commit, and receipt implementation.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P09-greenhouse-lifecycle.md",
+            "docs/evidence/P09-pre-dispatch-drift.md",
+            "docs/evidence/P09-coverage-verification.md"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P09-03",
+          "text": "Variant fixtures. Capture sanitized real form structures and rebuild representative variants in the mock environment, including employer-added questions and localized labels.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P09-greenhouse-lifecycle.md",
+            "docs/evidence/P09-pre-dispatch-drift.md",
+            "docs/evidence/P09-coverage-verification.md"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P09-04",
+          "text": "Drift detection. Monitor structural fingerprints and missing expected controls, pausing only the affected adapter version when its contract breaks.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P09-greenhouse-lifecycle.md",
+            "docs/evidence/P09-pre-dispatch-drift.md",
+            "docs/evidence/P09-coverage-verification.md"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P09-05",
+          "text": "Support matrix. Publish discovery, inspection, fill, account, commit, receipt, and reconciliation coverage separately with last-tested dates and known limitations.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P09-greenhouse-lifecycle.md",
+            "docs/evidence/P09-pre-dispatch-drift.md",
+            "docs/evidence/P09-coverage-verification.md"
+          ],
+          "nextAction": null
+        }
       ],
       "gates": [
         {
@@ -734,8 +1028,16 @@
         }
       ],
       "externalPrerequisites": [],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
       "lastVerifiedCommit": "9cd7cdafc3821b3cdc88d6a76fcc3b8122fd99bf",
+      "remoteVerification": [],
+      "acceptanceTests": ["T12", "T13"],
+      "nextAction": null,
       "evidence": [
+        "docs/plans/P09-portal-breadth-amendment.md",
         "docs/evidence/P09-coverage-verification.md",
         "docs/evidence/P09-pre-dispatch-drift.md",
         "docs/evidence/P09-greenhouse-lifecycle.md"
@@ -747,26 +1049,73 @@
       "status": "in_progress",
       "dependsOn": ["P09"],
       "tickets": [
-        [
-          "P10-01",
-          "Account registry. Map candidate identity to employer domain and applicant account. Store only vault"
-        ],
-        [
-          "P10-02",
-          "Signup workflow. Fill supported ordinary signup forms using approved identity, generate unique"
-        ],
-        [
-          "P10-03",
-          "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route,"
-        ],
-        [
-          "P10-04",
-          "Exception inbox. Show the exact question/blocker, affected job, suggested supported answer if any,"
-        ],
-        [
-          "P10-05",
-          "Propagation and resumption. An approved answer can resolve semantically equivalent pending questions"
-        ]
+        {
+          "id": "P10-01",
+          "text": "Account registry. Map candidate identity to employer domain and applicant account, storing only vault references with creation status, session validity, and last verification time.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/accounts.test.ts",
+            "tests/unit/vault.test.ts",
+            "tests/unit/signup.test.ts",
+            "tests/integration/handoff.test.ts",
+            "tests/e2e/handoff-broker.spec.ts",
+            "tests/integration/api.test.ts",
+            "tests/integration/documents.test.ts"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P10-02",
+          "text": "Signup workflow. Fill supported ordinary signup forms using approved identity, generate unique credentials, and store them securely before a workflow can depend on them, detecting verification, MFA, payment, and unusual agreement steps.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/accounts.test.ts",
+            "tests/unit/vault.test.ts",
+            "tests/unit/signup.test.ts",
+            "tests/integration/handoff.test.ts",
+            "tests/e2e/handoff-broker.spec.ts",
+            "tests/integration/api.test.ts",
+            "tests/integration/documents.test.ts"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P10-03",
+          "text": "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route, and expire stale handles, without implementing CAPTCHA bypass.",
+          "status": "complete",
+          "acceptanceTests": [],
+          "evidence": [
+            "docs/evidence/P10-security-checkpoints.md",
+            "tests/integration/accounts.test.ts",
+            "tests/unit/vault.test.ts",
+            "tests/unit/signup.test.ts",
+            "tests/integration/handoff.test.ts",
+            "tests/e2e/handoff-broker.spec.ts",
+            "tests/integration/api.test.ts",
+            "tests/integration/documents.test.ts"
+          ],
+          "nextAction": null
+        },
+        {
+          "id": "P10-04",
+          "text": "Exception inbox. Show the exact question or blocker, affected job, suggested supported answer if any, evidence, and actions to resolve, defer, skip, or open a session.",
+          "status": "in_progress",
+          "acceptanceTests": ["T21", "T22", "T32"],
+          "evidence": [],
+          "nextAction": "P10-04"
+        },
+        {
+          "id": "P10-05",
+          "text": "Propagation and resumption. An approved answer resolves semantically equivalent pending questions within its scope, and the entire affected form is revalidated before commitment.",
+          "status": "in_progress",
+          "acceptanceTests": ["T21", "T22", "T32"],
+          "evidence": [],
+          "nextAction": "P10-05"
+        }
       ],
       "gates": [
         {
@@ -776,19 +1125,14 @@
           "evidence": [
             "docs/evidence/P10-security-checkpoints.md",
             "tests/integration/accounts.test.ts",
-            "tests/unit/vault.test.ts",
-            "GitHub Actions 36457888701"
+            "tests/unit/vault.test.ts"
           ]
         },
         {
           "id": "P10-G2",
           "requirement": "A lost signup response does not automatically create a second account.",
           "status": "complete",
-          "evidence": [
-            "docs/evidence/P10-security-checkpoints.md",
-            "tests/unit/signup.test.ts",
-            "GitHub Actions 36457888701"
-          ]
+          "evidence": ["docs/evidence/P10-security-checkpoints.md", "tests/unit/signup.test.ts"]
         },
         {
           "id": "P10-G3",
@@ -834,7 +1178,36 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": "19470542e3ecc1aa20d5d1e4475a17f7292c88fa",
+      "remoteVerification": [
+        {
+          "runId": "36457888701",
+          "commit": "8b2a40b6ae386b8ff106e0093390530e7aeef73d",
+          "lanes": [
+            "local-contract:ubuntu-latest",
+            "local-contract:windows-latest",
+            "postgres-contract"
+          ],
+          "covers": "Account vault and one-action signup checkpoint only. The handoff-lease and visible-handoff checkpoints have no recorded cross-platform run."
+        }
+      ],
+      "acceptanceTests": ["T21", "T22", "T32"],
+      "nextAction": "P10-04",
+      "evidence": [
+        "docs/plans/P10-closeout.md",
+        "docs/evidence/P10-security-checkpoints.md",
+        "tests/integration/accounts.test.ts",
+        "tests/unit/vault.test.ts",
+        "tests/unit/signup.test.ts",
+        "tests/integration/handoff.test.ts",
+        "tests/e2e/handoff-broker.spec.ts",
+        "tests/integration/api.test.ts",
+        "tests/integration/documents.test.ts"
+      ]
     },
     {
       "id": "P11",
@@ -842,26 +1215,46 @@
       "status": "not_started",
       "dependsOn": ["P10"],
       "tickets": [
-        [
-          "P11-01",
-          "OAuth lifecycle. Implement least-sufficient scopes, secure token storage, refresh, disconnect, revocation"
-        ],
-        [
-          "P11-02",
-          "Narrow message acquisition. Query only relevant time windows and application/account contexts, fetch"
-        ],
-        [
-          "P11-03",
-          "Correlation. Match messages to pending applications using expected recipient, employer/sender domain,"
-        ],
-        [
-          "P11-04",
-          "Verification links. Follow only links bound to a pending signup and validated destination chain. Reject"
-        ],
-        [
-          "P11-05",
-          "Outcome updates. Classify receipt, interview, rejection, or ambiguous message with supporting evidence."
-        ]
+        {
+          "id": "P11-01",
+          "text": "OAuth lifecycle. Implement least-sufficient scopes, secure token storage, refresh, disconnect, revocation handling, and actionable reconnect states, documenting testing-mode versus deployed-app limitations.",
+          "status": "not_started",
+          "acceptanceTests": ["T23", "T24"],
+          "evidence": [],
+          "nextAction": "P11-01"
+        },
+        {
+          "id": "P11-02",
+          "text": "Narrow message acquisition. Query only relevant time windows and application and account contexts, fetch minimal fields, and avoid retaining unrelated email.",
+          "status": "not_started",
+          "acceptanceTests": ["T23", "T24"],
+          "evidence": [],
+          "nextAction": "P11-02"
+        },
+        {
+          "id": "P11-03",
+          "text": "Correlation. Match messages to pending applications using expected recipient, employer or sender domain, role or requisition ID, application ID, and timing, preserving uncertainty where several jobs could match.",
+          "status": "not_started",
+          "acceptanceTests": ["T23", "T24"],
+          "evidence": [],
+          "nextAction": "P11-03"
+        },
+        {
+          "id": "P11-04",
+          "text": "Verification links. Follow only links bound to a pending signup and a validated destination chain, rejecting unexpected redirects or instructions to disclose secrets.",
+          "status": "not_started",
+          "acceptanceTests": ["T23", "T24"],
+          "evidence": [],
+          "nextAction": "P11-04"
+        },
+        {
+          "id": "P11-05",
+          "text": "Outcome updates. Classify receipt, interview, rejection, or ambiguous message with supporting evidence, without automatically replying to recruiters or accepting interview times.",
+          "status": "not_started",
+          "acceptanceTests": ["T23", "T24"],
+          "evidence": [],
+          "nextAction": "P11-05"
+        }
       ],
       "gates": [
         {
@@ -908,7 +1301,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": ["T23", "T24"],
+      "nextAction": "P11-01",
+      "evidence": ["docs/plans/P11-email-reconciliation.md"]
     },
     {
       "id": "P12",
@@ -916,26 +1317,46 @@
       "status": "not_started",
       "dependsOn": ["P11"],
       "tickets": [
-        [
-          "P12-01",
-          "Graph contracts. Implement extractor, match analyst, drafter, form-answer planner, critic, and bounded"
-        ],
-        [
-          "P12-02",
-          "Checkpointing. Save calculation checkpoints with graph/prompt/schema versions. Resume compatible"
-        ],
-        [
-          "P12-03",
-          "Batching. Batch only independent similarly sized tasks, require item IDs, validate each result separately,"
-        ],
-        [
-          "P12-04",
-          "Dynamic routing. Select eligible free models by measured task quality, context needs, health, and latency."
-        ],
-        [
-          "P12-05",
-          "Evaluation and ablation. Compare deterministic/template baseline, single-model generation, and"
-        ]
+        {
+          "id": "P12-01",
+          "text": "Graph contracts. Implement extractor, match analyst, drafter, form-answer planner, critic, and bounded repair nodes with typed input and output and capability restrictions.",
+          "status": "not_started",
+          "acceptanceTests": ["T12", "T30"],
+          "evidence": [],
+          "nextAction": "P12-01"
+        },
+        {
+          "id": "P12-02",
+          "text": "Checkpointing. Save calculation checkpoints with graph, prompt, and schema versions, resuming compatible work and explicitly migrating or restarting incompatible pure preparation.",
+          "status": "not_started",
+          "acceptanceTests": ["T12", "T30"],
+          "evidence": [],
+          "nextAction": "P12-02"
+        },
+        {
+          "id": "P12-03",
+          "text": "Batching. Batch only independent similarly sized tasks, require item IDs, validate each result separately, and split on truncation or context pressure.",
+          "status": "not_started",
+          "acceptanceTests": ["T12", "T30"],
+          "evidence": [],
+          "nextAction": "P12-03"
+        },
+        {
+          "id": "P12-04",
+          "text": "Dynamic routing. Select eligible free models by measured task quality, context needs, health, and latency, keeping model pinning subject to the free-only firewall.",
+          "status": "not_started",
+          "acceptanceTests": ["T12", "T30"],
+          "evidence": [],
+          "nextAction": "P12-04"
+        },
+        {
+          "id": "P12-05",
+          "text": "Evaluation and ablation. Compare the deterministic and template baseline, single-model generation, and drafter-plus-critic on the same held-out jobs, measuring claim errors, correction rate, latency, and requests per accepted packet.",
+          "status": "not_started",
+          "acceptanceTests": ["T12", "T30"],
+          "evidence": [],
+          "nextAction": "P12-05"
+        }
       ],
       "gates": [
         {
@@ -976,7 +1397,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": ["T12", "T30"],
+      "nextAction": "P12-01",
+      "evidence": ["docs/plans/P12-bounded-agents.md"]
     },
     {
       "id": "P13",
@@ -984,26 +1413,46 @@
       "status": "not_started",
       "dependsOn": ["P12"],
       "tickets": [
-        [
-          "P13-01",
-          "Background runtime. Package a launcher and owner-approved startup mechanism. Add graceful"
-        ],
-        [
-          "P13-02",
-          "Scheduling. Implement source-specific polling, queue priorities, daily targets, browser concurrency limits,"
-        ],
-        [
-          "P13-03",
-          "Operations dashboard. Show actual stage counts, confirmed evidence, unresolved ambiguity, needs-help"
-        ],
-        [
-          "P13-04",
-          "Capacity testing. Run synthetic day workloads with varied fit, model latency, account friction, portal"
-        ],
-        [
-          "P13-05",
-          "Controlled live ramp. Under active policy, progress from the verified canary to small batches and then"
-        ]
+        {
+          "id": "P13-01",
+          "text": "Background runtime. Package a launcher and an owner-approved startup mechanism with graceful shutdown, crash restart, health checks, and configuration migration.",
+          "status": "not_started",
+          "acceptanceTests": ["T20", "T25"],
+          "evidence": [],
+          "nextAction": "P13-01"
+        },
+        {
+          "id": "P13-02",
+          "text": "Scheduling. Implement source-specific polling, queue priorities, daily targets, browser concurrency limits, quiet hours for notifications, and Europe/Amsterdam day boundaries.",
+          "status": "not_started",
+          "acceptanceTests": ["T20", "T25"],
+          "evidence": [],
+          "nextAction": "P13-02"
+        },
+        {
+          "id": "P13-03",
+          "text": "Operations dashboard. Show actual stage counts, confirmed evidence, unresolved ambiguity, the needs-help queue, next work, the model quota estimate, and stop controls.",
+          "status": "not_started",
+          "acceptanceTests": ["T20", "T25"],
+          "evidence": [],
+          "nextAction": "P13-03"
+        },
+        {
+          "id": "P13-04",
+          "text": "Capacity testing. Run synthetic day workloads with varied fit, model latency, account friction, portal errors, and challenges, measuring bottlenecks and memory growth.",
+          "status": "not_started",
+          "acceptanceTests": ["T20", "T25"],
+          "evidence": [],
+          "nextAction": "P13-04"
+        },
+        {
+          "id": "P13-05",
+          "text": "Controlled live ramp. Under active policy, progress from the verified canary to small batches and then toward the requested target, stopping or isolating affected routes on correctness regressions.",
+          "status": "not_started",
+          "acceptanceTests": ["T20", "T25"],
+          "evidence": [],
+          "nextAction": "P13-05"
+        }
       ],
       "gates": [
         {
@@ -1050,7 +1499,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": ["T20", "T25"],
+      "nextAction": "P13-01",
+      "evidence": ["docs/plans/P13-unattended-windows.md"]
     },
     {
       "id": "P14",
@@ -1058,26 +1515,46 @@
       "status": "not_started",
       "dependsOn": ["P13"],
       "tickets": [
-        [
-          "P14-01",
-          "Server images and Compose. Build reproducible images with pinned browser/runtime compatibility,"
-        ],
-        [
-          "P14-02",
-          "Secrets and storage. Support environment-mounted or external secret-store references without baking"
-        ],
-        [
-          "P14-03",
-          "Hybrid transport. Implement outbound worker registration, authenticated command delivery, owner"
-        ],
-        [
-          "P14-04",
-          "Secure browser handoff. Provide owner-authenticated, expiring access to a single waiting server browser"
-        ],
-        [
-          "P14-05",
-          "Migration. Export/import candidate and application state consistently, drain active commits, reconcile"
-        ]
+        {
+          "id": "P14-01",
+          "text": "Server images and Compose. Build reproducible images with pinned browser and runtime compatibility, PostgreSQL, persistent artifacts, an authenticated API, TLS configuration, health checks, and restart policies.",
+          "status": "not_started",
+          "acceptanceTests": ["T27"],
+          "evidence": [],
+          "nextAction": "P14-01"
+        },
+        {
+          "id": "P14-02",
+          "text": "Secrets and storage. Support environment-mounted or external secret-store references without baking credentials into images, with S3-compatible storage contract tests and encryption configuration.",
+          "status": "not_started",
+          "acceptanceTests": ["T27"],
+          "evidence": [],
+          "nextAction": "P14-02"
+        },
+        {
+          "id": "P14-03",
+          "text": "Hybrid transport. Implement outbound worker registration, authenticated command delivery, owner binding, command expiry, replay protection, lease renewal, and receipt acknowledgment.",
+          "status": "not_started",
+          "acceptanceTests": ["T27"],
+          "evidence": [],
+          "nextAction": "P14-03"
+        },
+        {
+          "id": "P14-04",
+          "text": "Secure browser handoff. Provide owner-authenticated, expiring access to a single waiting server browser session over a reviewed private transport, never exposing raw debug endpoints publicly.",
+          "status": "not_started",
+          "acceptanceTests": ["T27"],
+          "evidence": [],
+          "nextAction": "P14-04"
+        },
+        {
+          "id": "P14-05",
+          "text": "Migration. Export and import candidate and application state consistently, drain active commits, reconcile uncertainty, move artifact manifests, and require session reauthentication when necessary.",
+          "status": "not_started",
+          "acceptanceTests": ["T27"],
+          "evidence": [],
+          "nextAction": "P14-05"
+        }
       ],
       "gates": [
         {
@@ -1124,7 +1601,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": ["T27"],
+      "nextAction": "P14-01",
+      "evidence": ["docs/plans/P14-server-hybrid.md"]
     },
     {
       "id": "P15",
@@ -1132,26 +1617,46 @@
       "status": "not_started",
       "dependsOn": ["P14"],
       "tickets": [
-        [
-          "P15-01",
-          "Threat review. Test malicious job descriptions, email instructions, document payloads, unsafe imported"
-        ],
-        [
-          "P15-02",
-          "Crash matrix. Execute every commit boundary under process kill, network loss, worker duplication, lease"
-        ],
-        [
-          "P15-03",
-          "Recovery drills. Back up, restore, rekey where supported, rotate credentials, revoke authorization, and"
-        ],
-        [
-          "P15-04",
-          "Supply-chain checks. Audit dependencies, pin CI actions where practical, generate an SBOM, scan release"
-        ],
-        [
-          "P15-05",
-          "Soak and performance. Run 72-hour synthetic operation with outages and quota resets. Measure resource"
-        ]
+        {
+          "id": "P15-01",
+          "text": "Threat review. Test malicious job descriptions, email instructions, document payloads, unsafe imported URLs, untrusted model output, and attempts to widen execution authority.",
+          "status": "not_started",
+          "acceptanceTests": ["T26", "T28", "T29"],
+          "evidence": [],
+          "nextAction": "P15-01"
+        },
+        {
+          "id": "P15-02",
+          "text": "Crash matrix. Execute every commit boundary under process kill, network loss, worker duplication, lease expiry, queue redelivery, and receipt-write failure.",
+          "status": "not_started",
+          "acceptanceTests": ["T26", "T28", "T29"],
+          "evidence": [],
+          "nextAction": "P15-02"
+        },
+        {
+          "id": "P15-03",
+          "text": "Recovery drills. Back up, restore, rekey where supported, rotate credentials, revoke authorization, and simulate restoring a database older than external applications.",
+          "status": "not_started",
+          "acceptanceTests": ["T26", "T28", "T29"],
+          "evidence": [],
+          "nextAction": "P15-03"
+        },
+        {
+          "id": "P15-04",
+          "text": "Supply-chain checks. Audit dependencies, pin CI actions where practical, generate an SBOM, scan release artifacts for secrets, and document the provenance of copied code.",
+          "status": "not_started",
+          "acceptanceTests": ["T26", "T28", "T29"],
+          "evidence": [],
+          "nextAction": "P15-04"
+        },
+        {
+          "id": "P15-05",
+          "text": "Soak and performance. Run 72-hour synthetic operation with outages and quota resets, measuring resource bounds, reconciliation lag, queue fairness, and parser drift response.",
+          "status": "not_started",
+          "acceptanceTests": ["T26", "T28", "T29"],
+          "evidence": [],
+          "nextAction": "P15-05"
+        }
       ],
       "gates": [
         {
@@ -1198,7 +1703,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": ["T26", "T28", "T29"],
+      "nextAction": "P15-01",
+      "evidence": ["docs/plans/P15-security-release-gates.md"]
     },
     {
       "id": "P16",
@@ -1206,26 +1719,46 @@
       "status": "not_started",
       "dependsOn": ["P15"],
       "tickets": [
-        [
-          "P16-01",
-          "Outcome ledger. Track receipt, screening, interview, rejection, offer, owner withdrawal, and unknown"
-        ],
-        [
-          "P16-02",
-          "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants"
-        ],
-        [
-          "P16-03",
-          "Score calibration. Evaluate whether high fit scores correspond to better reviewed relevance and"
-        ],
-        [
-          "P16-04",
-          "Quality regression loop. Turn corrected facts, rejected claims, misclassified forms, and adapter drift into"
-        ],
-        [
-          "P16-05",
-          "Controlled experiments. Compare approved wording or ordering variants without applying twice to the"
-        ]
+        {
+          "id": "P16-01",
+          "text": "Outcome ledger. Track receipt, screening, interview, rejection, offer, owner withdrawal, and unknown outcome with source and date, keeping recruiter messages and manual corrections auditable.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P16-01"
+        },
+        {
+          "id": "P16-02",
+          "text": "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants using fixed application cohorts and suitable observation windows.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P16-02"
+        },
+        {
+          "id": "P16-03",
+          "text": "Score calibration. Evaluate whether high fit scores correspond to better reviewed relevance and eventually better outcomes, publishing no interview probabilities before enough reliable labeled outcomes exist.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P16-03"
+        },
+        {
+          "id": "P16-04",
+          "text": "Quality regression loop. Turn corrected facts, rejected claims, misclassified forms, and adapter drift into sanitized regression fixtures.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P16-04"
+        },
+        {
+          "id": "P16-05",
+          "text": "Controlled experiments. Compare approved wording or ordering variants without applying twice to the same job or weakening truthfulness, recording experiment assignments before outcomes are known.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P16-05"
+        }
       ],
       "gates": [
         {
@@ -1272,7 +1805,15 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": [],
+      "nextAction": "P16-01",
+      "evidence": ["docs/plans/P16-outcomes-calibration.md"]
     },
     {
       "id": "P17",
@@ -1280,26 +1821,46 @@
       "status": "not_started",
       "dependsOn": ["P16"],
       "tickets": [
-        [
-          "P17-01",
-          "Release package. Produce versioned Windows and server artifacts, checksums, release notes, migration"
-        ],
-        [
-          "P17-02",
-          "Public repository. Finalize README, architecture, ADRs, setup guides, contribution/security policies,"
-        ],
-        [
-          "P17-03",
-          "Demonstration. Create a synthetic end-to-end demo showing fit explanations, truthful documents, actual"
-        ],
-        [
-          "P17-04",
-          "Clean-room verification. Follow the published instructions on a clean environment and confirm demo,"
-        ],
-        [
-          "P17-05",
-          "Maintenance plan. Define dependency updates, source/adapter drift review, model-catalogue refresh,"
-        ]
+        {
+          "id": "P17-01",
+          "text": "Release package. Produce versioned Windows and server artifacts, checksums, release notes, migration instructions, and a rollback plan that preserves the application ledger or disables commits until reconciled.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P17-01"
+        },
+        {
+          "id": "P17-02",
+          "text": "Public repository. Finalize the README, architecture, ADRs, setup guides, contribution and security policies, license, upstream attribution, issue templates, and adapter status.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P17-02"
+        },
+        {
+          "id": "P17-03",
+          "text": "Demonstration. Create a synthetic end-to-end demo showing fit explanations, truthful documents, an actual mock submission, receipt evidence, crash recovery, and a challenge handoff.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P17-03"
+        },
+        {
+          "id": "P17-04",
+          "text": "Clean-room verification. Follow the published instructions on a clean environment and confirm demo, tests, build, deployment, and backup and restore work without hidden local files.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P17-04"
+        },
+        {
+          "id": "P17-05",
+          "text": "Maintenance plan. Define dependency updates, source and adapter drift review, model-catalogue refresh, immigration-rule refresh, incident handling, and recurring regression checks.",
+          "status": "not_started",
+          "acceptanceTests": [],
+          "evidence": [],
+          "nextAction": "P17-05"
+        }
       ],
       "gates": [
         {
@@ -1346,7 +1907,119 @@
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": null
+      "externalVerification": {
+        "status": "not_required",
+        "note": "No external prerequisite is recorded for this phase."
+      },
+      "lastVerifiedCommit": null,
+      "remoteVerification": [],
+      "acceptanceTests": [],
+      "nextAction": "P17-01",
+      "evidence": ["docs/plans/P17-release-handoff.md"]
+    },
+    {
+      "id": "P18",
+      "title": "Owner-account sources, universal hosted forms, and portal breadth",
+      "status": "not_started",
+      "dependsOn": ["P09", "P10"],
+      "externalPrerequisites": [
+        "Owner confirmation of which third-party accounts the automation may hold a logged-in session for, and that the account is the owner's own."
+      ],
+      "externalVerification": {
+        "status": "not_required",
+        "note": "Every gate in this phase is satisfiable against synthetic fixtures and dated read-only public reads. No live employer write is required for any P18 gate."
+      },
+      "lastVerifiedCommit": null,
+      "nextAction": "P18-01",
+      "evidence": ["docs/plans/P18-owner-sources-hosted-forms.md"],
+      "acceptanceTests": ["T03", "T31", "T32"],
+      "remoteVerification": [],
+      "gates": [
+        {
+          "id": "P18-G1",
+          "requirement": "An owner-account browser session is stored encrypted, and its material never reaches model prompts, logs, audit payloads, or API responses.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G2",
+          "requirement": "An arbitrary approved-origin hosted form can be inspected and its recognized low-risk fields filled and read back, and an ambiguous control stops preparation as unsupported.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G3",
+          "requirement": "Logged-in owner-account ingestion is rate-limited and deduplicated, retains dated source evidence, and cannot produce a mass false closure on drift.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G4",
+          "requirement": "Every added public-API family passes the connector contract and yields a normalized job with a dated read-only sample and retained raw evidence.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G5",
+          "requirement": "Every account-gated family stores credentials in the vault and completes a synthetic account plus application lifecycle with correlated receipt evidence.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G6",
+          "requirement": "A drifted or unsupported family pauses only its own version and permits a fresh preparation without degrading into generic clicking.",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "P18-G7",
+          "requirement": "No family is labeled live-verified without a genuine private receipt and a date, and every unsupported variant states the exact blocker.",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "tickets": [
+        {
+          "id": "P18-01",
+          "text": "Owner-account session store. Store encrypted browser storage state for owner-authorized account sessions in the vault, never exposing or logging session material.",
+          "status": "not_started",
+          "acceptanceTests": ["T03", "T31", "T32"],
+          "evidence": [],
+          "nextAction": "P18-01"
+        },
+        {
+          "id": "P18-02",
+          "text": "Universal hosted-form engine. Inspect an arbitrary approved-origin career page, map labelled controls to semantic keys, fill only recognized low-risk fields, and stop as unsupported at ambiguity while sharing primitives with the family adapters.",
+          "status": "not_started",
+          "acceptanceTests": ["T03", "T31", "T32"],
+          "evidence": [],
+          "nextAction": "P18-02"
+        },
+        {
+          "id": "P18-03",
+          "text": "Owner-account job ingestion. Ingest search results and job details from owner-authorized logged-in sources at bounded rates, deduplicated against existing jobs, with raw evidence retention.",
+          "status": "not_started",
+          "acceptanceTests": ["T03", "T31", "T32"],
+          "evidence": [],
+          "nextAction": "P18-03"
+        },
+        {
+          "id": "P18-04",
+          "text": "Public-API family expansion. Add Ashby, Teamtailor, SmartRecruiters, Workable, Personio, and Breezy discovery connectors with normalization, identity resolution, and coverage rows.",
+          "status": "not_started",
+          "acceptanceTests": ["T03", "T31", "T32"],
+          "evidence": [],
+          "nextAction": "P18-04"
+        },
+        {
+          "id": "P18-05",
+          "text": "Account-gated family adapters. Add Workday, SuccessFactors, iCIMS, Jobvite, and BambooHR with vault-backed signup and login, typed inspection, fill, commit, and receipt evidence.",
+          "status": "not_started",
+          "acceptanceTests": ["T03", "T31", "T32"],
+          "evidence": [],
+          "nextAction": "P18-05"
+        }
+      ]
     }
   ]
 }

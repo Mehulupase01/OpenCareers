@@ -19,12 +19,13 @@
     "test": "vitest run",
     "doctor": "tsx scripts/doctor.ts",
     "public:scan": "tsx scripts/public-scan.ts",
+    "check:ledger": "tsx scripts/validate-ledger.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
     "goldens:p06": "tsx scripts/generate-p06-goldens.ts",
     "api": "tsx apps/api/src/main.ts",
     "worker": "tsx apps/worker/src/main.ts",
     "start": "node dist/apps/api/src/main.js",
-    "check": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build"
+    "check": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm check:ledger && corepack pnpm test && corepack pnpm build"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
