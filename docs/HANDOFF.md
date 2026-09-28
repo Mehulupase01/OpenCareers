@@ -243,3 +243,22 @@ now routes explicit no-sponsorship vacancies to review when future sponsorship
 is needed; they remain discoverable, since a separately verified payroll
 arrangement may be possible. Do not infer such an arrangement or answer a
 mandatory application question inaccurately. See the synthetic gate test.
+
+Private onboarding advanced on 2026-09-28: all 17 imported source facts were
+reviewed after the owner confirmed the CV, one owner-asserted identity and a
+CV-backed Woobblr part-time role were added, and profile revision 1 was
+published with 22 facts and no chronology issues. A seven-day review-only
+policy covers Netherlands AI/ML roles; it cannot create final-click authority.
+Seven public ATS sources (five Recruitee, two Greenhouse) are healthy at
+20-minute intervals, with 499 listings read and 448 normalized jobs on the
+first private poll. These records and policies remain in ignored local data.
+External submission remains disabled.
+
+The ignored local OpenRouter allowlist now pins the only observed free ZDR
+structured route, Qwen 3.8 27B at ModelRun, with a daily cap of five. A
+synthetic probe still returned provider HTTP 429; no private profile content
+was sent. Model-dependent assessments remain paused. Greenhouse read-only
+inspection of current DEPT posting 8232711 found a challenge and four visible
+unlabeled controls. The runtime inspector now records these as unsupported
+instead of crashing; zero writes were attempted. See
+`docs/sources/P09-greenhouse-hosted-form.md`.

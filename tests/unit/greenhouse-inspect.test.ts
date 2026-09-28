@@ -164,6 +164,26 @@ describe("Greenhouse hosted form inspection", () => {
     ).toBe("unsupported");
   });
 
+  it("records visible unlabeled controls as unsupported instead of crashing", async () => {
+    await page.locator("form").evaluate((form) => {
+      const input = document.createElement("input");
+      form.append(input);
+    });
+    const snapshot = await inspectGreenhouseForm(page, target);
+    expect(snapshot.blocker).toBe("unsupported");
+    expect(snapshot.fields).toContainEqual(
+      expect.objectContaining({
+        name: expect.stringMatching(/^unnamed_\d+$/),
+        label: expect.stringMatching(/^Unlabeled control \d+$/),
+        kind: "unsupported",
+      }),
+    );
+    await page
+      .locator("form input:not([id])")
+      .last()
+      .evaluate((input) => input.remove());
+  });
+
   it("reports challenge scripts before preparation", async () => {
     await page.evaluate(() => {
       const challenge = document.createElement("script");

@@ -45,46 +45,56 @@ export async function inspectGreenhouseForm(
         "input,textarea,select",
       ),
     ].filter((field) => !(field instanceof HTMLInputElement && field.type === "hidden"));
-    const required = (field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
-      const label = (field.labels?.[0]?.textContent ?? field.getAttribute("aria-label") ?? "")
+    const described = allControls.map((field, index) => {
+      const observedLabel = (
+        field.labels?.[0]?.textContent ??
+        field.getAttribute("aria-label") ??
+        ""
+      )
         .replace(/\s+/g, " ")
         .trim();
-      return (
-        field.required ||
-        field.getAttribute("aria-required") === "true" ||
-        ["first_name", "last_name", "email", "resume"].includes(field.id) ||
-        /\*\s*$/.test(label)
-      );
-    };
-    const hiddenRequired = allControls
-      .filter((field) => field.getClientRects().length === 0 && required(field))
-      .map((field) => field.id || field.getAttribute("name") || "unnamed");
-    const controls = allControls.filter((field) => field.getClientRects().length > 0);
-    const fields = controls.map((field) => {
-      const label = (field.labels?.[0]?.textContent ?? field.getAttribute("aria-label") ?? "")
-        .replace(/\s+/g, " ")
-        .trim();
-      const type = field instanceof HTMLInputElement ? field.type : field.tagName.toLowerCase();
-      const semanticKey =
-        field.id === "resume" ? "cv" : field.id === "cover_letter" ? "cover_letter" : field.id;
       return {
-        name: field.id,
-        semanticKey,
-        label,
-        kind: ["text", "email", "tel", "textarea", "select", "file", "checkbox"].includes(type)
-          ? type
-          : "unsupported",
-        required: required(field),
-        maxLength:
-          field instanceof HTMLSelectElement || field.maxLength <= 0 ? null : field.maxLength,
-        options:
-          field instanceof HTMLSelectElement
-            ? [...field.options]
-                .filter((option) => option.value)
-                .map((option) => ({ label: option.label, value: option.value }))
-            : [],
+        field,
+        name: field.id || `unnamed_${index + 1}`,
+        label: observedLabel || `Unlabeled control ${index + 1}`,
+        unsupported: !field.id || !observedLabel,
+        visible: field.getClientRects().length > 0,
+        required:
+          field.required ||
+          field.getAttribute("aria-required") === "true" ||
+          ["first_name", "last_name", "email", "resume"].includes(field.id) ||
+          /\*\s*$/.test(observedLabel),
       };
     });
+    const hiddenRequired = described
+      .filter((entry) => !entry.visible && entry.required)
+      .map((entry) => entry.field.id || entry.field.getAttribute("name") || "unnamed");
+    const fields = described
+      .filter((entry) => entry.visible)
+      .map(({ field, name, label, required, unsupported }) => {
+        const type = field instanceof HTMLInputElement ? field.type : field.tagName.toLowerCase();
+        const semanticKey =
+          field.id === "resume" ? "cv" : field.id === "cover_letter" ? "cover_letter" : name;
+        return {
+          name,
+          semanticKey,
+          label,
+          kind:
+            !unsupported &&
+            ["text", "email", "tel", "textarea", "select", "file", "checkbox"].includes(type)
+              ? type
+              : "unsupported",
+          required,
+          maxLength:
+            field instanceof HTMLSelectElement || field.maxLength <= 0 ? null : field.maxLength,
+          options:
+            field instanceof HTMLSelectElement
+              ? [...field.options]
+                  .filter((option) => option.value)
+                  .map((option) => ({ label: option.label, value: option.value }))
+              : [],
+        };
+      });
     const challenge = document.querySelector(
       'script[src*="/recaptcha/"],iframe[src*="/recaptcha/"],iframe[src*="captcha"],iframe[src*="challenge"],[data-sitekey],.g-recaptcha,.h-captcha',
     );
@@ -95,7 +105,7 @@ export async function inspectGreenhouseForm(
         ? "challenge"
         : form.querySelector('input[type="password"]')
           ? "login"
-          : hiddenRequired.length
+          : hiddenRequired.length || described.some((entry) => entry.visible && entry.unsupported)
             ? "unsupported"
             : "none",
     };

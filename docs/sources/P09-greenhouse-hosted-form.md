@@ -93,3 +93,17 @@ remains `unsupported`, and no Greenhouse submit task is queued.
 The packet must also be valid and bound to the exact Greenhouse board and
 posting URL before browser preparation or filling. Synthetic tests reject a
 different posting and an invalid packet before any field is changed.
+
+## DEPT Variant Follow-up
+
+Read-only inspection on 2026-09-28 covered the current DEPT AI Engineer
+posting `8232711`. The hosted form returned HTTP 200 and exposed 18 visible
+controls. Four dynamically rendered controls had neither stable IDs nor
+associated labels; the inspector now records bounded synthetic names for
+these controls and classifies them as unsupported instead of failing before
+diagnostic evidence can be produced. The form also contained a challenge and
+required location, work-authorization, salary and privacy answers. Its dated
+structural fingerprint was
+`38e1d45684e9e48fb835dc105cea09adf0c6fefeb904f678c69d46eb9c90c571`.
+The GET-only barrier observed zero attempted writes. This is public read-only
+evidence, not preparation readiness or submission support.
