@@ -262,3 +262,11 @@ inspection of current DEPT posting 8232711 found a challenge and four visible
 unlabeled controls. The runtime inspector now records these as unsupported
 instead of crashing; zero writes were attempted. See
 `docs/sources/P09-greenhouse-hosted-form.md`.
+
+P09 engineering completed at `9cd7cda`. Greenhouse is registered as the second
+common-SDK submission family with exact board/posting/fingerprint binding,
+fresh-browser reinspection, one POST after dispatch authorization, typed
+receipt evidence and transactional receipt correlation. Synthetic success,
+target/form drift, validation rejection and ambiguous-response cases pass.
+Public Greenhouse forms are still read-only evidence; no employer write or real
+submission occurred. See `docs/evidence/P09-greenhouse-lifecycle.md`.

@@ -671,7 +671,7 @@
     {
       "id": "P09",
       "title": "High-yield portal coverage",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P08"],
       "tickets": [
         [
@@ -699,14 +699,14 @@
         {
           "id": "P09-G1",
           "requirement": "Every added adapter passes the common SDK contract and portal-specific fixtures.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P09-greenhouse-lifecycle.md"]
         },
         {
           "id": "P09-G2",
           "requirement": "Each supported variant has at least one successful synthetic receipt and relevant negative cases.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P09-greenhouse-lifecycle.md"]
         },
         {
           "id": "P09-G3",
@@ -729,12 +729,17 @@
         {
           "id": "P09-G6",
           "requirement": "At least two portal families complete the full synthetic pipeline without special workflow code outside the adapter boundary.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P09-greenhouse-lifecycle.md"]
         }
       ],
       "externalPrerequisites": [],
-      "lastVerifiedCommit": "a2f755df5f354fe09e61a9cc997f2da3b8b7a35a"
+      "lastVerifiedCommit": "9cd7cdafc3821b3cdc88d6a76fcc3b8122fd99bf",
+      "evidence": [
+        "docs/evidence/P09-coverage-verification.md",
+        "docs/evidence/P09-pre-dispatch-drift.md",
+        "docs/evidence/P09-greenhouse-lifecycle.md"
+      ]
     },
     {
       "id": "P10",

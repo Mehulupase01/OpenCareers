@@ -16,7 +16,7 @@ that portal family.
 | Owned mock ATS | Fixture-tested P07 | Dry-run-tested P07 | Auto-submit tested P08 | Correlated receipt and recovery tested P08 | Synthetic only |
 | Recruitee Careers Site API v1 | Collection live-read and fixture-tested P09 | Payload preparation tested P08 | Multipart commit and candidate-ID receipt fixture-tested P08 | Email reconciliation pending P11 | Freeday collection read-only, 2026-09-27; live POST pending |
 | Lever hosted Protolabs variant | Public form inspected read-only | Unsupported: substantive answers and challenge | None | None | Public read-only 2026-09-27 |
-| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Adyen hosted form inspected read-only; fill/upload unsupported | Planned | Planned | Adyen reCAPTCHA Enterprise detected after hydration, read-only 2026-09-27 |
+| Greenhouse public Job Board GET / hosted external form | Live-read P04 | Fingerprint-pinned hosted form fixture-tested P09; unknown controls and challenges blocked | One guarded POST and correlated receipt fixture-tested P09 | Unknown outcomes stop without replay; read-only recovery pending P11 | DEPT/Adyen public reads only; no live POST or private receipt |
 | Lever public postings GET | Fixture-tested P04 | Planned | Planned | Planned | No live read |
 | Ashby | Planned P04 | Planned | Planned | Planned | None |
 
@@ -42,3 +42,13 @@ Discovery reads one bounded `/api/offers/` snapshot and binds stable numeric off
 identity to the submission-facing slug. See
 [P09 discovery research](sources/P09-recruitee-discovery.md) for the current public
 read and the documented February 2027 token boundary.
+
+The Greenhouse hosted adapter is limited to the exact
+`https://job-boards.greenhouse.io/{board}/jobs/{postingId}` origin and an
+explicitly pinned inspected form fingerprint. Preparation blocks every write;
+commit reinspects and reads back all fields, then permits one exact POST only
+after durable intent and dispatch authorization. The synthetic receipt binds
+board, posting, job, email hash and receipt URL. Changed or unknown controls,
+challenges, pre-submit upload traffic, extra writes, validation rejection and
+ambiguous responses fail closed. This is fixture-tested engineering support,
+not live-verified employer support.

@@ -57,6 +57,10 @@ unrelated adapter engineering to continue without relabeling P08 complete.
 7. Publish the generated support matrix and evidence. Run SQLite/PostgreSQL,
    Windows/Linux, desktop/mobile, privacy scan and dependency audit gates.
 
+Implemented at `9cd7cda`: the fingerprint-pinned Greenhouse hosted-form family
+now completes prepare, one-action commit and transactional receipt correlation
+through the common SDK. Public employer forms remain read-only and provisional.
+
 ## Acceptance
 
 - P09-G1: every adapter passes the same lifecycle, origin, permit, receipt and
