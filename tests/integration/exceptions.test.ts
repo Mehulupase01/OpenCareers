@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
 import { loadConfig } from "../../packages/config/src/index.js";
 import type { OwnerException } from "../../packages/contracts/src/exception.js";
+import { DomainError } from "../../packages/contracts/src/index.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import {
   type Database,
@@ -335,13 +336,109 @@ for (const engine of ["sqlite", "postgres"] as const) {
         ).toBe("NEEDS_INPUT");
       });
 
-      it("surfaces a parked application that has no exception row at all", async () => {
+      it("materializes a parked application once with a durable actionable identifier", async () => {
         await db.query("UPDATE exceptions SET status='resolved' WHERE owner_id=$1", [owner]);
         const inbox = await exceptions.inbox();
         const parked = inbox.find((entry) => entry.applicationId === applicationId);
         expect(parked).toMatchObject({ blocker: "needs_input", state: "open" });
         expect(parked?.question).toBeNull();
-        expect(parked?.id).toMatch(/^parked:/);
+        if (!parked) throw new Error("Expected parked application blocker");
+        expect(parked.id).toMatch(/^[a-f0-9-]{36}$/);
+        expect(parked.actions).toEqual(["defer", "skip"]);
+        expect(await exceptions.get(parked.id)).toEqual(parked);
+        expect(
+          (await exceptions.inbox()).find((entry) => entry.applicationId === applicationId)?.id,
+        ).toBe(parked.id);
+        expect((await exceptions.history(parked.id)).every((entry) => entry.intact)).toBe(true);
+        await expect(
+          exceptions.resolve(parked.id, {
+            action: "resolve_answer",
+            answer: "Invented",
+            factIds: [factId],
+          }),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await exceptions.resolve(parked.id, { action: "defer", note: "Awaiting profile review" });
+        expect((await exceptions.get(parked.id)).state).toBe("deferred");
+      });
+
+      it("does not offer unavailable challenge, retry or reconciliation paths", async () => {
+        for (const [state, blocker, hidden] of [
+          ["CHALLENGE_REQUIRED", "challenge_required", "open_session"],
+          ["NEEDS_REVIEW", "needs_review", "reconcile"],
+        ] as const) {
+          await db.query("UPDATE applications SET state=$1 WHERE owner_id=$2 AND id=$3", [
+            state,
+            owner,
+            applicationId,
+          ]);
+          await db.query("UPDATE exceptions SET status='resolved' WHERE owner_id=$1", [owner]);
+          const entry = (await exceptions.inbox()).find(
+            (item) => item.applicationId === applicationId,
+          );
+          if (!entry) throw new Error("Expected synthetic blocker");
+          expect(entry.blocker).toBe(blocker);
+          expect(entry.actions).not.toContain(hidden);
+          if (state === "NEEDS_REVIEW") {
+            expect(entry.actions).toEqual(["defer"]);
+            await expect(exceptions.resolve(entry.id, { action: "skip" })).rejects.toMatchObject({
+              code: "STATE_INVALID",
+            });
+          }
+        }
+        await db.query("UPDATE applications SET state='NEEDS_INPUT' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          applicationId,
+        ]);
+        await db.query("DELETE FROM match_assessments WHERE owner_id=$1", [owner]);
+        const failed = await exceptions.record({
+          applicationId,
+          blocker: "task_failed",
+          code: "CONFIG_INVALID",
+          reason: "Synthetic missing assessment",
+        });
+        expect((await exceptions.get(failed)).actions).not.toContain("retry");
+        await expect(exceptions.resolve(failed, { action: "retry" })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+      });
+
+      it("skipping retires stale work, advances the application revision and settles sibling blockers", async () => {
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        await repo.resolveQuestion(applicationId, "notice.period", "Notice period in months");
+        const item = await salaryItem(exceptions);
+        await repo.enqueue({
+          type: "prepare",
+          applicationId,
+          domain: "documents",
+          dedupeKey: "stale-preparation",
+          payload: { schemaVersion: 1, assessmentId },
+        });
+        const lease = await repo.claim("synthetic-worker", ["prepare"]);
+        if (!lease) throw new Error("Expected synthetic lease");
+        const before = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            applicationId,
+          ])
+        )[0];
+        await exceptions.resolve(item.id, { action: "skip" });
+        const after = (
+          await db.query("SELECT revision,state FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            applicationId,
+          ])
+        )[0];
+        expect(after?.state).toBe("SKIPPED");
+        expect(after?.revision).toBe(Number(before?.revision) + 1);
+        await expect(repo.renew(lease)).rejects.toMatchObject({ code: "LEASE_STALE" });
+        expect(await exceptions.inbox()).toEqual([]);
+        const event = (
+          await db.query(
+            "SELECT actor,revision FROM audit_events WHERE owner_id=$1 AND action='exception.skip'",
+            [owner],
+          )
+        )[0];
+        expect(event).toMatchObject({ actor: `owner:${owner}`, revision: after?.revision });
       });
 
       it("keeps a tamper-evident record of every owner decision", async () => {
@@ -357,6 +454,246 @@ for (const engine of ["sqlite", "postgres"] as const) {
           [owner],
         );
         expect((await exceptions.history(item.id)).some((entry) => !entry.intact)).toBe(true);
+      });
+
+      it("keeps failed non-application tasks visible and deferrable without breaking the inbox", async () => {
+        await repo.enqueue({
+          type: "demo_probe",
+          domain: "synthetic",
+          dedupeKey: "failed-discovery",
+        });
+        const task = await repo.claim("worker", ["demo_probe"]);
+        if (!task) throw new Error("Expected synthetic task lease");
+        await repo.fail(task, new DomainError("CONFIG_INVALID", "Synthetic failure"));
+        const item = (await exceptions.inbox()).find((entry) => entry.applicationId === null);
+        if (!item) throw new Error("Expected task exception");
+        expect(item).toMatchObject({ job: null, blocker: "task_failed", actions: ["defer"] });
+        expect((await exceptions.resolve(item.id, { action: "defer" })).exception.state).toBe(
+          "deferred",
+        );
+        expect((await exceptions.get(item.id)).job).toBeNull();
+        await expect(exceptions.resolve(item.id, { action: "retry" })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+      });
+
+      it("does not reopen or resume an owner-skipped application when an equivalent answer is approved", async () => {
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        const item = await salaryItem(exceptions);
+        await exceptions.resolve(item.id, { action: "skip" });
+        await repo.saveAnswer({
+          semanticKey: "salary.numeric",
+          meaning: "Gross annual salary in EUR",
+          answer: 65000,
+          validFrom: "2026-09-28",
+          validUntil: "2026-10-01",
+          employerIds: ["synthetic-employer"],
+          countries: ["NL"],
+          evidenceFactIds: [factId],
+        });
+        expect((await exceptions.get(item.id)).state).toBe("resolved");
+        expect(await exceptions.inbox()).toEqual([]);
+        expect(
+          (
+            await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              applicationId,
+            ])
+          )[0]?.state,
+        ).toBe("SKIPPED");
+        expect(await db.query("SELECT id FROM tasks WHERE owner_id=$1", [owner])).toHaveLength(0);
+      });
+
+      it("uses the checked original intent for reconciliation after task-fence revocation and never offers skip", async () => {
+        const at = new Date(now).toISOString();
+        const packetId = randomUUID();
+        const intentId = randomUUID();
+        const authorization = (
+          await db.query("SELECT id FROM authorizations WHERE owner_id=$1", [owner])
+        )[0];
+        await db.query(
+          "INSERT INTO packets(owner_id,id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,'{}',$4,$5)",
+          [owner, packetId, applicationId, "a".repeat(64), at],
+        );
+        const payload = {
+          schemaVersion: 1 as const,
+          packetId,
+          preparationId: "original-preparation",
+          expectedRevision: 1,
+        };
+        const task = await repo.enqueue({
+          type: "submit",
+          domain: "mock-ats",
+          applicationId,
+          dedupeKey: "original-submit",
+          payload,
+        });
+        const snapshot = {
+          applicationId,
+          taskId: task.id,
+          adapter: "mock-ats",
+          fence: 1,
+          packetId,
+          preparationId: payload.preparationId,
+        };
+        await db.query(
+          "INSERT INTO intents(owner_id,id,application_id,packet_id,authorization_id,snapshot,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+          [
+            owner,
+            intentId,
+            applicationId,
+            packetId,
+            String(authorization?.id),
+            JSON.stringify(snapshot),
+            createHash("sha256").update(JSON.stringify(snapshot)).digest("hex"),
+            at,
+          ],
+        );
+        await db.query(
+          "INSERT INTO attempts(owner_id,id,application_id,intent_id,fence,state,started_at) VALUES($1,$2,$3,$4,1,'UNKNOWN',$5)",
+          [owner, randomUUID(), applicationId, intentId, at],
+        );
+        await db.query("UPDATE tasks SET state='cancelled',fence=2 WHERE owner_id=$1 AND id=$2", [
+          owner,
+          task.id,
+        ]);
+        await db.query("UPDATE applications SET state='NEEDS_REVIEW' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          applicationId,
+        ]);
+        const item = (await exceptions.inbox()).find(
+          (entry) => entry.applicationId === applicationId,
+        );
+        if (!item) throw new Error("Expected outcome-review exception");
+        expect(item.actions).toEqual(["reconcile", "defer"]);
+        expect((await exceptions.resolve(item.id, { action: "reconcile" })).requeued).toBe(1);
+        expect((await exceptions.resolve(item.id, { action: "reconcile" })).requeued).toBe(0);
+        const queued = (
+          await db.query(
+            "SELECT domain,payload FROM tasks WHERE owner_id=$1 AND type='reconcile'",
+            [owner],
+          )
+        )[0];
+        expect(queued?.domain).toBe("mock-ats");
+        expect(JSON.parse(String(queued?.payload))).toEqual(payload);
+        await expect(exceptions.resolve(item.id, { action: "skip" })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+        await db.query("UPDATE intents SET sha256=$1 WHERE owner_id=$2 AND id=$3", [
+          "f".repeat(64),
+          owner,
+          intentId,
+        ]);
+        expect((await exceptions.get(item.id)).actions).toEqual(["defer"]);
+        await expect(exceptions.resolve(item.id, { action: "reconcile" })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+      });
+
+      it("resumes every equivalent in-scope application once but waits for other unresolved questions", async () => {
+        const addApplication = async (suffix: string, employerId: string, meaning: string) => {
+          const id = `job-${suffix}`;
+          await repo.putJob({
+            id,
+            employerId,
+            requisitionId: suffix,
+            title: "Synthetic role",
+            company: "Synthetic company",
+            location: "NL",
+            countryCode: "NL",
+            url: `https://synthetic.example/${suffix}`,
+            source: "fixture",
+            synthetic: true,
+            description: "Synthetic vacancy",
+          });
+          const app = await repo.createApplication(id, (await repo.snapshot()).candidateId);
+          await db.query(
+            "UPDATE applications SET state='NEEDS_INPUT' WHERE owner_id=$1 AND id=$2",
+            [owner, app.id],
+          );
+          await db.query(
+            "INSERT INTO match_assessments(owner_id,id,job_id,profile_id,application_id,revision,data,sha256,created_at) SELECT owner_id,$1,$2,profile_id,$3,1,'{}',sha256,created_at FROM match_assessments WHERE owner_id=$4 AND id=$5",
+            [randomUUID(), id, app.id, owner, assessmentId],
+          );
+          await repo.resolveQuestion(app.id, "salary.numeric", meaning);
+          return app.id;
+        };
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        const equivalent = await addApplication(
+          "equivalent",
+          "synthetic-employer",
+          "Gross annual salary in EUR",
+        );
+        const incomplete = await addApplication(
+          "incomplete",
+          "synthetic-employer",
+          "Gross annual salary in EUR",
+        );
+        await repo.resolveQuestion(incomplete, "notice.period", "Notice period in months");
+        const otherEmployer = await addApplication(
+          "other",
+          "other-employer",
+          "Gross annual salary in EUR",
+        );
+        const otherMeaning = await addApplication(
+          "net",
+          "synthetic-employer",
+          "Net monthly salary in EUR",
+        );
+        const item = (await exceptions.inbox()).find(
+          (entry) =>
+            entry.applicationId === applicationId &&
+            entry.question?.semanticKey === "salary.numeric",
+        );
+        if (!item) throw new Error("Expected the original application salary blocker");
+        const result = await exceptions.resolve(item.id, {
+          action: "resolve_answer",
+          answer: 65000,
+          factIds: [factId],
+        });
+        expect(result.requeued).toBe(2);
+        const apps = await db.query("SELECT id,state FROM applications WHERE owner_id=$1", [owner]);
+        for (const id of [applicationId, equivalent])
+          expect(apps.find((app) => app.id === id)?.state).toBe("PREPARING");
+        for (const id of [incomplete, otherEmployer, otherMeaning])
+          expect(apps.find((app) => app.id === id)?.state).toBe("NEEDS_INPUT");
+        expect(
+          await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='prepare'", [owner]),
+        ).toHaveLength(2);
+        await repo.saveAnswer({
+          semanticKey: "salary.numeric",
+          meaning: "Gross annual salary in EUR",
+          answer: 65000,
+          validFrom: "2026-09-28",
+          validUntil: "2026-10-01",
+          employerIds: ["synthetic-employer"],
+          countries: ["NL"],
+          evidenceFactIds: [factId],
+        });
+        expect(
+          await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='prepare'", [owner]),
+        ).toHaveLength(2);
+        await repo.saveAnswer({
+          semanticKey: "notice.period",
+          meaning: "Notice period in months",
+          answer: 1,
+          validFrom: "2026-09-28",
+          validUntil: "2026-10-01",
+          employerIds: ["synthetic-employer"],
+          countries: ["NL"],
+          evidenceFactIds: [factId],
+        });
+        expect(
+          (
+            await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              incomplete,
+            ])
+          )[0]?.state,
+        ).toBe("PREPARING");
+        expect(
+          await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='prepare'", [owner]),
+        ).toHaveLength(3);
       });
 
       it("isolates the inbox by owner", async () => {

@@ -21,6 +21,7 @@ import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
 import { localDay } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { assertDiscoveryEligibility } from "./job-identity.js";
+import { PreparationRecovery } from "./preparation-recovery.js";
 import { Repository, taskFromRow } from "./repository.js";
 
 const json = <T>(row: Row, field = "data"): T => JSON.parse(String(row[field])) as T;
@@ -680,6 +681,13 @@ export class CandidateRepository extends Repository {
 
   /** Shares canonical approval checks with owner decisions in the same transaction. */
   async saveAnswerIn(tx: SqlExecutor, raw: AnswerInput): Promise<ApprovedAnswer> {
+    return (await this.approveAnswerIn(tx, raw)).answer;
+  }
+
+  async approveAnswerIn(
+    tx: SqlExecutor,
+    raw: AnswerInput,
+  ): Promise<{ answer: ApprovedAnswer; requeued: number }> {
     const input = answerInputSchema.parse(raw);
     await this.lockOwner(tx);
     const candidate = await this.candidate(tx);
@@ -721,9 +729,10 @@ export class CandidateRepository extends Repository {
       ],
     );
     const blocks = await tx.query(
-      "SELECT b.*,j.employer_id FROM question_blocks b JOIN applications a ON a.owner_id=b.owner_id AND a.id=b.application_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE b.owner_id=$1 AND b.semantic_key=$2",
+      "SELECT b.*,j.employer_id FROM question_blocks b JOIN applications a ON a.owner_id=b.owner_id AND a.id=b.application_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE b.owner_id=$1 AND b.semantic_key=$2 AND a.state NOT IN ('SKIPPED','CONFIRMED','DEFINITIVE_FAILURE')",
       [this.ownerId, input.semanticKey],
     );
+    const affected = new Set<string>();
     for (const block of blocks) {
       const match = await this.matchingAnswer(
         tx,
@@ -736,13 +745,30 @@ export class CandidateRepository extends Repository {
         "UPDATE question_blocks SET resolved_answer_id=$1 WHERE owner_id=$2 AND application_id=$3 AND semantic_key=$4",
         [match?.id ?? null, this.ownerId, block.application_id ?? null, input.semanticKey],
       );
-      await tx.query("UPDATE exceptions SET status=$1,resolved_at=$2 WHERE owner_id=$3 AND id=$4", [
-        match ? "resolved" : "open",
-        match ? this.now() : null,
-        this.ownerId,
-        block.exception_id ?? null,
-      ]);
+      await tx.query(
+        "UPDATE exceptions SET status=$1,resolved_at=$2,updated_at=$5 WHERE owner_id=$3 AND id=$4",
+        [
+          match ? "resolved" : "open",
+          match ? this.now() : null,
+          this.ownerId,
+          block.exception_id ?? null,
+          this.now(),
+        ],
+      );
+      if (match) {
+        affected.add(String(block.application_id));
+        if (match.id !== block.resolved_answer_id)
+          await this.appendExceptionAction(
+            tx,
+            String(block.exception_id),
+            "answer_propagated",
+            "Approved answer matched the exact question and scope.",
+          );
+      }
     }
+    let requeued = 0;
+    const recovery = new PreparationRecovery(this.db, this.ownerId, this.clock);
+    for (const applicationId of affected) requeued += await recovery.resumeIn(tx, applicationId);
     await this.audit(
       tx,
       answer.id,
@@ -751,7 +777,7 @@ export class CandidateRepository extends Repository {
       { semanticKey: input.semanticKey },
       `owner:${this.ownerId}`,
     );
-    return answer;
+    return { answer, requeued };
   }
   /**
    * Writes one tamper-evident entry onto an exception's decision chain. The

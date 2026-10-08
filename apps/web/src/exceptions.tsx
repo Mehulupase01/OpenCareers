@@ -74,7 +74,7 @@ export function ExceptionsPanel() {
         );
       else
         setNotice(
-          `Recorded. ${result.requeued === 1 ? "That application was requeued." : "No work was resumed."}`,
+          `Recorded. ${result.requeued > 0 ? `${result.requeued} application${result.requeued === 1 ? "" : "s"} requeued.` : "No work was resumed."}`,
         );
       await refresh();
     } catch (cause) {
@@ -123,8 +123,14 @@ export function ExceptionsPanel() {
               </div>
               <p className="exception-reason">{item.reason}</p>
               <p className="exception-job">
-                {item.job.title} &middot; {item.job.company}
-                {item.job.countryCode ? ` · ${item.job.countryCode}` : ""}
+                {item.job ? (
+                  <>
+                    {item.job.title} &middot; {item.job.company}
+                    {item.job.countryCode ? ` / ${item.job.countryCode}` : ""}
+                  </>
+                ) : (
+                  "Background processing"
+                )}
               </p>
               {item.question && (
                 <p className="exception-question">

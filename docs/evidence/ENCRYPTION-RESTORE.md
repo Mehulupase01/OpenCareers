@@ -84,7 +84,8 @@ Final `corepack pnpm check` passed lint, typecheck, ledger and production build:
 desktop/mobile browser cases passed in 2.8 minutes. Public-source scan passed
 (255 files before staging), `git diff --check` passed, and production audit found
 no known vulnerabilities. PostgreSQL cases run against the dedicated CI service,
-not the private database. Post-push CI is pending until its run completes.
+not the private database. GitHub run 37857873687 passed Windows, Ubuntu and
+PostgreSQL at f93254420f5954fee4b4c1fef95017800bb0ad06.
 
 No private migration, key rewrite, service restart or employer action was performed.
 

@@ -2,10 +2,17 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { dryRunResultSchema } from "../../contracts/src/browser.js";
 import { type HandoffSession, handoffSessionSchema } from "../../contracts/src/handoff.js";
 import { DomainError } from "../../contracts/src/index.js";
-import type { Database, Row } from "./database.js";
+import type { Database, Row, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest();
+export interface HandoffCreateInput {
+  applicationId: string;
+  preparationId: string;
+  adapterId: string;
+  targetFingerprint: string;
+  ttlMs?: number;
+}
 
 function sessionFrom(row: Row): HandoffSession {
   return handoffSessionSchema.parse({
@@ -28,13 +35,14 @@ export class HandoffRepository extends Repository {
     super(db, ownerId, clock);
   }
 
-  async create(input: {
-    applicationId: string;
-    preparationId: string;
-    adapterId: string;
-    targetFingerprint: string;
-    ttlMs?: number;
-  }): Promise<{ session: HandoffSession; token: string }> {
+  async create(input: HandoffCreateInput): Promise<{ session: HandoffSession; token: string }> {
+    return this.db.transaction((tx) => this.createIn(tx, input));
+  }
+
+  async createIn(
+    tx: SqlExecutor,
+    input: HandoffCreateInput,
+  ): Promise<{ session: HandoffSession; token: string }> {
     const ttlMs = input.ttlMs ?? 10 * 60 * 1000;
     if (ttlMs < 60_000 || ttlMs > 15 * 60 * 1000)
       throw new DomainError("CONFIG_INVALID", "Handoff expiry is outside the safe range.");
@@ -46,67 +54,62 @@ export class HandoffRepository extends Repository {
     const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const requestedExpiry = this.clock().getTime() + ttlMs;
-    const session = await this.db.transaction(async (tx) => {
-      await this.lockOwner(tx);
-      const row = (
-        await tx.query(
-          "SELECT a.state AS application_state,b.status,b.expires_at,b.result FROM applications a JOIN browser_preparations b ON b.owner_id=a.owner_id AND b.application_id=a.id WHERE a.owner_id=$1 AND a.id=$2 AND b.id=$3",
-          [this.ownerId, input.applicationId, input.preparationId],
-        )
-      )[0];
-      if (row?.application_state !== "CHALLENGE_REQUIRED" || row.status !== "challenge")
-        throw new DomainError("STATE_INVALID", "A current challenge preparation is required.");
-      if (row.expires_at && String(row.expires_at) <= this.now())
-        throw new DomainError("SESSION_EXPIRED", "Challenge preparation has expired.");
-      const result = dryRunResultSchema.parse(JSON.parse(String(row.result)));
-      if (
-        result.adapter?.id !== input.adapterId ||
-        result.adapter.targetFingerprint !== input.targetFingerprint
-      )
-        throw new DomainError("FORM_CHANGED", "Handoff target does not match preparation.");
-      const preparationExpiry = row.expires_at
-        ? Date.parse(String(row.expires_at))
-        : requestedExpiry;
-      const expiresAt = new Date(Math.min(requestedExpiry, preparationExpiry)).toISOString();
-      const expired = await tx.query(
-        "UPDATE handoff_sessions SET state='expired',lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding') AND expires_at<=$3 RETURNING id,generation",
-        [this.ownerId, input.applicationId, this.now()],
-      );
-      for (const stale of expired)
-        await this.audit(tx, String(stale.id), "handoff.expired", Number(stale.generation), {});
-      const active = await tx.query(
-        "SELECT id FROM handoff_sessions WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding')",
-        [this.ownerId, input.applicationId],
-      );
-      if (active.length)
-        throw new DomainError("STATE_INVALID", "An active handoff already exists.");
+    await this.lockOwner(tx);
+    const row = (
       await tx.query(
-        "INSERT INTO handoff_sessions(owner_id,id,application_id,preparation_id,adapter_id,target_fingerprint,token_hash,state,generation,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'open',1,$8,$9)",
-        [
+        "SELECT a.state AS application_state,b.status,b.expires_at,b.result FROM applications a JOIN browser_preparations b ON b.owner_id=a.owner_id AND b.application_id=a.id WHERE a.owner_id=$1 AND a.id=$2 AND b.id=$3",
+        [this.ownerId, input.applicationId, input.preparationId],
+      )
+    )[0];
+    if (row?.application_state !== "CHALLENGE_REQUIRED" || row.status !== "challenge")
+      throw new DomainError("STATE_INVALID", "A current challenge preparation is required.");
+    if (row.expires_at && String(row.expires_at) <= this.now())
+      throw new DomainError("SESSION_EXPIRED", "Challenge preparation has expired.");
+    const result = dryRunResultSchema.parse(JSON.parse(String(row.result)));
+    if (
+      result.adapter?.id !== input.adapterId ||
+      result.adapter.targetFingerprint !== input.targetFingerprint
+    )
+      throw new DomainError("FORM_CHANGED", "Handoff target does not match preparation.");
+    const preparationExpiry = row.expires_at ? Date.parse(String(row.expires_at)) : requestedExpiry;
+    const expiresAt = new Date(Math.min(requestedExpiry, preparationExpiry)).toISOString();
+    const expired = await tx.query(
+      "UPDATE handoff_sessions SET state='expired',lease_owner=NULL,lease_until=NULL WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding') AND expires_at<=$3 RETURNING id,generation",
+      [this.ownerId, input.applicationId, this.now()],
+    );
+    for (const stale of expired)
+      await this.audit(tx, String(stale.id), "handoff.expired", Number(stale.generation), {});
+    const active = await tx.query(
+      "SELECT id FROM handoff_sessions WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding')",
+      [this.ownerId, input.applicationId],
+    );
+    if (active.length) throw new DomainError("STATE_INVALID", "An active handoff already exists.");
+    await tx.query(
+      "INSERT INTO handoff_sessions(owner_id,id,application_id,preparation_id,adapter_id,target_fingerprint,token_hash,state,generation,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'open',1,$8,$9)",
+      [
+        this.ownerId,
+        id,
+        input.applicationId,
+        input.preparationId,
+        input.adapterId,
+        input.targetFingerprint,
+        tokenHash(token).toString("hex"),
+        expiresAt,
+        this.now(),
+      ],
+    );
+    await this.audit(tx, id, "handoff.created", 1, {
+      applicationId: input.applicationId,
+      adapterId: input.adapterId,
+    });
+    const session = sessionFrom(
+      (
+        await tx.query("SELECT * FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
           this.ownerId,
           id,
-          input.applicationId,
-          input.preparationId,
-          input.adapterId,
-          input.targetFingerprint,
-          tokenHash(token).toString("hex"),
-          expiresAt,
-          this.now(),
-        ],
-      );
-      await this.audit(tx, id, "handoff.created", 1, {
-        applicationId: input.applicationId,
-        adapterId: input.adapterId,
-      });
-      return sessionFrom(
-        (
-          await tx.query("SELECT * FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
-            this.ownerId,
-            id,
-          ])
-        )[0] as Row,
-      );
-    });
+        ])
+      )[0] as Row,
+    );
     return { session, token };
   }
 

@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { ensureCandidate, ensureListing } from "../helpers/browser-setup.js";
+import { ensureCandidate, ensureListing, makeJson } from "../helpers/browser-setup.js";
+
+test.afterEach(async ({ page }) => {
+  const json = makeJson(page);
+  await json("/v1/control/pause", { stage: "preparation", paused: false });
+  await json("/v1/control/pause", { stage: "submissions", paused: false });
+});
 
 test("immutable document packet review and downloads remain inspectable", async ({
   page,
@@ -9,6 +15,9 @@ test("immutable document packet review and downloads remain inspectable", async 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByText("No real applications submitted")).toBeVisible();
+  const json = makeJson(page);
+  await json("/v1/control/pause", { stage: "preparation", paused: true });
+  await json("/v1/control/pause", { stage: "submissions", paused: true });
   // Run outside the browser context: this uses page.request, not page.evaluate.
   await ensureCandidate(page, "documents");
   const guaranteed = await ensureListing(page);
@@ -230,6 +239,8 @@ test("immutable document packet review and downloads remain inspectable", async 
     path: `test-results/P07-browser-ready-${info.project.name}.png`,
     fullPage: true,
   });
+  await json("/v1/control/pause", { stage: "preparation", paused: false });
+  await json("/v1/control/pause", { stage: "submissions", paused: false });
   await expect
     .poll(
       async () => {

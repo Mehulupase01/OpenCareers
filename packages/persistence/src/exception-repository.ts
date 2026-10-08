@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
+import { dryRunResultSchema } from "../../contracts/src/browser.js";
 import {
   type ExceptionAction,
   type ExceptionBlocker,
@@ -12,28 +14,15 @@ import {
 import {
   DomainError,
   errorCodeSchema,
+  idSchema,
   type JobInput,
   jobInputSchema,
 } from "../../contracts/src/index.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { HandoffRepository } from "./handoff-repository.js";
+import { PreparationRecovery } from "./preparation-recovery.js";
 import { Repository } from "./repository.js";
-
-/**
- * The actions offered for each blocker. Offering an action that cannot succeed is
- * worse than offering none, so the set is derived from the blocker rather than
- * stored or passed in by the caller.
- */
-const ACTIONS: Record<ExceptionBlocker, ExceptionAction[]> = {
-  answer_unknown: ["resolve_answer", "defer", "skip"],
-  challenge_required: ["open_session", "defer", "skip"],
-  needs_review: ["reconcile", "defer", "skip"],
-  needs_input: ["resolve_answer", "defer", "skip"],
-  unsupported_form: ["defer", "skip"],
-  task_failed: ["retry", "defer", "skip"],
-  account_blocked: ["defer", "skip"],
-};
 
 const STATE_BLOCKER: Record<string, ExceptionBlocker> = {
   CHALLENGE_REQUIRED: "challenge_required",
@@ -56,6 +45,23 @@ const RESUMABLE = [
 const appendDigest = (exceptionId: string, previous: string, entry: string) =>
   createHash("sha256").update(`${previous}\n${exceptionId}\n${entry}`).digest("hex");
 
+const reconciliationIntentSchema = z.object({
+  applicationId: idSchema,
+  taskId: idSchema,
+  adapter: z.string().min(1),
+  fence: z.number().int().positive(),
+  packetId: idSchema,
+  preparationId: idSchema,
+});
+const reconciliationPayloadSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    packetId: idSchema,
+    preparationId: idSchema,
+    expectedRevision: z.number().int().positive(),
+  })
+  .strict();
+
 export class ExceptionRepository extends Repository {
   constructor(db: Database, ownerId: string, clock?: () => Date) {
     super(db, ownerId, clock);
@@ -71,17 +77,44 @@ export class ExceptionRepository extends Repository {
       const out: OwnerException[] = [];
       for (const row of rows) out.push(await this.present(tx, row));
 
-      // An application parked without a recorded exception still needs the owner,
-      // so the inbox is a view over both sources rather than over one table.
+      // Materialize missing blockers under the owner lock so every shown ID is actionable.
       const parked = await tx.query(
-        "SELECT a.id,a.state,a.created_at,a.updated_at,j.data AS job_data FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1",
+        "SELECT a.id,a.state,a.revision,a.created_at,a.updated_at FROM applications a WHERE a.owner_id=$1",
         [this.ownerId],
       );
       for (const row of parked) {
         const state = String(row.state);
         if (!PARKED.has(state)) continue;
         if (out.some((item) => item.applicationId === String(row.id))) continue;
-        out.push(await this.presentParked(row, state));
+        const id = randomUUID();
+        const blocker = STATE_BLOCKER[state] ?? "needs_input";
+        const code =
+          state === "CHALLENGE_REQUIRED"
+            ? "CHALLENGE_REQUIRED"
+            : state === "NEEDS_REVIEW"
+              ? "COMMIT_UNKNOWN"
+              : state === "UNSUPPORTED"
+                ? "ADAPTER_UNSUPPORTED"
+                : "ANSWER_UNKNOWN";
+        await tx.query(
+          "INSERT INTO exceptions(id,owner_id,application_id,code,blocker,reason,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'open',$7,$8)",
+          [
+            id,
+            this.ownerId,
+            String(row.id),
+            code,
+            blocker,
+            `The application is parked in ${state} and needs an owner decision.`,
+            String(row.created_at),
+            String(row.updated_at),
+          ],
+        );
+        await this.append(tx, id, "record", "Materialized parked application blocker.", "system");
+        await this.audit(tx, String(row.id), "exception.materialized", Number(row.revision), {
+          exceptionId: id,
+          blocker,
+        });
+        out.push(await this.present(tx, await this.reload(tx, id)));
       }
       return out;
     });
@@ -100,44 +133,67 @@ export class ExceptionRepository extends Repository {
 
   async resolve(id: string, raw: ExceptionResolveInput): Promise<ExceptionResolved> {
     const input = exceptionResolveInputSchema.parse(raw);
-    const blocker = await this.blockerFor(id);
-    if (!ACTIONS[blocker].includes(input.action))
+    const current = await this.get(id);
+    const blocker = current.blocker;
+    if (current.state === "resolved" || !current.actions.includes(input.action))
       throw new DomainError(
         "STATE_INVALID",
         `"${input.action}" is not supported for a ${blocker} blocker.`,
       );
-    // Only now that the action is known to be permitted for this blocker may it
-    // reach a path with a side effect such as minting a handoff token.
-    const opened = input.action === "open_session" ? await this.openSession(id, input) : null;
-    if (opened) return opened;
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const row = await this.reload(tx, id);
       if (row.status === "resolved")
         throw new DomainError("STATE_INVALID", "This exception is already resolved.");
-      if (!ACTIONS[exceptionBlockerSchema.parse(row.blocker)].includes(input.action))
+      if (!(await this.availableActions(tx, row)).includes(input.action))
         throw new DomainError("STATE_INVALID", "The exception blocker changed.");
       const applicationId = String(row.application_id ?? "");
-      if (!applicationId)
+      if (!applicationId && input.action !== "defer")
         throw new DomainError("STATE_INVALID", "This exception is not attached to an application.");
+      if (input.action === "open_session") return this.openSessionIn(tx, row, input);
 
-      if (input.action === "resolve_answer") await this.approveForBlock(tx, id, input);
+      const answered =
+        input.action === "resolve_answer" ? await this.approveForBlock(tx, id, input) : 0;
 
-      if (input.action === "skip")
+      if (input.action === "skip") {
         await tx.query(
-          "UPDATE applications SET state='SKIPPED',updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state IN ('NEEDS_INPUT','CHALLENGE_REQUIRED','NEEDS_REVIEW','UNSUPPORTED','PAUSED','RETRY_WAIT')",
+          "UPDATE applications SET state='SKIPPED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3",
           [this.now(), this.ownerId, applicationId],
         );
+        await tx.query(
+          "UPDATE tasks SET state='cancelled',lease_owner=NULL,lease_until=NULL,fence=fence+1,last_error='TASK_CANCELLED' WHERE owner_id=$1 AND application_id=$2 AND type<>'reconcile' AND state IN ('ready','retry_wait','leased')",
+          [this.ownerId, applicationId],
+        );
+        await tx.query(
+          "UPDATE handoff_sessions SET state='cancelled',generation=generation+1,lease_owner=NULL,lease_until=NULL,completed_at=$1 WHERE owner_id=$2 AND application_id=$3 AND state IN ('open','claimed','rebuilding')",
+          [this.now(), this.ownerId, applicationId],
+        );
+        const siblings = await tx.query(
+          "SELECT id FROM exceptions WHERE owner_id=$1 AND application_id=$2 AND id<>$3 AND status<>'resolved'",
+          [this.ownerId, applicationId, id],
+        );
+        for (const sibling of siblings) {
+          await tx.query(
+            "UPDATE exceptions SET status='resolved',resolved_action='skip',note=$1,updated_at=$2,resolved_at=$2 WHERE owner_id=$3 AND id=$4",
+            [input.note ?? null, this.now(), this.ownerId, String(sibling.id)],
+          );
+          await this.append(tx, String(sibling.id), "skip", input.note ?? "");
+        }
+      }
 
       const requeued =
         input.action === "reconcile"
           ? await this.queueReconciliation(tx, applicationId)
-          : input.action === "retry" || input.action === "resolve_answer"
-            ? await this.requeue(tx, applicationId)
-            : 0;
+          : input.action === "retry"
+            ? await new PreparationRecovery(this.db, this.ownerId, this.clock).resumeIn(
+                tx,
+                applicationId,
+                true,
+              )
+            : answered;
 
       await tx.query(
-        "UPDATE exceptions SET status=$1,resolved_action=$2,note=$3,updated_at=$4 WHERE owner_id=$5 AND id=$6",
+        "UPDATE exceptions SET status=$1,resolved_action=$2,note=$3,updated_at=$4,resolved_at=$7 WHERE owner_id=$5 AND id=$6",
         [
           input.action === "defer"
             ? "deferred"
@@ -149,13 +205,27 @@ export class ExceptionRepository extends Repository {
           this.now(),
           this.ownerId,
           id,
+          input.action === "defer" || input.action === "reconcile" ? null : this.now(),
         ],
       );
       await this.append(tx, id, input.action, input.note ?? "");
-      await this.audit(tx, applicationId, `exception.${input.action}`, Number(row.revision ?? 1), {
-        exceptionId: id,
-        blocker,
-      });
+      const application = (
+        await tx.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          applicationId,
+        ])
+      )[0];
+      await this.audit(
+        tx,
+        applicationId || id,
+        `exception.${input.action}`,
+        Number(application?.revision ?? 0),
+        {
+          exceptionId: id,
+          blocker,
+        },
+        `owner:${this.ownerId}`,
+      );
       return {
         exception: await this.present(tx, await this.reload(tx, id)),
         requeued,
@@ -165,19 +235,8 @@ export class ExceptionRepository extends Repository {
   }
 
   private async queueReconciliation(tx: SqlExecutor, applicationId: string): Promise<number> {
-    const attempt = (
-      await tx.query(
-        "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND state='UNKNOWN' ORDER BY started_at DESC,id DESC LIMIT 1",
-        [this.ownerId, applicationId],
-      )
-    )[0];
-    const source = (
-      await tx.query(
-        "SELECT t.id,t.domain,t.payload FROM tasks t JOIN attempts a ON a.owner_id=t.owner_id AND a.application_id=t.application_id AND a.fence=t.fence WHERE t.owner_id=$1 AND t.application_id=$2 AND t.type='submit' AND a.state='UNKNOWN' ORDER BY a.started_at DESC,a.id DESC LIMIT 1",
-        [this.ownerId, applicationId],
-      )
-    )[0];
-    if (!attempt || !source)
+    const source = await this.reconciliationSource(tx, applicationId);
+    if (!source)
       throw new DomainError(
         "STATE_INVALID",
         "Reconciliation needs an unknown attempt and its original target.",
@@ -191,46 +250,63 @@ export class ExceptionRepository extends Repository {
       type: "reconcile",
       domain: String(source.domain),
       applicationId,
-      dedupeKey: `owner-reconcile:${attempt.id}:${randomUUID()}`,
-      payload: JSON.parse(String(source.payload)),
+      dedupeKey: `owner-reconcile:${source.attemptId}:${randomUUID()}`,
+      payload: source.payload,
       priority: 100,
     });
     return 1;
   }
 
-  /**
-   * A handoff is a separate one-time credential, so it is created in its own
-   * transaction and the token is returned exactly once here.
-   */
-  /** Reads the blocker and refuses an unknown exception before any action runs. */
-  private async blockerFor(id: string): Promise<ExceptionBlocker> {
-    const row = (
-      await this.db.query("SELECT blocker,status FROM exceptions WHERE owner_id=$1 AND id=$2", [
-        this.ownerId,
-        id,
-      ])
+  private async reconciliationSource(tx: SqlExecutor, applicationId: string) {
+    const attempt = (
+      await tx.query(
+        "SELECT a.id,a.fence,i.snapshot,i.sha256 FROM attempts a JOIN intents i ON i.owner_id=a.owner_id AND i.id=a.intent_id AND i.application_id=a.application_id WHERE a.owner_id=$1 AND a.application_id=$2 AND a.state='UNKNOWN' ORDER BY a.started_at DESC,a.id DESC LIMIT 1",
+        [this.ownerId, applicationId],
+      )
     )[0];
-    if (!row) throw new DomainError("NOT_FOUND", "Exception was not found.");
-    if (row.status === "resolved")
-      throw new DomainError("STATE_INVALID", "This exception is already resolved.");
-    return exceptionBlockerSchema.parse(String(row.blocker ?? "task_failed"));
+    if (!attempt) return null;
+    try {
+      const rawSnapshot = JSON.parse(String(attempt.snapshot));
+      const snapshot = reconciliationIntentSchema.parse(rawSnapshot);
+      if (
+        createHash("sha256").update(JSON.stringify(rawSnapshot)).digest("hex") !== attempt.sha256 ||
+        snapshot.applicationId !== applicationId ||
+        snapshot.fence !== Number(attempt.fence)
+      )
+        return null;
+      // A restore revokes the task fence; its immutable intent still names the original target.
+      const source = (
+        await tx.query(
+          "SELECT domain,payload FROM tasks WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND type='submit'",
+          [this.ownerId, snapshot.taskId, applicationId],
+        )
+      )[0];
+      if (!source || source.domain !== snapshot.adapter) return null;
+      const payload = reconciliationPayloadSchema.parse(JSON.parse(String(source.payload)));
+      if (
+        payload.packetId !== snapshot.packetId ||
+        payload.preparationId !== snapshot.preparationId
+      )
+        return null;
+      return { attemptId: String(attempt.id), domain: String(source.domain), payload };
+    } catch {
+      return null;
+    }
   }
 
-  private async openSession(id: string, input: ExceptionResolveInput): Promise<ExceptionResolved> {
-    const row = (
-      await this.db.query("SELECT * FROM exceptions WHERE owner_id=$1 AND id=$2", [
-        this.ownerId,
-        id,
-      ])
-    )[0];
-    if (!row) throw new DomainError("NOT_FOUND", "Exception was not found.");
+  private async openSessionIn(
+    tx: SqlExecutor,
+    row: Row,
+    input: ExceptionResolveInput,
+  ): Promise<ExceptionResolved> {
+    const id = String(row.id);
     const applicationId = String(row.application_id ?? "");
     if (!applicationId)
       throw new DomainError("STATE_INVALID", "This exception is not attached to an application.");
     const preparation = (
-      await this.db.query(
-        "SELECT id FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 AND status='challenge' ORDER BY created_at DESC LIMIT 1",
-        [this.ownerId, applicationId],
+      await tx.query(
+        "SELECT id,result FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 AND status='challenge' AND resolved_at IS NULL AND (expires_at IS NULL OR expires_at>$3) ORDER BY created_at DESC,id DESC LIMIT 1",
+        [this.ownerId, applicationId, this.now()],
       )
     )[0];
     if (!preparation)
@@ -238,33 +314,37 @@ export class ExceptionRepository extends Repository {
         "CHALLENGE_REQUIRED",
         "No challenged browser preparation is available to resume. Rebuild the form first.",
       );
-    const target = await this.db.query(
-      "SELECT result FROM browser_preparations WHERE owner_id=$1 AND id=$2",
-      [this.ownerId, String(preparation.id)],
-    );
-    const parsed = JSON.parse(String(target[0]?.result ?? "{}")) as {
-      adapter?: { targetFingerprint?: string };
-    };
+    const parsed = dryRunResultSchema.parse(JSON.parse(String(preparation.result)));
     if (!parsed.adapter?.targetFingerprint)
       throw new DomainError("FORM_CHANGED", "The challenged preparation has no adapter binding.");
     const handoffs = new HandoffRepository(this.db, this.ownerId, this.clock);
-    const created = await handoffs.create({
+    const created = await handoffs.createIn(tx, {
       applicationId,
       preparationId: String(preparation.id),
-      adapterId: String((parsed.adapter as { id?: string }).id ?? ""),
+      adapterId: parsed.adapter.id,
       targetFingerprint: parsed.adapter.targetFingerprint,
     });
-    await this.db.transaction(async (tx) => {
-      await this.lockOwner(tx);
-      await tx.query(
-        "UPDATE exceptions SET status='resolved',resolved_action='open_session',note=$1,updated_at=$2 WHERE owner_id=$3 AND id=$4",
-        [input.note ?? null, this.now(), this.ownerId, id],
-      );
-      await this.append(tx, id, "open_session", input.note ?? "");
-      await this.audit(tx, applicationId, "exception.open_session", 1, { exceptionId: id });
-    });
+    await tx.query(
+      "UPDATE exceptions SET status='resolved',resolved_action='open_session',note=$1,updated_at=$2,resolved_at=$2 WHERE owner_id=$3 AND id=$4",
+      [input.note ?? null, this.now(), this.ownerId, id],
+    );
+    await this.append(tx, id, "open_session", input.note ?? "");
+    const application = (
+      await tx.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        applicationId,
+      ])
+    )[0];
+    await this.audit(
+      tx,
+      applicationId,
+      "exception.open_session",
+      Number(application?.revision ?? 0),
+      { exceptionId: id },
+      `owner:${this.ownerId}`,
+    );
     return {
-      exception: await this.get(id),
+      exception: await this.present(tx, await this.reload(tx, id)),
       requeued: 0,
       handoff: { sessionId: created.session.id, token: created.token },
     };
@@ -299,7 +379,7 @@ export class ExceptionRepository extends Repository {
         "INSERT INTO exceptions(id,owner_id,application_id,code,blocker,reason,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'open',$7,$7)",
         [id, this.ownerId, input.applicationId, code, blocker, input.reason, this.now()],
       );
-      await this.append(tx, id, "record", input.reason);
+      await this.append(tx, id, "record", input.reason, "system");
       return id;
     });
   }
@@ -318,7 +398,7 @@ export class ExceptionRepository extends Repository {
     tx: SqlExecutor,
     exceptionId: string,
     input: ExceptionResolveInput,
-  ): Promise<void> {
+  ): Promise<number> {
     const block = (
       await tx.query("SELECT * FROM question_blocks WHERE owner_id=$1 AND exception_id=$2", [
         this.ownerId,
@@ -338,16 +418,20 @@ export class ExceptionRepository extends Repository {
       throw new DomainError("ANSWER_UNKNOWN", "Resolving a question requires the owner's answer.");
     const job = await this.job(tx, String(block.application_id));
     const country = String(block.country ?? "");
-    await new CandidateRepository(this.db, this.ownerId, this.clock).saveAnswerIn(tx, {
-      semanticKey: String(block.semantic_key),
-      meaning,
-      answer: input.answer,
-      validFrom: today,
-      validUntil: new Date(this.clock().getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
-      employerIds: [job.employerId],
-      countries: country ? [country] : [],
-      evidenceFactIds: input.factIds ?? [],
-    });
+    const result = await new CandidateRepository(this.db, this.ownerId, this.clock).approveAnswerIn(
+      tx,
+      {
+        semanticKey: String(block.semantic_key),
+        meaning,
+        answer: input.answer,
+        validFrom: today,
+        validUntil: new Date(this.clock().getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
+        employerIds: [job.employerId],
+        countries: country ? [country] : [],
+        evidenceFactIds: input.factIds ?? [],
+      },
+    );
+    return result.requeued;
   }
   /**
    * Rebuilds a form from the saved packet and the active policy.
@@ -417,52 +501,12 @@ export class ExceptionRepository extends Repository {
     });
   }
 
-  /** Requeues only the affected application, never the whole queue. */
-  private async requeue(tx: SqlExecutor, applicationId: string): Promise<number> {
-    const state = String(
-      (
-        await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
-          this.ownerId,
-          applicationId,
-        ])
-      )[0]?.state ?? "",
-    );
-    if (!RESUMABLE.includes(state)) return 0;
-    const ambiguous = await tx.query(
-      "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
-      [this.ownerId, applicationId],
-    );
-    if (ambiguous.length)
-      throw new DomainError(
-        "DUPLICATE_SUSPECTED",
-        "A prior final action must be reconciled before retrying preparation.",
-      );
-    const assessment = (
-      await tx.query(
-        "SELECT m.id FROM match_assessments m JOIN candidates c ON c.owner_id=m.owner_id AND c.active_profile_id=m.profile_id WHERE m.owner_id=$1 AND m.application_id=$2 ORDER BY m.created_at DESC,m.revision DESC LIMIT 1",
-        [this.ownerId, applicationId],
-      )
-    )[0];
-    if (!assessment) return 0;
-    await tx.query(
-      "UPDATE applications SET state='PREPARING',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3",
-      [this.now(), this.ownerId, applicationId],
-    );
-    await this.enqueueIn(tx, {
-      type: "prepare",
-      domain: "documents",
-      applicationId,
-      dedupeKey: `prepare:${applicationId}:owner:${randomUUID()}`,
-      payload: { schemaVersion: 1, assessmentId: String(assessment.id), refreshAnswers: true },
-    });
-    return 1;
-  }
-
   private async append(
     tx: SqlExecutor,
     exceptionId: string,
     action: string,
     note: string,
+    actor = `owner:${this.ownerId}`,
   ): Promise<void> {
     const previous = (
       await tx.query(
@@ -478,17 +522,7 @@ export class ExceptionRepository extends Repository {
     );
     await tx.query(
       "INSERT INTO exception_actions(owner_id,id,exception_id,action,note,seq,actor,occurred_at,required_append) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-      [
-        this.ownerId,
-        randomUUID(),
-        exceptionId,
-        action,
-        note,
-        seq,
-        `owner:${this.ownerId}`,
-        this.now(),
-        digest,
-      ],
+      [this.ownerId, randomUUID(), exceptionId, action, note, seq, actor, this.now(), digest],
     );
   }
 
@@ -540,8 +574,8 @@ export class ExceptionRepository extends Repository {
       blocker,
       code: errorCodeSchema.parse(String(row.code)),
       reason: String(row.reason ?? String(row.code)),
-      applicationId,
-      job: await this.job(tx, applicationId),
+      applicationId: applicationId || null,
+      job: applicationId ? await this.job(tx, applicationId) : null,
       question: block
         ? {
             semanticKey: String(block.semantic_key),
@@ -551,7 +585,7 @@ export class ExceptionRepository extends Repository {
           }
         : null,
       suggestedAnswer: await this.suggestion(tx, block, applicationId),
-      actions: ACTIONS[blocker],
+      actions: await this.availableActions(tx, row),
       state:
         row.status === "deferred" ? "deferred" : row.status === "resolved" ? "resolved" : "open",
       createdAt: String(row.created_at),
@@ -582,29 +616,105 @@ export class ExceptionRepository extends Repository {
     };
   }
 
-  private async presentParked(row: Row, state: string): Promise<OwnerException> {
-    const blocker = STATE_BLOCKER[state] ?? "needs_input";
-    const job = jobInputSchema.parse(JSON.parse(String(row.job_data))) as JobInput;
-    return ownerExceptionSchema.parse({
-      id: `parked:${String(row.id)}:${state}`,
-      blocker,
-      code: state === "CHALLENGE_REQUIRED" ? "CHALLENGE_REQUIRED" : "ANSWER_UNKNOWN",
-      reason: `The application is parked in ${state} and needs an owner decision.`,
-      applicationId: String(row.id),
-      job: {
-        id: job.id,
-        title: job.title,
-        company: job.company,
-        employerId: job.employerId,
-        ...(job.countryCode ? { countryCode: job.countryCode } : {}),
-      },
-      question: null,
-      suggestedAnswer: null,
-      actions: ACTIONS[blocker],
-      state: "open",
-      createdAt: String(row.created_at ?? this.now()),
-      updatedAt: String(row.updated_at ?? this.now()),
-    });
+  private async availableActions(tx: SqlExecutor, row: Row): Promise<ExceptionAction[]> {
+    const applicationId = String(row.application_id ?? "");
+    const blocker = exceptionBlockerSchema.parse(row.blocker);
+    const app = (
+      await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        applicationId,
+      ])
+    )[0];
+    if (!app || row.status === "resolved") return ["defer"];
+    const potential =
+      (
+        await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+          [this.ownerId, applicationId],
+        )
+      ).length > 0;
+    const restored =
+      (
+        await tx.query(
+          "SELECT application_id FROM restore_reviews WHERE owner_id=$1 AND application_id=$2 AND disposition<>'receipt' LIMIT 1",
+          [this.ownerId, applicationId],
+        )
+      ).length > 0;
+    const actions: ExceptionAction[] = [];
+    if (!potential && !restored && ["answer_unknown", "needs_input"].includes(blocker)) {
+      const block = (
+        await tx.query(
+          "SELECT semantic_key FROM question_blocks WHERE owner_id=$1 AND exception_id=$2 AND resolved_answer_id IS NULL",
+          [this.ownerId, String(row.id)],
+        )
+      )[0];
+      if (block) actions.push("resolve_answer");
+    }
+    if (blocker === "needs_review") {
+      if (await this.reconciliationSource(tx, applicationId)) actions.push("reconcile");
+    }
+    if (
+      !potential &&
+      !restored &&
+      blocker === "challenge_required" &&
+      app.state === "CHALLENGE_REQUIRED"
+    ) {
+      const preparation = (
+        await tx.query(
+          "SELECT result FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 AND status='challenge' AND resolved_at IS NULL AND (expires_at IS NULL OR expires_at>$3) ORDER BY created_at DESC,id DESC LIMIT 1",
+          [this.ownerId, applicationId, this.now()],
+        )
+      )[0];
+      let bound = false;
+      try {
+        bound = Boolean(
+          preparation && dryRunResultSchema.parse(JSON.parse(String(preparation.result))).adapter,
+        );
+      } catch {
+        bound = false;
+      }
+      const active = await tx.query(
+        "SELECT id FROM handoff_sessions WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding') AND expires_at>$3 LIMIT 1",
+        [this.ownerId, applicationId, this.now()],
+      );
+      if (bound && !active.length) actions.push("open_session");
+    }
+    if (
+      !potential &&
+      !restored &&
+      blocker === "task_failed" &&
+      RESUMABLE.includes(String(app.state)) &&
+      app.state !== "NEEDS_REVIEW"
+    ) {
+      const assessment = await tx.query(
+        "SELECT m.id FROM match_assessments m JOIN candidates c ON c.owner_id=m.owner_id AND c.active_profile_id=m.profile_id WHERE m.owner_id=$1 AND m.application_id=$2 LIMIT 1",
+        [this.ownerId, applicationId],
+      );
+      const unanswered = await tx.query(
+        "SELECT exception_id FROM question_blocks WHERE owner_id=$1 AND application_id=$2 AND resolved_answer_id IS NULL LIMIT 1",
+        [this.ownerId, applicationId],
+      );
+      if (assessment.length && !unanswered.length) actions.push("retry");
+    }
+    actions.push("defer");
+    if (
+      !potential &&
+      !restored &&
+      blocker !== "needs_review" &&
+      [
+        ...RESUMABLE.filter((state) => state !== "NEEDS_REVIEW"),
+        "DISCOVERED",
+        "NORMALIZED",
+        "ASSESSED",
+        "ELIGIBLE",
+        "PREPARING",
+        "PREPARED",
+        "INSPECTING",
+        "READY",
+      ].includes(String(app.state))
+    )
+      actions.push("skip");
+    return actions;
   }
 
   private async job(tx: SqlExecutor, applicationId: string) {

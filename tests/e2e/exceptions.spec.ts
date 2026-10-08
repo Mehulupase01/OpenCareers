@@ -53,3 +53,41 @@ test("the exception inbox is reachable and never invents an answer", async ({ pa
   });
   expect(errors).toEqual([]);
 });
+
+test("background-task exceptions render without a vacancy and can be deferred", async ({
+  page,
+}) => {
+  const item = {
+    id: "synthetic-background-exception",
+    blocker: "task_failed",
+    code: "CONFIG_INVALID",
+    reason: "The synthetic discovery task exhausted its retries.",
+    applicationId: null,
+    job: null,
+    question: null,
+    suggestedAnswer: null,
+    actions: ["defer"],
+    state: "open",
+    createdAt: "2026-09-28T12:00:00.000Z",
+    updatedAt: "2026-09-28T12:00:00.000Z",
+  };
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/v1/exceptions", (route) => route.fulfill({ json: [item] }));
+  await page.route("**/v1/exceptions/synthetic-background-exception/resolve", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ action: "defer" });
+    item.state = "deferred";
+    await route.fulfill({ json: { exception: item, requeued: 0, handoff: null } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Applications", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Needs your decision" });
+  await expect(panel.getByText("Background processing")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+  await panel.getByRole("button", { name: "Defer", exact: true }).click();
+  await expect(panel.locator("[data-state='deferred']")).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  expect(errors).toEqual([]);
+});

@@ -1112,7 +1112,7 @@
             "tests/integration/documents.test.ts",
             "tests/integration/handoff.test.ts"
           ],
-          "nextAction": "Resume all affected applications and validate exact answer meanings across every supported adapter."
+          "nextAction": "Affected applications now resume transactionally; finish exact answer/form-value validation across every supported adapter and UI scope review. See docs/evidence/INBOX-RESUMPTION.md."
         }
       ],
       "gates": [
@@ -1213,8 +1213,9 @@
         }
       ],
       "acceptanceTests": ["T21", "T22", "T32"],
-      "nextAction": "Complete solved-session continuation, all-adapter exact answer gates and affected-application resumption; verify with synthetic CI before reclosing P10.",
+      "nextAction": "Complete solved-session continuation, all-adapter exact answer gates and UI scope review; affected-application resumption is implemented. Verify remaining gates before reclosing P10.",
       "evidence": [
+        "docs/evidence/INBOX-RESUMPTION.md",
         "docs/evidence/WORKFLOW-RECOVERY.md",
         "docs/evidence/P10-closeout-checkpoint.md",
         "docs/evidence/P10-security-checkpoints.md"

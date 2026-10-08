@@ -509,11 +509,42 @@ whole-database encryption, complete backup/restore tools, signup/mailbox fencing
 solved-session continuation, automatic restore detection and real soaks remain.
 Full check passed (274 tests, 94 PostgreSQL skips, 41 files), as did all 42 isolated
 desktop/mobile browser cases in 2.8 minutes. Lint/typecheck/build/ledger, public scan
-and production audit passed. Post-push CI is pending; no live support is claimed.
+and production audit passed. GitHub run 37857873687 passed Windows, Ubuntu and
+PostgreSQL at f93254420f5954fee4b4c1fef95017800bb0ad06; no live support is claimed.
 
 Owner answered the pending chat questions: Gmail is the mailbox provider and the
 previously exposed OpenRouter key has been rotated in the local .env. Gmail OAuth
 desktop-app credentials are already saved locally; their path is not yet supplied.
-Never print
-the key. Next inference work must explicitly implement the earlier approved
+Never print the key. Next inference work must explicitly implement the earlier approved
 reviewed-provider/minimized-facts privacy amendment; strict routing is still active.
+
+## 2026-10-09: Actionable Inbox and Scoped Resumption
+
+Parked applications now get persistent exception IDs instead of unresolvable
+synthetic IDs. Action availability is derived from current questions, assessment,
+challenge preparation, handoff, attempt and restore state, then rechecked under
+the owner lock. Non-application dead-letter tasks remain visible and deferrable.
+Skip revokes stale work and handoffs, advances the application revision, settles
+sibling blockers and cannot conceal a possible employer dispatch.
+
+Candidate and exception approval now share affected-application resumption.
+Every equivalent in-scope application can resume once its known questions are
+resolved and an active-profile assessment exists. Other wordings/employers,
+unresolved questions, terminal applications and restore/dispatch uncertainty
+remain excluded. Fresh preparation retires old forms and handoffs. Owner answer
+propagation is recorded in the decision history; candidate UI scope controls and
+all-adapter form-value validation remain open.
+
+Reconciliation resolves the original task through its checksum-verified intent,
+not its now-revoked task fence. It validates owner/application/adapter/packet/form
+bindings and can only enqueue read-only reconciliation. Challenge-session creation
+and exception completion are one transaction, with owner attribution and expiry.
+See `docs/evidence/INBOX-RESUMPTION.md` for verification and remaining gates.
+
+Full check passed (281 tests, 101 PostgreSQL skips, 41 files), as did all 44 isolated
+desktop/mobile browser cases in 2.4 minutes. Public-source scan and production
+audit passed. Post-push CI is pending; no live adapter support is claimed.
+
+P10 and P15 remain in progress: no additional phase is claimed complete. Gmail
+credentials exist locally; their path was requested in chat, never their contents.
+No real employer action, private migration, key change or service restart occurred.

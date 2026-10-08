@@ -5,7 +5,7 @@ import {
   exceptionResolveInputSchema,
   type OwnerException,
 } from "../../../packages/contracts/src/exception.js";
-import { idSchema } from "../../../packages/contracts/src/index.js";
+import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { ExceptionRepository } from "../../../packages/persistence/src/exception-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 
@@ -29,6 +29,8 @@ export async function exceptionRoutes(app: FastifyInstance, repository: Reposito
   app.post<{ Params: { id: string } }>("/v1/exceptions/:id/rebuild", async (request) => {
     const { id } = z.object({ id: idSchema }).parse(request.params);
     const exception = await exceptions.get(id);
+    if (!exception.applicationId)
+      throw new DomainError("STATE_INVALID", "This task exception has no application form.");
     return exceptions.rebuild(exception.applicationId);
   });
 }

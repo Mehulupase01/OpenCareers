@@ -107,7 +107,23 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await db.query("INSERT INTO candidates(owner_id,id) VALUES($1,$2)", [owner, candidateId]);
         await db.query(
           "INSERT INTO jobs(owner_id,id,employer_id,requisition_id,data,created_at,last_seen_at) VALUES($1,$2,'synthetic-employer','req',$3,$4,$4)",
-          [owner, jobId, "{}", new Date(now).toISOString()],
+          [
+            owner,
+            jobId,
+            JSON.stringify({
+              id: jobId,
+              employerId: "synthetic-employer",
+              requisitionId: "req",
+              title: "Synthetic role",
+              company: "Synthetic company",
+              location: "NL",
+              url: "https://synthetic.example/req",
+              description: "Synthetic vacancy",
+              source: "fixture",
+              synthetic: true,
+            }),
+            new Date(now).toISOString(),
+          ],
         );
         await db.query(
           "INSERT INTO applications(owner_id,id,candidate_id,job_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,'READY',$5,$5)",
@@ -270,6 +286,46 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(session?.lease_owner).toBeNull();
         expect(session?.lease_until).toBeNull();
         expect(session?.completed_at).toBe(new Date(now).toISOString());
+      });
+
+      it("creates the handoff and records the owner's challenge decision in one transaction", async () => {
+        await addPreparation(new Date(now - minutes(1)).toISOString(), "challenge");
+        await db.query(
+          "UPDATE applications SET state='CHALLENGE_REQUIRED',revision=4 WHERE owner_id=$1 AND id=$2",
+          [owner, applicationId],
+        );
+        const id = await exceptions.record({
+          applicationId,
+          blocker: "challenge_required",
+          code: "CHALLENGE_REQUIRED",
+          reason: "Synthetic verification",
+        });
+        expect((await exceptions.get(id)).actions).toContain("open_session");
+        const result = await exceptions.resolve(id, { action: "open_session" });
+        expect(result.exception.state).toBe("resolved");
+        expect(result.handoff?.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(await handoffs.snapshot()).toHaveLength(1);
+        expect(
+          (
+            await db.query(
+              "SELECT actor,revision FROM audit_events WHERE owner_id=$1 AND action='exception.open_session'",
+              [owner],
+            )
+          )[0],
+        ).toMatchObject({ actor: `owner:${owner}`, revision: 4 });
+        expect(
+          (
+            await db.query("SELECT resolved_at FROM exceptions WHERE owner_id=$1 AND id=$2", [
+              owner,
+              id,
+            ])
+          )[0]?.resolved_at,
+        ).toBe(new Date(now).toISOString());
+        expect((await exceptions.history(id)).every((entry) => entry.intact)).toBe(true);
+        await expect(exceptions.resolve(id, { action: "open_session" })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+        expect(await handoffs.snapshot()).toHaveLength(1);
       });
 
       it("refuses a rebuild from a state where rebuilding is meaningless", async () => {

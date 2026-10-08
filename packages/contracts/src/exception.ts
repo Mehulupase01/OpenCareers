@@ -44,7 +44,7 @@ export const ownerExceptionSchema = z
     blocker: exceptionBlockerSchema,
     code: errorCodeSchema,
     reason: z.string().min(1).max(240),
-    applicationId: idSchema,
+    applicationId: idSchema.nullable(),
     job: z
       .object({
         id: idSchema,
@@ -53,7 +53,8 @@ export const ownerExceptionSchema = z
         employerId: idSchema,
         countryCode: z.string().max(2).optional(),
       })
-      .strict(),
+      .strict()
+      .nullable(),
     question: z
       .object({
         semanticKey: z.string().min(1).max(120),
@@ -69,7 +70,10 @@ export const ownerExceptionSchema = z
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
-  .strict();
+  .strict()
+  .refine((item) => (item.applicationId === null) === (item.job === null), {
+    message: "Application and job context must be present together.",
+  });
 export type OwnerException = z.infer<typeof ownerExceptionSchema>;
 
 export const exceptionResolveInputSchema = z

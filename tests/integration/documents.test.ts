@@ -1225,6 +1225,19 @@ for (const engine of ["sqlite", "postgres"] as const) {
           dedupeKey: `submit:${packet.manifest.applicationId}`,
           applicationId: packet.manifest.applicationId,
           domain: "mock-ats",
+          payload: {
+            schemaVersion: 1,
+            packetId: packet.manifest.id,
+            preparationId: preparation.id,
+            expectedRevision: Number(
+              (
+                await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+                  owner,
+                  packet.manifest.applicationId,
+                ])
+              )[0]?.revision,
+            ),
+          },
         });
         const task = await queue.claim("synthetic-worker", ["submit"]);
         if (!task) throw new Error("Expected a leased submit task.");
