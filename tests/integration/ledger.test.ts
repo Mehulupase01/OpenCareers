@@ -99,7 +99,6 @@ describe("phase ledger", () => {
 
   it("keeps unstarted work addressable through a next action", () => {
     for (const phase of ledger.phases) {
-      const open = phase.gates.some((gate) => gate.status !== "complete");
       const openTicket = phase.tickets.some((ticket) => ticket.status !== "complete");
       if (phase.status === "complete") {
         expect(phase.nextAction).toBeNull();

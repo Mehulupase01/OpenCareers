@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { ApprovedAnswer } from "../../contracts/src/candidate.js";
 import {
   type PacketRequestedAnswer,
   type PacketSnapshot,

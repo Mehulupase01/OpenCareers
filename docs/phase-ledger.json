@@ -638,7 +638,7 @@
         },
         {
           "id": "P06-03",
-          "text": "Validation. Check claim support, years-of-experience wording, company and role correctness, language requirements, tense and delivery status, and absence of placeholders or another employer's name.",
+          "text": "Validation. Check claim support, years-of-experience wording, company and role correctness, language requirements, tense and delivery status, and absence of placeholders or another employer\u0027s name.",
           "status": "complete",
           "acceptanceTests": [],
           "evidence": ["docs/evidence/P06-verification.md"],
@@ -1199,7 +1199,7 @@
         "status": "not_required",
         "note": "Every P10 gate is satisfiable against owned fixtures and loopback servers."
       },
-      "lastVerifiedCommit": null,
+      "lastVerifiedCommit": "84acb1a6685a7da78da489ed60cc8eecdb3fe78f",
       "remoteVerification": [
         {
           "runId": "36457888701",
@@ -1569,7 +1569,7 @@
       "gates": [
         {
           "id": "P14-G1",
-          "requirement": "A clean server deployment completes the full mock application workflow with the owner's PC disconnected.",
+          "requirement": "A clean server deployment completes the full mock application workflow with the owner\u0027s PC disconnected.",
           "status": "not_started",
           "evidence": []
         },
@@ -1933,7 +1933,7 @@
       "status": "not_started",
       "dependsOn": ["P09", "P10"],
       "externalPrerequisites": [
-        "Owner confirmation of which third-party accounts the automation may hold a logged-in session for, and that the account is the owner's own."
+        "Owner confirmation of which third-party accounts the automation may hold a logged-in session for, and that the account is the owner\u0027s own."
       ],
       "externalVerification": {
         "status": "not_required",

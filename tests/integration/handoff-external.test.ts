@@ -1,7 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
 import { loadConfig } from "../../packages/config/src/index.js";
+import type { OwnerException } from "../../packages/contracts/src/exception.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import {
   type Database,
@@ -15,6 +16,23 @@ import { ExceptionRepository } from "../../packages/persistence/src/exception-re
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { identity, policy } from "../helpers/candidate-fixtures.js";
+
+/** Finds an inbox item or fails loudly, so the tests never assert on undefined. */
+async function salaryItem(exceptions: ExceptionRepository): Promise<OwnerException> {
+  const item = (await exceptions.inbox()).find(
+    (entry) => entry.question?.semanticKey === "salary.numeric",
+  );
+  if (!item) throw new Error("Expected a salary exception in the inbox.");
+  return item;
+}
+
+async function noticeItem(exceptions: ExceptionRepository): Promise<OwnerException> {
+  const item = (await exceptions.inbox()).find(
+    (entry) => entry.question?.semanticKey === "notice.period",
+  );
+  if (!item) throw new Error("Expected a notice exception in the inbox.");
+  return item;
+}
 
 for (const engine of ["sqlite", "postgres"] as const) {
   describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
@@ -103,18 +121,16 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
       it("resolves a question only with the owner's answer and requeues just that application", async () => {
         await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
-        const item = (await exceptions.inbox()).find(
-          (entry) => entry.question?.semanticKey === "salary.numeric",
-        );
+        const item = await salaryItem(exceptions);
         expect(item).toBeDefined();
-        const result = await exceptions.resolve(item!.id, {
+        const result = await exceptions.resolve(item.id, {
           action: "resolve_answer",
           answer: 65000,
           factIds: [factId],
         });
         expect(result.exception.state).toBe("resolved");
         expect(result.requeued).toBe(1);
-        expect((await exceptions.inbox()).some((e) => e.id === item!.id)).toBe(false);
+        expect((await exceptions.inbox()).some((e) => e.id === item.id)).toBe(false);
         // Only the affected application moved, and the answer is now approved.
         const apps = await db.query("SELECT id,state FROM applications WHERE owner_id=$1", [owner]);
         expect(apps).toHaveLength(1);
@@ -130,23 +146,21 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
       it("refuses to resolve without an answer and refuses an unsupported action", async () => {
         await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
-        const item = (await exceptions.inbox()).find(
-          (e) => e.question?.semanticKey === "salary.numeric",
-        );
+        const item = await salaryItem(exceptions);
         // A missing answer and missing supporting evidence are both refused by
         // request validation, before any database work happens.
         await expect(
-          exceptions.resolve(item!.id, { action: "resolve_answer", factIds: [factId] }),
+          exceptions.resolve(item.id, { action: "resolve_answer", factIds: [factId] }),
         ).rejects.toThrow(/approved answer/i);
         await expect(
-          exceptions.resolve(item!.id, {
+          exceptions.resolve(item.id, {
             action: "resolve_answer",
             answer: 65000,
             factIds: ["nope"],
           }),
         ).rejects.toThrow(/not part of this profile/i);
         await expect(
-          exceptions.resolve(item!.id, { action: "open_session", note: "nope" }),
+          exceptions.resolve(item.id, { action: "open_session", note: "nope" }),
         ).rejects.toMatchObject({ code: "STATE_INVALID" });
       });
 
@@ -162,9 +176,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
           evidenceFactIds: [factId],
         });
         await repo.resolveQuestion(applicationId, "salary.numeric", "Net monthly salary in EUR");
-        const item = (await exceptions.inbox()).find(
-          (e) => e.question?.semanticKey === "salary.numeric",
-        );
+        const item = await salaryItem(exceptions);
         // A differently worded question gets no suggestion even though an answer
         // exists under the same key.
         expect(item?.suggestedAnswer).toBeNull();
@@ -172,10 +184,8 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
       it("skips and defers without inventing progress", async () => {
         await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
-        const item = (await exceptions.inbox()).find(
-          (e) => e.question?.semanticKey === "salary.numeric",
-        );
-        await exceptions.resolve(item!.id, { action: "skip" });
+        const item = await salaryItem(exceptions);
+        await exceptions.resolve(item.id, { action: "skip" });
         expect(
           String(
             (await db.query("SELECT state FROM applications WHERE owner_id=$1", [owner]))[0]?.state,
@@ -184,10 +194,8 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
         await db.query("UPDATE applications SET state='NEEDS_INPUT' WHERE owner_id=$1", [owner]);
         await repo.resolveQuestion(applicationId, "notice.period", "Notice period in months");
-        const second = (await exceptions.inbox()).find(
-          (e) => e.question?.semanticKey === "notice.period",
-        );
-        const deferred = await exceptions.resolve(second!.id, { action: "defer" });
+        const second = await noticeItem(exceptions);
+        const deferred = await exceptions.resolve(second.id, { action: "defer" });
         expect(deferred.exception.state).toBe("deferred");
         expect(deferred.requeued).toBe(0);
         expect(
@@ -208,11 +216,9 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
       it("keeps a tamper-evident record of every owner decision", async () => {
         await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
-        const item = (await exceptions.inbox()).find(
-          (e) => e.question?.semanticKey === "salary.numeric",
-        );
-        await exceptions.resolve(item!.id, { action: "defer", note: "waiting on a decision" });
-        const history = await exceptions.history(item!.id);
+        const item = await salaryItem(exceptions);
+        await exceptions.resolve(item.id, { action: "defer", note: "waiting on a decision" });
+        const history = await exceptions.history(item.id);
         expect(history.map((entry) => entry.action)).toEqual(["record", "defer"]);
         expect(history.every((entry) => entry.intact)).toBe(true);
         // Altering a stored decision must be detectable on the next read.
@@ -220,7 +226,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
           "UPDATE exception_actions SET note='tampered' WHERE owner_id=$1 AND action='defer'",
           [owner],
         );
-        expect((await exceptions.history(item!.id)).some((entry) => !entry.intact)).toBe(true);
+        expect((await exceptions.history(item.id)).some((entry) => !entry.intact)).toBe(true);
       });
 
       it("isolates the inbox by owner", async () => {

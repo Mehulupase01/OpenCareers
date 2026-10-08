@@ -10,7 +10,7 @@ const targetFingerprint = createHash("sha256")
   .update(JSON.stringify({ adapterId: "greenhouse" }))
   .digest("hex");
 
-const sessionFor = (url: string) => {
+const sessionFor = () => {
   const applicationId = randomUUID();
   return handoffSessionSchema.parse({
     id: randomUUID(),
@@ -27,7 +27,7 @@ const sessionFor = (url: string) => {
   });
 };
 
-const resultFor = (session: { applicationId: string; id: string }, url: string) => {
+const resultFor = (session: { applicationId: string }, url: string) => {
   const snapshot = {
     url,
     origin: new URL(url).origin,
@@ -63,7 +63,7 @@ const resultFor = (session: { applicationId: string; id: string }, url: string) 
 test("an external adapter handoff opens its own prepared page and never reaches the final action", async () => {
   const fixture = await startHandoffFixture();
   const url = `${fixture.url}/jobs/hosted`;
-  const session = sessionFor(url);
+  const session = sessionFor();
   const broker = new VisibleHandoffBroker({
     visible: false,
     onOpened: async (page) => {

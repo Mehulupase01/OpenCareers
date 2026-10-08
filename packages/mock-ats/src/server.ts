@@ -196,11 +196,11 @@ export async function buildMockAts(recordDir?: string) {
       return reply.code(422).send({ error: "Synthetic signup validation rejection" });
     if (fixture === "validation-reject")
       return reply.code(422).send({ error: "Synthetic definitive signup rejection" });
-    if (accounts.some((account) => account.email === body.email!.toLowerCase()))
+    if (accounts.some((account) => account.email === body.email?.toLowerCase()))
       return reply.code(422).send({ error: "Synthetic duplicate account" });
     const account = {
       id: randomUUID(),
-      email: body.email.toLowerCase(),
+      email: body.email?.toLowerCase() ?? "",
       identityEmailHash: emailHash(body.email),
       verificationRequired: fixture === "verification-required",
     };

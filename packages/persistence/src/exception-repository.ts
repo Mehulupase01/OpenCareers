@@ -16,7 +16,6 @@ import {
   type JobInput,
   jobInputSchema,
 } from "../../contracts/src/index.js";
-import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { HandoffRepository } from "./handoff-repository.js";
 import { Repository } from "./repository.js";

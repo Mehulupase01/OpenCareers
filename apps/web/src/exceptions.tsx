@@ -84,8 +84,6 @@ export function ExceptionsPanel() {
     }
   };
 
-  const factKey = (id: string) => facts.find((fact) => fact.id === id)?.key ?? id;
-
   return (
     <section className="exceptions-panel" aria-labelledby="exceptions-heading">
       <div className="section-toolbar">

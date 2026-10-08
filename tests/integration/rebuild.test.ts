@@ -144,6 +144,25 @@ for (const engine of ["sqlite", "postgres"] as const) {
         return created.session.id;
       };
 
+      it("a preparation older than a settled handoff is not silently reusable", async () => {
+        await addPreparation(new Date(now - minutes(10)).toISOString(), "challenge");
+        await settleHandoff(new Date(now - minutes(5)).toISOString());
+        const ready = await addPreparation(new Date(now - minutes(4)).toISOString(), "ready");
+        // The rebuild path is the correct recovery: it retires the stale preparation
+        // so nothing can present it as a description of the current form.
+        await db.query(
+          "UPDATE applications SET state='CHALLENGE_REQUIRED' WHERE owner_id=$1 AND id=$2",
+          [owner, applicationId],
+        );
+        await exceptions.rebuild(applicationId);
+        expect(
+          await db.query(
+            "SELECT id FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 AND resolved_at IS NULL AND id=$3",
+            [owner, applicationId, ready],
+          ),
+        ).toHaveLength(0);
+      });
+
       it("rebuild refuses outright while a prior final action is ambiguous", async () => {
         const authorizationId = randomUUID();
         await db.query(
