@@ -376,3 +376,60 @@ zero-data-retention provider eligibility is still unprobed and is the only
 remaining hard blocker. The owner must also rotate the OpenRouter key pasted
 into chat before any live route work.
 
+
+P10 is closed and the browser suite is now hermetic. All of this is committed and
+pushed: `6aa6355` adds the exception inbox and makes its resolution reachable,
+`1bfd961` measures free route zero-data-retention eligibility, `84acb1a` closes
+P10-G7, and `48292ba` makes the browser suite hermetic and closes P10 with a
+verified commit. The ledger records 72 of 128 gates and ten of nineteen phases
+complete. Private local service restored: API `4317` (PID 23420) and UI `4318`
+(PID 26324), profile `local`, readiness confirmed.
+
+The exception inbox was the one P10 plan increment whose subject did not exist in
+any form. `CandidateRepository.resolveQuestion` was correct but unreachable, so an
+ANSWER_UNKNOWN exception could never be created in a running system. Packet
+generation now records an exception for every requested answer that answer memory
+cannot satisfy, which is what makes the inbox reachable from ordinary operation.
+Resolving requires the owner's wording and the facts that support it; a suggestion
+appears only when an approved answer already exists for that exact meaning,
+employer, country and date; and every decision is a hash-chained append whose
+chain is re-verified on read.
+
+P10-G7 closed two real defects. A completed or expired handoff did not unblock
+the final action, which was correct, but nothing required the preparation to be
+newer than the handoff either, so a form inspected before a challenge could be
+submitted after one. The commit gate now refuses any preparation that predates a
+settled handoff and names the rebuild as the safe action. Separately,
+`BrowserRepository.save` refused nothing about prior attempts, so a form could be
+rebuilt while an earlier commit was still ambiguous; it now refuses outright.
+
+The browser suite was not hermetic and this was a genuine defect, not just
+flakiness: different specs failed on different runs, and documents.spec.ts failed
+when run alone because it inherited its corpus from whichever spec ran first.
+tests/helpers/browser-setup.ts now guarantees the corpus and the profile
+explicitly, and the suite passes 42 of 42 twice consecutively from a fresh reset
+with documents passing in isolation.
+
+Free route availability was measured rather than assumed, using the owner's
+rotated key read through the application configuration and never printed. Every
+probe carried one synthetic sentence and no candidate content. Of the 20 free
+models, 3 are zero-data-retention eligible and 4 advertise structured outputs, and
+those two sets are disjoint. All NVIDIA free routes return 404 for zero data
+retention, which settles the earlier 404 as a provider property. The previously
+pinned qwen3.8-27b:free has been retired from the free tier, so the earlier 429s
+were that and not rate limiting. Owner amendment 5, which rejects a deterministic
+letter for a real auto-submit packet, is therefore satisfiable only by having
+code select the approved contribution IDs deterministically while the model
+authors prose; that path is the next increment and needs an owner decision on
+letter quality for small flash-class models versus enabling a ZDR-capable
+provider on the OpenRouter account.
+
+Known tracked advisories: four moderate transitive advisories in fast-uri and
+fastify, published after the last supply-chain pass, are recorded with a
+reachability analysis in docs/evidence/P10-closeout-checkpoint.md and belong to
+P15-04.
+
+The next unblocked increments are the B1 letter path, the P18-01 owner-account
+session vault, and the account session exception mapping tracked as Appx.B
+scenario T32. Browser tests still require ports 4317 and 4318, so the private
+service must be stopped before running `pnpm test:e2e` and restarted afterwards.
