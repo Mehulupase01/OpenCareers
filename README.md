@@ -7,21 +7,14 @@ under a standing owner policy. There are no live-verified adapters yet.
 
 ## Current State
 
-P00 architecture, P01 runnable foundation and P02 persistence are complete. The dashboard reads real
-database state for synthetic jobs, tasks, controls and worker health. P02 provides durable
-queue ownership, cancellation, audit events and crash recovery on SQLite/PostgreSQL.
-P03 candidate onboarding is complete and verified locally and on GitHub:
-PDF/DOCX source import, reviewed facts, immutable profiles, scoped answer memory and
-revocable standing authorization. P04 adds fixed-origin Greenhouse/Lever discovery,
-source health and evidence, canonical job identity, reversible duplicate resolution
-and historical import. Final submission is still ahead; the
-current application does not apply to employers. P05 adds deterministic eligibility
-gates, evidence-bound semantic matching, code-owned scores, durable free-inference
-budgets and an inspectable Matching workspace. P06 adds deterministic tailored CV,
-letter and answer packets, independent claim checks, immutable DOCX/PDF artifacts,
-and an inspectable Documents workspace. P07 adds a first-party mock ATS,
-isolated dry-run browser, typed form plans and exact read-back to READY. It
-does not submit to employers or mark an application confirmed.
+The ledger records P00-P07, P09 and P10 complete, with P08 awaiting a genuine
+receipt and P11-P18 open. Existing behavior includes reviewed candidate evidence,
+standing authorization, durable SQLite/PostgreSQL work, three public ATS discovery
+families, evidence-bound matching and documents, guarded submission adapters,
+accounts, challenge handoffs and an exception inbox. Mock submissions are verified;
+Recruitee and Greenhouse application variants are fixture-tested, not live-verified.
+Known workflow and security gaps are being repaired before production activation.
+See [production completion](docs/plans/PRODUCTION-COMPLETION.md) for the full scope.
 
 ## Development
 
@@ -44,16 +37,17 @@ Commands: `dev`, `build`, `lint`, `typecheck`, `test:unit`, `test:integration`,
 `test:e2e`, `doctor`, `demo:reset`. Commands still under development must not be
 reported as verified; see the handoff for actual results.
 
+Browser tests use separate loopback ports 14317/14318 and never reuse an existing
+server. Override them with `AUTOPILOT_E2E_API_PORT` and `AUTOPILOT_E2E_WEB_PORT`
+if occupied. Your private service on 4317/4318 can remain running. Tests force the
+synthetic demo profile and refuse any server reporting a private profile.
+
 ## Validation
 
-The current matrix has 151 tests, including 49 PostgreSQL cases. This includes
-four-process claim races, forced worker termination, disk-full rollback, PostgreSQL
-connection loss, populated-schema upgrades, connector paging/backoff, discovery
-identity and historical suppression, concurrent inference budgets, route backoff and
-a frozen 72-case matching evaluation. Desktop/mobile browser workflows are tested
-separately (22 passed on a fresh synthetic workspace). GitHub Actions run `36194183542`
-passed the Windows, Linux and PostgreSQL lanes for P07. See
-[P07 verification](docs/evidence/P07-verification.md) for the current dry-run gates.
+Verification counts and exact commands are recorded in
+[baseline recovery](docs/evidence/BASELINE-RECOVERY.md), with PostgreSQL skips and
+local versus CI results distinguished. Earlier phase evidence remains historical;
+passing synthetic tests does not establish live employer support.
 
 ```powershell
 npx --yes pnpm@12.4.2 check
@@ -76,5 +70,5 @@ Never point test commands at a private application database. See the
 - [Sources](docs/sources/research.md)
 
 No real candidate data or credentials belong in Git. Public demos and CI use synthetic
-fixtures; the owned mock ATS is planned for P07. Live success requires correlated
+fixtures; the owned mock ATS is implemented. Live success requires correlated
 employer receipt evidence.

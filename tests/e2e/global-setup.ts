@@ -1,4 +1,6 @@
-const READY_URL = "http://127.0.0.1:4318/health/ready";
+import { testApiPort, testOrigin, testWebPort } from "../helpers/browser-endpoints.js";
+
+const READY_URL = `${testOrigin}/health/ready`;
 
 /**
  * A browser test that quietly runs against a private profile would read and
@@ -12,13 +14,13 @@ export default async function globalSetup() {
     if (response.ok) profile = ((await response.json()) as { profile?: string }).profile;
   } catch {
     throw new Error(
-      "The Playwright web server did not become ready. Run `pnpm exec playwright install chromium` and free ports 4317 and 4318.",
+      `The Playwright web server did not become ready. Install Chromium and free test ports ${testApiPort} and ${testWebPort}.`,
     );
   }
   if (profile !== "demo") {
     throw new Error(
-      `Refusing to run browser tests: the server on 127.0.0.1:4318 reports profile "${profile ?? "unknown"}", not "demo". ` +
-        "Stop the process holding ports 4317 and 4318 (for example the private local `pnpm dev` instance) and run `pnpm demo:reset` first. " +
+      `Refusing to run browser tests: the server on ${testOrigin} reports profile "${profile ?? "unknown"}", not "demo". ` +
+        "Choose unused test ports and run `pnpm demo:reset` first. " +
         "Browser tests must never touch a private profile.",
     );
   }

@@ -9,10 +9,12 @@ scenario invariant; a passing adjacent test is recorded as partial, and a missin
 row names the production code that must change. Masterplan clause references use
 `Ch.NN` for chapters, `Appx.A`-`Appx.F` for appendices.
 
-The masterplan PDF is intentionally excluded from source control because it
-contains a private candidate-policy section (`docs/requirements.md:3-4`). This
-audit was performed against an offline copy supplied by the owner on 2026-09-28;
-no masterplan text, and no private policy field, is committed here.
+Correction, 2026-10-09: the PDF was tracked in `dda7862`, contradicting this
+historical audit's exclusion claim. Baseline recovery untracks it while retaining
+the local copy and refuses unreviewed PDF/DOCX source files in the public scan.
+Historical exposure remains a separate remediation decision; removing a file in
+a new commit does not purge earlier Git history. The original scenario verdicts
+below remain a dated baseline, not current verification results.
 
 ## Requirement Traceability
 

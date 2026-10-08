@@ -1,6 +1,9 @@
 # OpenCareers Knowledge Transfer
 
 **Prepared 2026-09-28 at commit `4736fc4` on branch `main`, worktree clean.**
+Historical snapshot. For the 2026-10-09 resumption, read
+`docs/plans/PRODUCTION-COMPLETION.md` and `docs/evidence/BASELINE-RECOVERY.md`
+first. They correct CI, private-document inventory and browser-test port claims.
 Target reader: an autonomous coding agent taking over the remaining work. This
 document is written to be acted on without re-deriving anything.
 
@@ -23,8 +26,10 @@ a **genuine, receipt-verified submission**, not a draft or a filled form.
 
 The specification is *Job Autopilot Production Masterplan v2.0* (18 phases
 P00-P17, 12 requirements R01-R12, 32 integrated scenarios T01-T32). It is
-deliberately **not in the repository** because it embeds a private candidate-policy
-section. The owner has an offline copy. Everything the repo needs from it is
+excluded from future commits because it embeds a private candidate-policy
+section. The 2026-10-09 audit found it tracked in `dda7862`; recovery untracks
+it and preserves the local file. This does not remove it from published history;
+any history rewrite requires a separate owner decision. Public requirements are
 distilled into `docs/requirements.md`, `docs/architecture.md`, `docs/amendments.md`
 and `docs/masterplan-traceability.md`.
 
@@ -429,13 +434,11 @@ result, or a credential.
 
 Discovered the hard way in this session. Each one produced a confusing failure.
 
-**Ports 4317/4318.** Browser tests need them. The owner's private `pnpm dev`
-occupies them. `playwright.config.ts` now sets `reuseExistingServer: false`,
-forces `AUTOPILOT_PROFILE=demo` and `AUTOPILOT_SKIP_ENV_FILE=1`, and
-`tests/e2e/global-setup.ts` refuses to run unless the server on 4318 reports
-profile `demo`. **Stop the private service before `pnpm test:e2e` and restart it
-afterwards.** This is deliberate: an earlier configuration let a browser test run
-against the owner's real candidate database.
+**Browser-test ports.** Tests now default to 14317/14318, independently of the
+private development service on 4317/4318. `reuseExistingServer: false`, forced
+demo/skip-env settings, and the readiness profile check remain. Override only
+`AUTOPILOT_E2E_API_PORT` and `AUTOPILOT_E2E_WEB_PORT` when necessary; never stop
+or reuse a private service merely to run browser tests.
 
 **`.env` loading overrides the ambient environment.**
 `packages/config/src/env.ts` calls `node:process`'s `loadEnvFile`, which

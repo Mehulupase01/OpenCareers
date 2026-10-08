@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { testOrigin } from "./browser-endpoints.js";
 
 export type Json = (path: string, body?: unknown) => Promise<any>;
 
@@ -9,7 +10,7 @@ export const makeJson =
       // A state-changing request through page.request does not carry the browser's
       // own cookie jar, so the trusted origin is passed explicitly. Without it the
       // API answers 403 and the spec looks broken for no real reason.
-      headers: { origin: "http://127.0.0.1:4318" },
+      headers: { origin: testOrigin },
       ...(body === undefined
         ? { method: "GET" }
         : { method: "POST", data: body as Record<string, unknown> }),

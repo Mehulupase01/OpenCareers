@@ -433,3 +433,25 @@ The next unblocked increments are the B1 letter path, the P18-01 owner-account
 session vault, and the account session exception mapping tracked as Appx.B
 scenario T32. Browser tests still require ports 4317 and 4318, so the private
 service must be stopped before running `pnpm test:e2e` and restarted afterwards.
+
+## 2026-10-09: Production Completion Resumed
+
+The owner approved the full completion plan with token-efficient execution; all
+P00-P18 scope remains. Read `docs/plans/PRODUCTION-COMPLETION.md` for execution order.
+Baseline recovery fixes Windows artifact-root aliases while rejecting redirected
+artifact/hash directories, installs Chromium in PostgreSQL CI, and patches all
+four known moderate dependency advisories. The private masterplan is untracked
+but preserved locally; its published history is not purged. Public scanning now
+rejects unreviewed documents and pins four reviewed synthetic goldens by hash.
+
+The old port instruction immediately above is superseded: browser tests now use
+14317/14318, never stop or reuse the private 4317/4318 service, and retain forced
+demo and readiness checks. Full check passed (236 tests, 82 PostgreSQL skips),
+42 browser cases passed, public scan passed, production audit reported no known
+vulnerabilities. A further golden-integrity regression passed separately. See
+`docs/evidence/BASELINE-RECOVERY.md`; post-push CI is recorded subsequently.
+
+Next: repair exception approval/reconciliation/rebuild and consume durable inspect
+tasks. No real application has been sent and no private database has been reset,
+migrated or republished. Existing closed phases are historical labels, not authority
+to ignore defects; reopen affected gates when recording the corrective work.
