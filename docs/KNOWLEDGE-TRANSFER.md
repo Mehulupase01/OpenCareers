@@ -4,7 +4,11 @@
 Target reader: an autonomous coding agent taking over the remaining work. This
 document is written to be acted on without re-deriving anything.
 
-Read this first, then `docs/HANDOFF.md`, then `docs/masterplan-traceability.md`.
+Read this file completely; it is the only orientation you need. Then
+`docs/HANDOFF.md` for the running engineering log and `docs/phase-ledger.json`
+for machine-readable truth. Two places are worth going to first if you are in a
+hurry: **section 13** lists every owner instruction that is *not* in the
+Masterplan, and **section 12** is the ordered list of what to do first.
 If you read only one file, read this one.
 
 ---
@@ -42,6 +46,13 @@ Still open:
   P18  0/7   owner-account sources, universal hosted forms, portal breadth
 ```
 
+**Work not in the Masterplan.** The owner issued twelve amendments, several of
+which add scope the specification never contained: mandatory real submissions, 11
+portal families beyond Ch.07 backlog, a universal hosted-form engine for
+arbitrary career pages, and LinkedIn/Indeed ingestion through the owner's own
+account sessions. All twelve are indexed in **section 13**. Amendments 7, 8 and 9
+are the largest unbudgeted additions and none has been started.
+
 The 55 remaining `not_started` gates are real, unspecced work. Do not treat the
 project as nearly finished. The four completed work sessions in this repository's
 recent history closed 3 gates, which is roughly the honest rate.
@@ -78,11 +89,16 @@ even if every test passes.
 9. **A gate is not complete until a named test or inspection backs it.** Evidence
    is absent until something asserts it.
 10. **No CAPTCHA solving, challenge-token reuse, fingerprint deception, proxy
-    rotation to evade blocks, or anti-bot bypass.** The owner requested these on
-    2026-09-28; `docs/amendments.md` item 10 records that the masterplan Ch.01
-    exclusions were explicitly retained rather than overridden. Challenges route
-    to the P10 visible handoff. If a future owner overrides this, record it in
-    `docs/amendments.md` first.
+    rotation to evade blocks, or anti-bot bypass, and no mass aggregator Easy
+    Apply.** These were **requested on 2026-09-16** (amendment 3) and then
+    explicitly **retained as exclusions on 2026-09-28** (amendment 10), which
+    states they "remain in force and are not overridden". The later amendment
+    wins, so this is settled rather than open, but the tension between the two
+    entries is real and a future owner may revisit it. Challenges route to the
+    P10 visible handoff: the owner solves it in the owned visible browser and
+    automation continues from a fresh context. Employer ATS application flows are
+    fully in scope and are the product's central outcome. If a future owner
+    overrides this, record it in `docs/amendments.md` first.
 
 ## 4. Environment and commands
 
@@ -299,10 +315,23 @@ control, a duplicated label, or a value that cannot be read back exactly must no
 be guessed, because a mis-mapped control is a false statement to an employer. The
 engine may never auto-submit. Reuse primitives in `packages/browser/src/adapter.ts`.
 
-**C3. P18-03 owner-account job ingestion.** Read-only ingestion over the owner's
-own logged-in sessions, bounded rate with persisted cooldown, same raw-evidence
-and count-drop-warning discipline as a public connector. **Blocked on the owner
-confirming which accounts.**
+**C3. P18-03 LinkedIn, Indeed and comparable boards via the owner's own sessions.**
+Amendment 9 (2026-09-28) is explicit: the owner has **already confirmed** that
+third-party accounts this system holds a session for are **the owner's own
+accounts**, and directs logged-in job discovery and detail ingestion for
+**LinkedIn, Indeed, and comparable boards**. That overrides the masterplan Ch.02
+exclusion of restricted logged-in scraping. The *authorization* question is
+therefore settled; do not treat this increment as blocked on it. Only the
+specific account list is unconfirmed. LinkedIn and Indeed are named directly and
+are not covered by C4 or C5, so build them explicitly.
+
+Read-only ingestion over the owner's own logged-in sessions, bounded rate with
+persisted cooldown, and the same raw-evidence and count-drop-warning discipline as
+a public connector. Detail views cost more and yield less than search listings,
+so bound them and record why. **Never write to a third-party account**: no
+messages, no follows, no applications outside the P07 submission package, no
+profile edits. Session material is a credential: encrypted at rest, never in a
+prompt, log, audit payload, or API response, and excluded from source control.
 
 **C4. P18-04 public-API families.** Ashby, Teamtailor, SmartRecruiters,
 Workable, Personio, Breezy. Per family: Zod wire schema, a `normalizePage`
@@ -380,8 +409,9 @@ result, or a credential.
 2. **P08-G6** needs a published standing authorization with final-click
    authority, a suitable live vacancy, and presence to verify a private receipt.
 3. **P13-G7** needs a real live ramp; reaching 50 is a measurement, never a claim.
-4. **P18-G1/G3** need confirmation of which third-party accounts the automation
-   may hold a logged-in session for.
+4. **P18-G1/G3** need the specific third-party account list the owner's LinkedIn
+   and Indeed sessions belong to. Authorization is already granted by amendment 9;
+   only the account list is missing. Do not treat this as blocked on approval.
 5. **P14** needs a hosting account and budget when that phase is reached.
 6. **P17-G2** needs the private installation to make a real authorized submission.
 7. **Outreach messaging** is currently excluded from P18 scope and needs an
@@ -550,7 +580,51 @@ warnings; read the remaining list.
 7. One increment, one commit, one push. Update the ledger and the evidence doc
    with real numbers before claiming anything.
 
-## 13. Honest summary of the remaining work
+## 13. Owner instructions that are not in the Masterplan
+
+The masterplan is a 2026-09-16 edition. Everything below came from the owner
+**later** and is authoritative under amendment 6, which states the conversation
+overrides the specification where they conflict. Full text in
+`docs/amendments.md`; this table is the index. Amendment 3 predates the later
+batch and is partly superseded by item 10.
+
+| # | Instruction | Status | Where planned |
+|---|---|---|---|
+| 1 | Use the existing OpenCareers repo at `D:\Mehul-Projects\OpenCareers`; keep name, history, license | Applied | this repo |
+| 2 | **Automatic final clicks and real submissions are mandatory.** Review-only and fill-only are optional modes and do **not** satisfy the delivery goal | Delivered as design; **one real receipt still outstanding** | P08-G6 |
+| 3 | Requested CAPTCHA bypass, anti-bot evasion, proxy rotation, restricted logged-in scraping; feasibility to be investigated; account access must be owned or authorized; do not claim universal coverage | **Feasibility never investigated. Superseded in part by item 10.** No bypass or logged-in scraping performed | ground rule 10 |
+| 4 | Commit and push to the existing origin after each phase; descriptive title and body; continue autonomously between checkpoints | Applied | section 6 |
+| 5 | Real applications need LLM-drafted letters; the deterministic P06 letter is retained **only** for synthetic demo and non-committing review paths; model downtime must never silently substitute a deterministic letter | **Open — blocked on the model decision** | section B, `docs/plans/P06-llm-letter-amendment.md` |
+| 6 | Conversation authority overrides the masterplan | Applied | this section |
+| 7 | Portal breadth is **required**: 6 public-API families (Ashby, Teamtailor, SmartRecruiters, Workable, Personio, Breezy) and 5 account-gated (Workday, SuccessFactors, iCIMS, Jobvite, BambooHR). Workday-class backlog items are now in scope | **Not started, 11 families** | C4, C5 |
+| 8 | Arbitrary company career pages must work via a universal hosted-form engine; ambiguity stops as `unsupported`, never guesses | **Not started** | C2 |
+| 9 | LinkedIn, Indeed and comparable boards via the owner's **own** account sessions; overrides Ch.02; session material is a credential | **Not started** | C3, C1 |
+| 10 | Ch.01 exclusions (CAPTCHA solving, challenge-token reuse, fingerprint deception, proxy rotation to evade, anti-bot bypass) **remain in force**; also no mass aggregator Easy Apply. Challenges route to the P10 handoff | Applied | ground rule 10, P10 |
+| 11 | Free-only inference must actually work; use any free OpenRouter model or NVIDIA Nemotron 3 Ultra on OpenRouter; per-route ZDR eligibility must be **probed, not assumed**; if nothing works, record as external blocker and never relax privacy | **Probed 2026-09-28 — no free route satisfies all three.** External blocker | section 8 item 1 |
+| 12 | Owner's OpenRouter key was pasted into chat and must be rotated before live route work; the repo never contains it | **Rotated**, confirmed by owner | `.env`, ignored |
+
+### Amendment 11 detail worth not re-deriving
+
+The owner's 2026-09-28 catalogue read found
+`nvidia/nemotron-3-super-120b-a12b:free` zero-priced in both dimensions **with**
+`structured_outputs`, and `nvidia/nemotron-3-ultra-550b-a55b:free` zero-priced
+**without** advertised structured outputs. The subsequent ZDR probe in
+`docs/evidence/B1-free-route-probe.md` returned HTTP 404 for zero-data-retention
+on **every** NVIDIA free route, which is a provider-property rejection rather than
+a transient error. Do not re-probe these hoping for a different answer; the two
+invariants (ZDR and structured outputs) are not simultaneously satisfiable on any
+free route measured on 2026-09-28.
+
+### Work that is genuinely in flight right now
+
+**None.** At `4736fc4` the worktree is clean, the only branch is `main`, there is
+no stashed or uncommitted change, no TODO/FIXME marker exists anywhere in
+`packages/*/src`, `apps/*/src` or `tests/`, and every browser test is
+deterministic. This document, the ledger, `docs/plans/` and the tracked issues in
+section 10 together constitute the complete pending list. If you find work that
+is not in any of those, that is a finding, not an oversight on your part.
+
+## 14. Honest summary of the remaining work
 
 The four most recent completed sessions closed roughly three gates and one phase.
 The remaining 55 gates belong to seven never-started phases plus the
