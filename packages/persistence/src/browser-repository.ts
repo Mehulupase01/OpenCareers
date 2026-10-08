@@ -109,6 +109,31 @@ export class BrowserRepository extends Repository {
       )[0];
       if (!row)
         throw new DomainError("NOT_FOUND", "A valid packet is required for browser preparation.");
+      // Rebuilding a form is not a recovery path for an ambiguous commit. If any
+      // attempt for this application may have reached the employer, the outcome
+      // must be reconciled first, because rebuilding and then submitting is
+      // exactly how a duplicate application is created.
+      const ambiguous = (
+        await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+          [this.ownerId, result.applicationId],
+        )
+      )[0];
+      if (ambiguous) {
+        const parked = String(
+          (
+            await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              this.ownerId,
+              result.applicationId,
+            ])
+          )[0]?.state ?? "",
+        );
+        if (["UNKNOWN", "IN_FLIGHT", "RECONCILING", "CONFIRMED", "NEEDS_REVIEW"].includes(parked))
+          throw new DomainError(
+            "DUPLICATE_SUSPECTED",
+            "A prior final action requires reconciliation before this form is rebuilt.",
+          );
+      }
       const manifest = packetManifestSchema.parse(JSON.parse(String(row.manifest)));
       if (
         manifest.profileId !== row.active_profile_id ||

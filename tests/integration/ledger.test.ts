@@ -157,18 +157,16 @@ describe("phase ledger", () => {
     }
   });
 
-  it("leaves the P10 gate that is genuinely open open", async () => {
+  it("closes P10 with every gate evidenced", () => {
     const p10 = byId.get("P10");
-    expect(p10?.status).toBe("in_progress");
-    expect(p10?.gates.find((gate) => gate.id === "P10-G7")?.status).toBe("not_started");
-    expect(p10?.gates.filter((gate) => gate.status === "complete")).toHaveLength(6);
-    expect(
-      p10?.tickets.filter((ticket) => ticket.status === "complete").map((ticket) => ticket.id),
-    ).toEqual(["P10-01", "P10-02", "P10-03"]);
-    // The exception inbox and the rebuild path are the remaining P10 work, and the
-    // ledger must say so rather than letting the phase look finished.
-    expect(p10?.nextAction).toBe("P10-04");
-    expect(p10?.tickets.find((ticket) => ticket.id === "P10-04")?.status).not.toBe("complete");
+    expect(p10?.status).toBe("complete");
+    expect(p10?.gates.every((gate) => gate.status === "complete")).toBe(true);
+    expect(p10?.gates).toHaveLength(7);
+    expect(p10?.tickets.every((ticket) => ticket.status === "complete")).toBe(true);
+    expect(p10?.nextAction).toBeNull();
+    expect(p10?.lastVerifiedCommit).toMatch(/^[0-9a-f]{40}$/);
+    for (const gate of p10?.gates ?? [])
+      for (const entry of gate.evidence) expect(existsSync(resolve(root, entry))).toBe(true);
   });
 
   it("tracks the owner-added breadth phase without borrowing P09 evidence", () => {

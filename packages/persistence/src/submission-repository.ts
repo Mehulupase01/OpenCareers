@@ -73,6 +73,7 @@ export class SubmissionRepository extends Repository {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       await this.assertLease(tx, task);
+      let handoffBoundary = 0;
       const app = (
         await tx.query(
           "SELECT state,revision,commit_fence,job_id FROM applications WHERE owner_id=$1 AND id=$2",
@@ -87,6 +88,21 @@ export class SubmissionRepository extends Repository {
       );
       if (activeHandoff.length)
         throw new DomainError("STATE_INVALID", "An active human handoff blocks final action.");
+      // A handoff that has completed or expired does not by itself unblock the
+      // final action. The preparation must postdate it, because a preparation
+      // inspected before the challenge cannot describe the form as it is now, and
+      // reusing it is exactly how a stale form gets submitted.
+      const settled = (
+        await tx.query(
+          "SELECT completed_at,expires_at FROM handoff_sessions WHERE owner_id=$1 AND application_id=$2 AND (completed_at IS NOT NULL OR expires_at<=$3) ORDER BY created_at DESC LIMIT 1",
+          [this.ownerId, applicationId, this.now()],
+        )
+      )[0];
+      if (settled)
+        handoffBoundary = Math.max(
+          settled.completed_at ? Date.parse(String(settled.completed_at)) : 0,
+          Date.parse(String(settled.expires_at)),
+        );
       if (Number(app.revision) !== input.expectedRevision)
         throw new DomainError("REVISION_STALE", "Application revision changed.");
       if (Number(app.commit_fence) !== task.fence)
@@ -110,6 +126,14 @@ export class SubmissionRepository extends Repository {
       )[0];
       if (preparation?.status !== "ready")
         throw new DomainError("FORM_CHANGED", "A ready browser preparation is required.");
+      // A form inspected before a challenge was handed off cannot describe the
+      // form as it is now. The preparation must be newer than the settled
+      // handoff, otherwise the safe action is to rebuild, never to reuse.
+      if (handoffBoundary && Date.parse(String(preparation.created_at)) <= handoffBoundary)
+        throw new DomainError(
+          "FORM_CHANGED",
+          "The form was rebuilt after a challenge handoff. Rebuild it before the final action.",
+        );
       const latest = (
         await tx.query(
           "SELECT id FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1",

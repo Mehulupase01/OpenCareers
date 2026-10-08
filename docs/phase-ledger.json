@@ -1046,7 +1046,7 @@
     {
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
-      "status": "in_progress",
+      "status": "complete",
       "dependsOn": ["P09"],
       "tickets": [
         {
@@ -1092,18 +1092,27 @@
         {
           "id": "P10-04",
           "text": "Exception inbox. Show the exact question or blocker, affected job, suggested supported answer if any, evidence, and actions to resolve, defer, skip, or open a session.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T21", "T22", "T32"],
-          "evidence": [],
-          "nextAction": "P10-04"
+          "evidence": [
+            "docs/evidence/P10-closeout-checkpoint.md",
+            "tests/integration/exceptions.test.ts",
+            "tests/e2e/exceptions.spec.ts"
+          ],
+          "nextAction": null
         },
         {
           "id": "P10-05",
           "text": "Propagation and resumption. An approved answer resolves semantically equivalent pending questions within its scope, and the entire affected form is revalidated before commitment.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T21", "T22", "T32"],
-          "evidence": [],
-          "nextAction": "P10-05"
+          "evidence": [
+            "docs/evidence/P10-closeout-checkpoint.md",
+            "tests/integration/rebuild.test.ts",
+            "tests/integration/documents.test.ts",
+            "tests/integration/handoff.test.ts"
+          ],
+          "nextAction": null
         }
       ],
       "gates": [
@@ -1176,16 +1185,21 @@
         {
           "id": "P10-G7",
           "requirement": "A resumed expired form is rebuilt safely, while an ambiguous prior commit is reconciled first.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P10-closeout-checkpoint.md",
+            "tests/integration/rebuild.test.ts",
+            "tests/integration/documents.test.ts",
+            "tests/integration/handoff.test.ts"
+          ]
         }
       ],
       "externalPrerequisites": [],
       "externalVerification": {
         "status": "not_required",
-        "note": "No external prerequisite is recorded for this phase."
+        "note": "Every P10 gate is satisfiable against owned fixtures and loopback servers."
       },
-      "lastVerifiedCommit": "19470542e3ecc1aa20d5d1e4475a17f7292c88fa",
+      "lastVerifiedCommit": null,
       "remoteVerification": [
         {
           "runId": "36457888701",
@@ -1199,7 +1213,7 @@
         }
       ],
       "acceptanceTests": ["T21", "T22", "T32"],
-      "nextAction": "P10-04",
+      "nextAction": null,
       "evidence": [
         "docs/evidence/P10-closeout-checkpoint.md",
         "docs/evidence/P10-security-checkpoints.md"

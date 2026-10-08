@@ -26,6 +26,11 @@ export async function exceptionRoutes(app: FastifyInstance, repository: Reposito
     const result: ExceptionResolved = await exceptions.resolve(id, input);
     return result;
   });
+  app.post<{ Params: { id: string } }>("/v1/exceptions/:id/rebuild", async (request) => {
+    const { id } = z.object({ id: idSchema }).parse(request.params);
+    const exception = await exceptions.get(id);
+    return exceptions.rebuild(exception.applicationId);
+  });
 }
 
 export type { OwnerException };

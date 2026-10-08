@@ -368,6 +368,65 @@ export class ExceptionRepository extends Repository {
       [this.now(), this.ownerId, exceptionId],
     );
   }
+  /**
+   * Rebuilds a form from the saved packet and the active policy.
+   *
+   * Reconciliation always comes first. If any attempt for this application may
+   * have reached the employer, the rebuild is refused outright rather than being
+   * offered as a way past the ambiguity, because rebuilding and then submitting is
+   * precisely how a duplicate application happens.
+   */
+  async rebuild(
+    applicationId: string,
+  ): Promise<{ requeued: number; reconciliationRequired: boolean }> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = (
+        await tx.query("SELECT state,revision FROM applications WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          applicationId,
+        ])
+      )[0];
+      if (!row) throw new DomainError("NOT_FOUND", "Application was not found.");
+      const ambiguous = (
+        await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+          [this.ownerId, applicationId],
+        )
+      )[0];
+      if (ambiguous)
+        throw new DomainError(
+          "DUPLICATE_SUSPECTED",
+          "A prior final action requires reconciliation before this form is rebuilt.",
+        );
+      const state = String(row.state);
+      if (!RESUMABLE.includes(state))
+        throw new DomainError("STATE_INVALID", `A form in ${state} cannot be rebuilt.`);
+      // The stale preparation is retired so nothing can reuse it, and the newest
+      // challenged handoff is closed so it cannot block the rebuild either.
+      await tx.query(
+        "UPDATE browser_preparations SET resolved_at=$1 WHERE owner_id=$2 AND application_id=$3 AND resolved_at IS NULL",
+        [this.now(), this.ownerId, applicationId],
+      );
+      await tx.query(
+        "UPDATE handoff_sessions SET state='cancelled' WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding')",
+        [this.ownerId, applicationId],
+      );
+      await tx.query(
+        "UPDATE applications SET state='INSPECTING',updated_at=$1 WHERE owner_id=$2 AND id=$3",
+        [this.now(), this.ownerId, applicationId],
+      );
+      await this.enqueueIn(tx, {
+        type: "prepare",
+        domain: "preparation",
+        applicationId,
+        dedupeKey: `prepare:${applicationId}`,
+      });
+      await this.audit(tx, applicationId, "form.rebuilt", Number(row.revision));
+      return { requeued: 1, reconciliationRequired: false };
+    });
+  }
+
   /** Requeues only the affected application, never the whole queue. */
   private async requeue(tx: SqlExecutor, applicationId: string): Promise<number> {
     const state = String(

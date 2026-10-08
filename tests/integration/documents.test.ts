@@ -889,6 +889,23 @@ for (const engine of ["sqlite", "postgres"] as const) {
             expectedRevision: Number(app?.revision),
           }),
         ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        // A handoff that has completed does not by itself unblock the final action.
+        // The preparation predates it, so it no longer describes the form, and the
+        // safe action is to rebuild rather than to reuse.
+        await db.query(
+          "UPDATE handoff_sessions SET state='completed',completed_at=$1 WHERE owner_id=$2 AND id=$3",
+          ["2026-09-28T09:20:00.000Z", owner, handoffId],
+        );
+        await expect(
+          submissions.begin(task, {
+            packetId: packet.manifest.id,
+            preparationId: preparation.id,
+            expectedRevision: Number(app?.revision),
+          }),
+        ).rejects.toMatchObject({
+          code: "FORM_CHANGED",
+          message: expect.stringContaining("rebuilt after a challenge handoff"),
+        });
         await db.query("DELETE FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
           owner,
           handoffId,

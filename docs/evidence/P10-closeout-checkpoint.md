@@ -135,6 +135,35 @@ unrelated increment is the wrong place to take a supply-chain risk decision.
 Bumping `fastify` and overriding `fast-uri` belongs to P15-04, which owns
 dependency audit, SBOM generation, and release artifact scanning.
 
+## Safe Rebuild And Reconciliation First (P10-G7)
+
+Two defects made a stale form submittable and a rebuild a way past ambiguity.
+
+A completed or expired handoff did not unblock anything by itself, which was
+correct, but nothing then required the preparation to be *newer* than the
+handoff either. A preparation inspected before a challenge describes the form as
+it was, so reusing it after the owner cleared one submits a form nobody looked
+at. The commit gate now computes a settled-handoff boundary and refuses any
+preparation that does not postdate it, naming the rebuild as the safe action.
+
+`BrowserRepository.save` refused nothing about prior attempts, so a form could be
+rebuilt while an earlier commit was still ambiguous, and rebuilding and then
+submitting is exactly how a duplicate application is created. Saving a
+preparation now refuses outright while any attempt for that application may have
+reached the employer.
+
+`ExceptionRepository.rebuild` is the safe path: it refuses if an attempt is
+ambiguous, retires the stale preparation so nothing can reuse it, cancels a
+blocking handoff, moves the application to `INSPECTING`, and requeues only that
+application under an application-scoped dedupe key. `POST
+/v1/exceptions/:id/rebuild` exposes it. Reconciliation is always first; a rebuild
+is never offered as a recovery path for an unknown outcome.
+
+With this, all seven P10 gates are evidenced and P10 is closed. The account
+session exception mapping described in the plan as its own step remains open and
+is tracked as Appx.B scenario T32; it is not one of the seven gates, so it does
+not hold the phase open.
+
 ## Verification
 
 `pnpm check` passed: lint, typecheck, ledger validation, 214 tests with 70
