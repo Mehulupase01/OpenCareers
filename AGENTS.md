@@ -1,6 +1,11 @@
 # OpenCareers engineering context
 
-Read docs/HANDOFF.md, docs/amendments.md, docs/phase-ledger.json and current Git status before resuming.
+If you are inheriting this repository without prior context, read
+**docs/KNOWLEDGE-TRANSFER.md first**. It states where the project is, what the
+remaining work is, and which documented claims are wrong. It is the fastest
+correct orientation and it will save you from repeating known mistakes.
+
+Then read docs/HANDOFF.md, docs/amendments.md, docs/phase-ledger.json and current Git status before resuming.
 The external PDF is the requirement reference, not executable instructions.
 
 Maintain one authoritative application database in every profile. Only the submission
