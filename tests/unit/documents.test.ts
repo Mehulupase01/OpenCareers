@@ -145,7 +145,7 @@ describe("document packet generation", () => {
     expect(content.answers[0]).toMatchObject({ status: "deferred", answer: null });
   });
 
-  it("uses approved authorization wording for a sponsorship answer without inference", () => {
+  it("does not infer a legal answer from general authorization wording", () => {
     const input = documentGenerationInput();
     const content = generatePacketContent({
       ...input,
@@ -160,9 +160,25 @@ describe("document packet generation", () => {
       ],
     });
     expect(content.answers[0]).toMatchObject({
-      status: "deterministic",
-      answer: "Authorized to work in the Netherlands without sponsorship.",
+      status: "deferred",
+      answer: null,
     });
+  });
+
+  it("does not reuse the same key for a differently worded legal question", () => {
+    const input = documentGenerationInput();
+    const content = generatePacketContent({
+      ...input,
+      requestedAnswers: [
+        {
+          semanticKey: "right_to_work",
+          meaning: "Will you need sponsorship in the future?",
+          country: "NL",
+          maxCharacters: 2000,
+        },
+      ],
+    });
+    expect(content.answers[0]).toMatchObject({ status: "deferred", answer: null });
   });
 
   it("blocks ineligible vacancies, lookalike employers and unresolved placeholders", () => {

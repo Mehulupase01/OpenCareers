@@ -7,6 +7,7 @@ const envSchema = z.object({
   AUTOPILOT_HOST: z.string().default("127.0.0.1"),
   AUTOPILOT_PORT: z.coerce.number().int().min(1024).max(65535).default(4317),
   AUTOPILOT_DATA_DIR: z.string().optional(),
+  AUTOPILOT_E2E_RUN_ID: z.uuid().optional(),
   AUTOPILOT_OWNER_ID: z
     .string()
     .regex(/^[a-zA-Z0-9_.:-]+$/)
@@ -59,14 +60,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   }
   const e = parsed.data;
   const profile = e.AUTOPILOT_PROFILE;
-  const dataDir = resolve(e.AUTOPILOT_DATA_DIR ?? resolve(cwd, ".data/demo"));
+  if (e.AUTOPILOT_E2E_RUN_ID && profile !== "demo")
+    throw new DomainError(
+      "CONFIG_INVALID",
+      "Browser-test run IDs are only supported in demo mode.",
+    );
+  const demoDir = e.AUTOPILOT_E2E_RUN_ID
+    ? resolve(cwd, ".data/e2e", e.AUTOPILOT_E2E_RUN_ID)
+    : resolve(cwd, ".data/demo");
+  const dataDir = resolve(e.AUTOPILOT_DATA_DIR ?? demoDir);
   if (profile !== "server" && !["127.0.0.1", "::1"].includes(e.AUTOPILOT_HOST)) {
     throw new DomainError("CONFIG_INVALID", "Demo and local profiles must bind to loopback.");
   }
-  if (profile === "demo" && dataDir !== resolve(cwd, ".data/demo")) {
+  if (profile === "demo" && dataDir !== demoDir) {
     throw new DomainError(
       "CONFIG_INVALID",
-      "Demo data must use the repository .data/demo directory.",
+      "Demo data must use its guarded repository demo directory.",
     );
   }
   if (profile !== "demo" && (!e.AUTOPILOT_DATA_DIR || !e.AUTOPILOT_OWNER_TOKEN)) {

@@ -63,10 +63,13 @@ export async function inspectForm(page: Page): Promise<FormSnapshot> {
                     value: option.value,
                   }))
                 : [];
+        const plainLabel = field.labels?.[0]?.cloneNode(true) as HTMLElement | undefined;
+        for (const control of plainLabel?.querySelectorAll("input,select,textarea") ?? [])
+          control.remove();
         const label =
           (field instanceof HTMLInputElement && field.type === "radio"
             ? field.closest('[role="group"]')?.getAttribute("aria-label")
-            : field.labels?.[0]?.textContent?.trim().replace(/\s+/g, " ")) ??
+            : plainLabel?.textContent?.trim().replace(/\s+/g, " ")) ??
           field.getAttribute("aria-label") ??
           "";
         return {
@@ -148,7 +151,7 @@ export function planFields(
       throw new Error(`Answer conflicts with packet-backed field: ${answer.semanticKey}`);
     if (answer.status !== "deferred" && answer.answer !== null)
       known[answer.semanticKey] = {
-        value: String(answer.answer),
+        value: typeof answer.answer === "boolean" ? answer.answer : String(answer.answer),
         evidence: answer.evidence.map((fact) => fact.factId),
       };
   }
@@ -163,6 +166,13 @@ export function planFields(
   const entries: FieldPlan["entries"] = [];
   const unresolved: string[] = [];
   for (const field of snapshot.fields) {
+    const proposal = packet.content.answers.find(
+      (answer) => answer.semanticKey === field.semanticKey,
+    );
+    if (proposal && proposal.meaning !== field.label) {
+      if (field.required) unresolved.push(field.semanticKey);
+      continue;
+    }
     const candidate = known[field.semanticKey];
     if (!candidate || field.kind === "unsupported") {
       if (field.required) unresolved.push(field.semanticKey);

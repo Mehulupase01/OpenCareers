@@ -98,11 +98,7 @@ export class SubmissionRepository extends Repository {
           [this.ownerId, applicationId, this.now()],
         )
       )[0];
-      if (settled)
-        handoffBoundary = Math.max(
-          settled.completed_at ? Date.parse(String(settled.completed_at)) : 0,
-          Date.parse(String(settled.expires_at)),
-        );
+      if (settled) handoffBoundary = Date.parse(String(settled.completed_at ?? settled.expires_at));
       if (Number(app.revision) !== input.expectedRevision)
         throw new DomainError("REVISION_STALE", "Application revision changed.");
       if (Number(app.commit_fence) !== task.fence)
@@ -666,9 +662,12 @@ export class SubmissionRepository extends Repository {
           [this.ownerId, applicationId],
         )
       )[0];
-      if (row?.state !== "UNKNOWN" || row.attempt_state !== "UNKNOWN")
+      if (
+        !["UNKNOWN", "NEEDS_REVIEW"].includes(String(row?.state)) ||
+        row?.attempt_state !== "UNKNOWN"
+      )
         throw new DomainError("STATE_INVALID", "Only an unknown attempt may be reconciled.");
-      assertTransition("UNKNOWN", "RECONCILING");
+      assertTransition(row.state as "UNKNOWN" | "NEEDS_REVIEW", "RECONCILING");
       const next = evidence ? "CONFIRMED" : "NEEDS_REVIEW";
       assertTransition("RECONCILING", next);
       if (evidence) {
@@ -703,14 +702,19 @@ export class SubmissionRepository extends Repository {
         );
       }
       const updated = await tx.query(
-        "UPDATE applications SET state=$1,revision=revision+2,updated_at=$2 WHERE owner_id=$3 AND id=$4 AND state='UNKNOWN' AND revision=$5 RETURNING revision",
-        [next, this.now(), this.ownerId, applicationId, Number(row.revision)],
+        "UPDATE applications SET state=$1,revision=revision+2,updated_at=$2 WHERE owner_id=$3 AND id=$4 AND state=$5 AND revision=$6 RETURNING revision",
+        [next, this.now(), this.ownerId, applicationId, row.state ?? null, Number(row.revision)],
       );
       if (!updated[0])
         throw new DomainError("REVISION_STALE", "Application changed during reconciliation.");
       await this.audit(tx, applicationId, "submission.reconciled", Number(updated[0].revision), {
         outcome: evidence ? "confirmed" : "needs_review",
       });
+      if (evidence)
+        await tx.query(
+          "UPDATE exceptions SET status='resolved',resolved_action='reconcile',resolved_at=$1,updated_at=$1 WHERE owner_id=$2 AND application_id=$3 AND blocker='needs_review' AND status<>'resolved'",
+          [this.now(), this.ownerId, applicationId],
+        );
       return evidence ? "confirmed" : "needs_review";
     });
   }

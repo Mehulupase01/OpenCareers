@@ -577,7 +577,7 @@ export class CandidateRepository extends Repository {
       throw new DomainError("RATE_LIMITED", "Daily submission limit reached.");
     return policy;
   }
-  private async matchingAnswer(
+  async matchingAnswer(
     tx: SqlExecutor,
     key: string,
     meaning: string,
@@ -646,9 +646,8 @@ export class CandidateRepository extends Repository {
         if (seen.has(answer.semanticKey)) continue;
         if (answer.employerIds.length && !answer.employerIds.includes(context.employerId)) continue;
         if (
-          context.country &&
           answer.countries.length &&
-          !answer.countries.includes(context.country)
+          (!context.country || !answer.countries.includes(context.country))
         )
           continue;
         if (answer.validFrom > context.asOf || answer.validUntil < context.asOf) continue;
@@ -676,83 +675,83 @@ export class CandidateRepository extends Repository {
     });
   }
   async saveAnswer(raw: AnswerInput): Promise<ApprovedAnswer> {
+    return this.db.transaction((tx) => this.saveAnswerIn(tx, raw));
+  }
+
+  /** Shares canonical approval checks with owner decisions in the same transaction. */
+  async saveAnswerIn(tx: SqlExecutor, raw: AnswerInput): Promise<ApprovedAnswer> {
     const input = answerInputSchema.parse(raw);
-    return this.db.transaction(async (tx) => {
-      await this.lockOwner(tx);
-      const candidate = await this.candidate(tx);
-      const facts = await this.facts(tx);
-      if (
-        input.evidenceFactIds.some(
-          (id) => !facts.some((f) => f.id === id && usableFact(f, this.now().slice(0, 10))),
-        )
+    await this.lockOwner(tx);
+    const candidate = await this.candidate(tx);
+    const facts = await this.facts(tx);
+    if (
+      input.evidenceFactIds.some(
+        (id) => !facts.some((f) => f.id === id && usableFact(f, this.now().slice(0, 10))),
       )
-        throw new DomainError("CLAIM_UNSUPPORTED", "Answers require usable reviewed facts.");
-      const revision =
-        Number(
-          (
-            await tx.query(
-              "SELECT COALESCE(MAX(revision),0) AS revision FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2",
-              [this.ownerId, input.semanticKey],
-            )
-          )[0]?.revision,
-        ) + 1;
-      const answer: ApprovedAnswer = {
-        ...input,
-        evidenceRevisions: Object.fromEntries(
-          input.evidenceFactIds.map((id) => [id, facts.find((f) => f.id === id)?.revision ?? 0]),
-        ),
-        id: randomUUID(),
-        revision,
-        approvedAt: this.now(),
-      };
-      await tx.query(
-        "INSERT INTO approved_answers(owner_id,id,candidate_id,semantic_key,revision,data,approved_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
-        [
-          this.ownerId,
-          answer.id,
-          candidate.id ?? null,
-          answer.semanticKey,
-          revision,
-          JSON.stringify(answer),
-          this.now(),
-        ],
-      );
-      const blocks = await tx.query(
-        "SELECT b.*,j.employer_id FROM question_blocks b JOIN applications a ON a.owner_id=b.owner_id AND a.id=b.application_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE b.owner_id=$1 AND b.semantic_key=$2",
-        [this.ownerId, input.semanticKey],
-      );
-      for (const block of blocks) {
-        const match = await this.matchingAnswer(
-          tx,
-          String(block.semantic_key),
-          String(block.meaning),
-          String(block.employer_id),
-          String(block.country),
-        );
-        await tx.query(
-          "UPDATE question_blocks SET resolved_answer_id=$1 WHERE owner_id=$2 AND application_id=$3 AND semantic_key=$4",
-          [match?.id ?? null, this.ownerId, block.application_id ?? null, input.semanticKey],
-        );
-        await tx.query(
-          "UPDATE exceptions SET status=$1,resolved_at=$2 WHERE owner_id=$3 AND id=$4",
-          [
-            match ? "resolved" : "open",
-            match ? this.now() : null,
-            this.ownerId,
-            block.exception_id ?? null,
-          ],
-        );
-      }
-      await this.audit(
-        tx,
+    )
+      throw new DomainError("CLAIM_UNSUPPORTED", "Answers require usable reviewed facts.");
+    const revision =
+      Number(
+        (
+          await tx.query(
+            "SELECT COALESCE(MAX(revision),0) AS revision FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2",
+            [this.ownerId, input.semanticKey],
+          )
+        )[0]?.revision,
+      ) + 1;
+    const answer: ApprovedAnswer = {
+      ...input,
+      evidenceRevisions: Object.fromEntries(
+        input.evidenceFactIds.map((id) => [id, facts.find((f) => f.id === id)?.revision ?? 0]),
+      ),
+      id: randomUUID(),
+      revision,
+      approvedAt: this.now(),
+    };
+    await tx.query(
+      "INSERT INTO approved_answers(owner_id,id,candidate_id,semantic_key,revision,data,approved_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+      [
+        this.ownerId,
         answer.id,
-        "candidate.answer_approved",
+        candidate.id ?? null,
+        answer.semanticKey,
         revision,
-        { semanticKey: input.semanticKey },
-        `owner:${this.ownerId}`,
+        JSON.stringify(answer),
+        this.now(),
+      ],
+    );
+    const blocks = await tx.query(
+      "SELECT b.*,j.employer_id FROM question_blocks b JOIN applications a ON a.owner_id=b.owner_id AND a.id=b.application_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE b.owner_id=$1 AND b.semantic_key=$2",
+      [this.ownerId, input.semanticKey],
+    );
+    for (const block of blocks) {
+      const match = await this.matchingAnswer(
+        tx,
+        String(block.semantic_key),
+        String(block.meaning),
+        String(block.employer_id),
+        String(block.country),
       );
-      return answer;
-    });
+      await tx.query(
+        "UPDATE question_blocks SET resolved_answer_id=$1 WHERE owner_id=$2 AND application_id=$3 AND semantic_key=$4",
+        [match?.id ?? null, this.ownerId, block.application_id ?? null, input.semanticKey],
+      );
+      await tx.query("UPDATE exceptions SET status=$1,resolved_at=$2 WHERE owner_id=$3 AND id=$4", [
+        match ? "resolved" : "open",
+        match ? this.now() : null,
+        this.ownerId,
+        block.exception_id ?? null,
+      ]);
+    }
+    await this.audit(
+      tx,
+      answer.id,
+      "candidate.answer_approved",
+      revision,
+      { semanticKey: input.semanticKey },
+      `owner:${this.ownerId}`,
+    );
+    return answer;
   }
   /**
    * Writes one tamper-evident entry onto an exception's decision chain. The

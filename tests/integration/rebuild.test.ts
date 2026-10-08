@@ -256,6 +256,20 @@ for (const engine of ["sqlite", "postgres"] as const) {
             applicationId,
           ]),
         ).toHaveLength(1);
+        const task = (
+          await db.query("SELECT type,payload FROM tasks WHERE owner_id=$1", [owner])
+        )[0];
+        expect(task?.type).toBe("inspect");
+        expect(JSON.parse(String(task?.payload))).toEqual({ schemaVersion: 1, packetId });
+        const session = (
+          await db.query(
+            "SELECT generation,lease_owner,lease_until,completed_at FROM handoff_sessions WHERE owner_id=$1",
+            [owner],
+          )
+        )[0];
+        expect(session?.lease_owner).toBeNull();
+        expect(session?.lease_until).toBeNull();
+        expect(session?.completed_at).toBe(new Date(now).toISOString());
       });
 
       it("refuses a rebuild from a state where rebuilding is meaningless", async () => {

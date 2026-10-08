@@ -230,7 +230,7 @@ export const documentAnswers: ApprovedAnswer[] = [
   {
     id: "answer-work-auth",
     semanticKey: "right_to_work",
-    meaning: "Right to work in the Netherlands",
+    meaning: "Are you authorized to work in the Netherlands?",
     answer: "Yes",
     validFrom: "2026-01-01",
     validUntil: "2027-01-01",

@@ -117,7 +117,7 @@ describe("phase ledger", () => {
         expect(ticket.text.trimEnd()).toMatch(/[.):]$/);
         expect(STATUSES).toContain(ticket.status);
         if (ticket.status === "complete") expect(ticket.nextAction).toBeNull();
-        else expect(ticket.nextAction).toBe(ticket.id);
+        else expect(ticket.nextAction?.trim().length).toBeGreaterThan(0);
       }
     }
   });
@@ -156,13 +156,17 @@ describe("phase ledger", () => {
     }
   });
 
-  it("closes P10 with every gate evidenced", () => {
+  it("reopens P10 when later workflow evidence contradicts the previous closure", () => {
     const p10 = byId.get("P10");
-    expect(p10?.status).toBe("complete");
-    expect(p10?.gates.every((gate) => gate.status === "complete")).toBe(true);
+    expect(p10?.status).toBe("in_progress");
+    expect(p10?.gates.filter((gate) => gate.status !== "complete").map((gate) => gate.id)).toEqual([
+      "P10-G3",
+      "P10-G6",
+      "P10-G7",
+    ]);
     expect(p10?.gates).toHaveLength(7);
-    expect(p10?.tickets.every((ticket) => ticket.status === "complete")).toBe(true);
-    expect(p10?.nextAction).toBeNull();
+    expect(p10?.nextAction).toBeTruthy();
+    expect(p10?.evidence).toContain("docs/evidence/WORKFLOW-RECOVERY.md");
     expect(p10?.lastVerifiedCommit).toMatch(/^[0-9a-f]{40}$/);
     for (const gate of p10?.gates ?? [])
       for (const entry of gate.evidence) expect(existsSync(resolve(root, entry))).toBe(true);

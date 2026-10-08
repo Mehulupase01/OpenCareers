@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
@@ -106,8 +106,30 @@ describe("external adapter challenge handoff", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await close();
     await fixture.close();
+  });
+
+  it("refuses an expired browser lease even when the session has not expired", async () => {
+    await seed("greenhouse", `${fixture.url}/jobs/hosted`);
+    const created = await repository.create({
+      applicationId,
+      preparationId,
+      adapterId: "greenhouse",
+      targetFingerprint,
+    });
+    const session = await repository.claimHandoff(created.session.id, created.token, "browser:ext");
+    const target = await repository.target(created.session.id);
+    await expect(
+      broker().open({ ...session, leaseUntil: at(-1000) }, target.result, "browser:ext"),
+    ).rejects.toMatchObject({ code: "LEASE_STALE" });
+    const active = broker();
+    await active.open(session, target.result, "browser:ext");
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(session.leaseUntil ?? session.expiresAt) + 1);
+    await expect(active.verify(session.id, session.generation)).rejects.toMatchObject({
+      code: "LEASE_STALE",
+    });
   });
 
   const broker = (onOpened?: (page: import("playwright").Page) => Promise<void>) => {

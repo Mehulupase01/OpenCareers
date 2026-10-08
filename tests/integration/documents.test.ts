@@ -3,6 +3,8 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runInspectionTask } from "../../apps/worker/src/inspection.js";
+import { AdapterRegistry, createAdapterRegistry } from "../../packages/browser/src/adapter-sdk.js";
 import type { DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { DomainError } from "../../packages/contracts/src/index.js";
@@ -18,6 +20,7 @@ import {
   openSqlite,
 } from "../../packages/persistence/src/database.js";
 import { DocumentRepository } from "../../packages/persistence/src/document-repository.js";
+import { ExceptionRepository } from "../../packages/persistence/src/exception-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { SubmissionRepository } from "../../packages/persistence/src/submission-repository.js";
@@ -227,6 +230,133 @@ for (const engine of ["sqlite", "postgres"] as const) {
       afterEach(async () => {
         await db?.close();
         if (dir) await rm(dir, { recursive: true, force: true });
+      });
+
+      it("automatically queues inspection, persists readiness and queues the bound final action", async () => {
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        await documents.queueInspection(packet);
+        await documents.queueInspection(packet);
+        const task = await queue.claim("inspection-worker", ["inspect"]);
+        if (!task) throw new Error("Expected inspection task.");
+        let prepares = 0;
+        const adapters = new AdapterRegistry([
+          {
+            id: "mock-ats",
+            version: "mock-ats-v1",
+            parseTarget: (value) => value,
+            async prepare(input) {
+              prepares++;
+              expect(input.approvedValues).toEqual({});
+              expect(input.cvPdf.length).toBeGreaterThan(100);
+              expect(input.target).toEqual({ fixture: "standard" });
+              return readyBrowserResult(input.packet);
+            },
+            async commit() {
+              throw new Error("Inspection must not call commit.");
+            },
+            async reconcile() {
+              throw new Error("Inspection must not reconcile.");
+            },
+          },
+        ]);
+        await runInspectionTask(task, {
+          config: { profile: "demo", externalSubmissionEnabled: false },
+          repository: queue,
+          documents,
+          browser: new BrowserRepository(db, owner, clock),
+          artifacts,
+          adapters,
+          clock,
+        });
+        await queue.complete(task);
+        expect(prepares).toBe(1);
+        const tasks = await db.query(
+          "SELECT type,domain,payload FROM tasks WHERE owner_id=$1 ORDER BY type",
+          [owner],
+        );
+        expect(tasks).toHaveLength(2);
+        const submit = tasks.find((row) => row.type === "submit");
+        expect(submit?.domain).toBe("mock-ats");
+        expect(JSON.parse(String(submit?.payload))).toMatchObject({
+          packetId: packet.manifest.id,
+          fixture: "standard",
+        });
+        expect(
+          (await db.query("SELECT state FROM applications WHERE owner_id=$1", [owner]))[0]?.state,
+        ).toBe("READY");
+        const current = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1", [owner])
+        )[0];
+        await expect(
+          new BrowserRepository(db, owner, clock).save(readyBrowserResult(packet), {
+            expectedRevision: Number(current?.revision) - 1,
+          }),
+        ).rejects.toMatchObject({ code: "REVISION_STALE" });
+        expect(
+          await db.query("SELECT id FROM browser_preparations WHERE owner_id=$1", [owner]),
+        ).toHaveLength(1);
+      });
+
+      it("discards a queued inspection once a newer owner preparation is ready", async () => {
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        await documents.queueInspection(packet);
+        const browser = new BrowserRepository(db, owner, clock);
+        await browser.save(readyBrowserResult(packet));
+        const task = await queue.claim("inspection-worker", ["inspect"]);
+        if (!task) throw new Error("Expected queued inspection.");
+        await runInspectionTask(task, {
+          config: { profile: "demo", externalSubmissionEnabled: false },
+          repository: queue,
+          documents,
+          browser,
+          artifacts,
+          adapters: new AdapterRegistry([]),
+          clock,
+        });
+        await queue.complete(task);
+        expect(
+          await db.query("SELECT id FROM browser_preparations WHERE owner_id=$1", [owner]),
+        ).toHaveLength(1);
+        expect(
+          (await db.query("SELECT state FROM applications WHERE owner_id=$1", [owner]))[0]?.state,
+        ).toBe("READY");
+      });
+
+      it("inspects the real mock browser and records an unknown question without submitting", async () => {
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const queue = new Repository(db, owner, clock);
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        await documents.queueInspection(packet);
+        const task = await queue.claim("inspection-worker", ["inspect"]);
+        if (!task) throw new Error("Expected inspection task.");
+        await runInspectionTask(task, {
+          config: { profile: "demo", externalSubmissionEnabled: false },
+          repository: queue,
+          documents,
+          browser: new BrowserRepository(db, owner, clock),
+          artifacts,
+          adapters: createAdapterRegistry(dir),
+          clock,
+        });
+        await queue.complete(task);
+        const inbox = await new ExceptionRepository(db, owner, clock).inbox();
+        expect(inbox.some((item) => item.question?.semanticKey === "country")).toBe(true);
+        expect(
+          await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='submit'", [owner]),
+        ).toHaveLength(0);
+        expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
+          0,
+        );
       });
 
       it("excludes an approved answer that is scoped to a different employer", async () => {
@@ -906,10 +1036,12 @@ for (const engine of ["sqlite", "postgres"] as const) {
           code: "FORM_CHANGED",
           message: expect.stringContaining("rebuilt after a challenge handoff"),
         });
-        await db.query("DELETE FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
-          owner,
-          handoffId,
-        ]);
+        // An early completion must not block a freshly inspected form until the
+        // handoff's original future expiry. Keep the session as durable evidence.
+        await db.query(
+          "UPDATE handoff_sessions SET completed_at=$1,expires_at=$2 WHERE owner_id=$3 AND id=$4",
+          ["2026-09-28T08:59:00.000Z", "2026-09-28T09:10:00.000Z", owner, handoffId],
+        );
         const handle = await submissions.begin(task, {
           packetId: packet.manifest.id,
           preparationId: preparation.id,
@@ -1099,8 +1231,24 @@ for (const engine of ["sqlite", "postgres"] as const) {
           receivedAt: clock().toISOString(),
           emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
         };
-        expect(await submissions.reconcileMockReceipt(reconcile, evidence)).toBe("confirmed");
+        expect(await submissions.reconcileMockReceipt(reconcile, null)).toBe("needs_review");
         await queue.complete(reconcile);
+        const exceptions = new ExceptionRepository(db, owner, clock);
+        const exceptionId = await exceptions.record({
+          applicationId: packet.manifest.applicationId,
+          blocker: "needs_review",
+          code: "COMMIT_UNKNOWN",
+          reason: "Synthetic lost response needs reconciliation.",
+        });
+        const requested = await exceptions.resolve(exceptionId, { action: "reconcile" });
+        expect(requested.exception.state).toBe("open");
+        expect(requested.requeued).toBe(1);
+        expect((await exceptions.resolve(exceptionId, { action: "reconcile" })).requeued).toBe(0);
+        const retryReconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
+        if (!retryReconcile) throw new Error("Expected an owner-requested reconciliation task.");
+        expect(await submissions.reconcileMockReceipt(retryReconcile, evidence)).toBe("confirmed");
+        await queue.complete(retryReconcile);
+        expect((await exceptions.get(exceptionId)).state).toBe("resolved");
         expect(
           await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
             owner,

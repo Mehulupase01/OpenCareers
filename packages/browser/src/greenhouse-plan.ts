@@ -53,7 +53,7 @@ export function planGreenhouseFields(
       throw new Error(`Answer conflicts with packet-backed field: ${answer.semanticKey}`);
     if (answer.status !== "deferred" && answer.answer !== null)
       mapped[answer.semanticKey] = {
-        value: String(answer.answer),
+        value: typeof answer.answer === "boolean" ? answer.answer : String(answer.answer),
         evidence: answer.evidence.map((fact) => fact.factId),
       };
   }
@@ -69,6 +69,13 @@ export function planGreenhouseFields(
   const entries: FieldPlan["entries"] = [];
   const unresolved: string[] = [];
   for (const field of snapshot.fields) {
+    const proposal = packet.content.answers.find(
+      (answer) => answer.semanticKey === field.semanticKey,
+    );
+    if (proposal && proposal.meaning !== field.label) {
+      if (field.required) unresolved.push(field.semanticKey);
+      continue;
+    }
     const candidate = mapped[field.semanticKey];
     if (!candidate || field.kind === "unsupported") {
       if (field.required) unresolved.push(field.semanticKey);

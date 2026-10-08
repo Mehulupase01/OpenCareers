@@ -17,6 +17,7 @@ export class BrowserRepository extends Repository {
     resultInput: DryRunResult,
     options: {
       queueSubmit?: { adapterId: string; target: Record<string, unknown> };
+      expectedRevision?: number;
     } = {},
   ): Promise<BrowserPreparation> {
     if (options.queueSubmit && !/^[a-z][a-z0-9-]{0,79}$/.test(options.queueSubmit.adapterId))
@@ -109,6 +110,14 @@ export class BrowserRepository extends Repository {
       )[0];
       if (!row)
         throw new DomainError("NOT_FOUND", "A valid packet is required for browser preparation.");
+      if (
+        options.expectedRevision !== undefined &&
+        Number(row.revision) !== options.expectedRevision
+      )
+        throw new DomainError(
+          "REVISION_STALE",
+          "Application changed while the browser was preparing.",
+        );
       // Rebuilding a form is not a recovery path for an ambiguous commit. If any
       // attempt for this application may have reached the employer, the outcome
       // must be reconciled first, because rebuilding and then submitting is

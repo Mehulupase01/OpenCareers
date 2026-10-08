@@ -24,7 +24,14 @@ browser-using integration tests had no installed Chromium.
 - Focused storage, public inventory and exception tests: 18 passed, 8 PostgreSQL
   cases skipped before the full suite; no dedicated local test database configured.
 - Production dependency audit at moderate threshold: no known vulnerabilities.
-- Full check, browser run, public scan and new CI: verification pending below.
+- Full local check: lint, typecheck, ledger, build and 236 tests passed; 82
+  PostgreSQL cases skipped because no dedicated local test database is configured.
+- Final additional inventory regression: five public-source cases passed.
+- Browser verification: 42 desktop/mobile tests passed on isolated ports.
+- Public scan: 243 tracked files passed. Four historical P06 synthetic PDF/DOCX
+  goldens are reviewed by exact path and SHA-256; arbitrary documents are refused.
+- Commit 058b79b: GitHub run 37852286732 passed all three lanes, including Windows,
+  Ubuntu and the real PostgreSQL integration contract.
 
 ## Remaining
 

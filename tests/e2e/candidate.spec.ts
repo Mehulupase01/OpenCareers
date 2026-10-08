@@ -104,6 +104,8 @@ test("candidate evidence, reviewed profile and revocable standing authorization"
   );
   await page.getByRole("button", { name: "Approve answer", exact: true }).click();
   expect((await answer).status()).toBe(200);
-  await expect(page.locator(".answer-list article").last()).toContainText("Alex Example");
+  await expect(
+    page.locator(".answer-list article").filter({ hasText: "identity.name.e2e" }).first(),
+  ).toContainText("Alex Example");
   expect(errors).toEqual([]);
 });

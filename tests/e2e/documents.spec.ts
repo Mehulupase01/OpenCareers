@@ -184,6 +184,43 @@ test("immutable document packet review and downloads remain inspectable", async 
   await dryRun.getByLabel("Available from", { exact: true }).fill("2026-11-01");
   await dryRun.getByRole("combobox", { name: "Remote preference" }).selectOption("yes");
   await dryRun.getByLabel("I confirm these details are accurate").check();
+  await page.evaluate(
+    async ({ employerId }) => {
+      const candidateResponse = await fetch("/v1/candidate");
+      const candidate = await candidateResponse.json();
+      const identity = candidate.facts.find(
+        (fact: { id: string; value: { kind: string } }) => fact.value.kind === "identity",
+      );
+      if (!identity) throw new Error("Expected reviewed synthetic identity evidence.");
+      const answers = [
+        { semanticKey: "country", meaning: "Country", answer: "NL" },
+        {
+          semanticKey: "sponsorship_required",
+          meaning: "Will you need sponsorship in the future?",
+          answer: "no",
+        },
+        { semanticKey: "available_from", meaning: "Available from", answer: "2026-11-01" },
+        { semanticKey: "remote_preference", meaning: "Remote preference", answer: "yes" },
+        { semanticKey: "terms", meaning: "I confirm these details are accurate", answer: true },
+      ];
+      for (const answer of answers) {
+        const response = await fetch("/v1/candidate/answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...answer,
+            validFrom: "2026-09-01",
+            validUntil: "2026-10-16",
+            countries: ["NL"],
+            employerIds: [employerId],
+            evidenceFactIds: [identity.id],
+          }),
+        });
+        if (!response.ok) throw new Error("Synthetic answer approval failed.");
+      }
+    },
+    { employerId: guaranteed.job.employerId },
+  );
   await dryRun.getByRole("button", { name: "Run dry run" }).click();
   await expect(dryRun.locator(".browser-result .packet-state")).toHaveText("ready", {
     timeout: 30000,

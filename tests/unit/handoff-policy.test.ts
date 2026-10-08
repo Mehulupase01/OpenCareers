@@ -10,6 +10,7 @@ import {
 const policy: HandoffPolicy = {
   origin: "https://job-boards.greenhouse.io",
   finalActionPaths: ["/forms/submit"],
+  challengeWritePaths: ["/challenge/verify"],
 };
 
 const request = (
@@ -54,6 +55,9 @@ describe("handoff URL policy", () => {
       "javascript:alert(1)",
       "http://careers.evil.example/jobs/1",
       "https://user:pass@job-boards.greenhouse.io/jobs/1",
+      "https://127.0.0.1/jobs/1",
+      "https://[::1]/jobs/1",
+      "https://localhost/jobs/1",
       "not a url",
     ]) {
       expect(() => assertHandoffUrl(url)).toThrow();
@@ -69,7 +73,7 @@ describe("handoff request classification", () => {
     ).toBe("allow");
   });
 
-  it("blocks the final application action and nothing else that writes", () => {
+  it("blocks final and unknown writes while allowing only reviewed challenge writes", () => {
     expect(
       classifyHandoffRequest(policy, request(`${policy.origin}/forms/submit`, "POST", "document")),
     ).toBe("block_final_action");
@@ -77,10 +81,16 @@ describe("handoff request classification", () => {
     expect(
       classifyHandoffRequest(policy, request(`${policy.origin}/challenge/verify`, "POST")),
     ).toBe("allow");
-    // A path that merely starts with the final action path is not that action.
+    // Final-action descendants and newly introduced endpoints fail closed.
     expect(
       classifyHandoffRequest(policy, request(`${policy.origin}/forms/submit/extra`, "POST")),
-    ).toBe("allow");
+    ).toBe("block_final_action");
+    expect(
+      classifyHandoffRequest(policy, request(`${policy.origin}/new-application`, "POST")),
+    ).toBe("block_final_action");
+    expect(classifyHandoffRequest(policy, request(`${policy.origin}/forms/submit`, "GET"))).toBe(
+      "block_final_action",
+    );
   });
 
   it("allows a challenge vendor's cross-origin subresources but never its writes", () => {
@@ -115,6 +125,46 @@ describe("handoff request classification", () => {
 
   it("refuses to classify an unparseable request as anything but offsite", () => {
     expect(classifyHandoffRequest(policy, request("::::"))).toBe("block_offsite");
+  });
+
+  it("blocks private-network and unreviewed cross-origin resources", () => {
+    for (const url of [
+      "http://127.0.0.1:4317/v1/candidate",
+      "http://169.254.169.254/latest/meta-data",
+      "https://collector.evil.example/collect",
+      "https://www.recaptcha.net.evil.example/api.js",
+      "https://user:pass@www.recaptcha.net/api.js",
+      "https://www.google.com/search?q=unreviewed",
+    ])
+      expect(classifyHandoffRequest(policy, request(url, "GET", "script", false))).toBe(
+        "block_offsite",
+      );
+  });
+
+  it("pins main-frame navigation to the inspected page", () => {
+    const pinned = { ...policy, pageUrl: `${policy.origin}/board/jobs/123` };
+    expect(classifyHandoffRequest(pinned, request(`${policy.origin}/other-board/jobs/456`))).toBe(
+      "block_offsite",
+    );
+    expect(classifyHandoffRequest(pinned, request(`${pinned.pageUrl}?challenge=solved`))).toBe(
+      "allow",
+    );
+    expect(
+      classifyHandoffRequest(pinned, request(`${pinned.pageUrl}?challenge=solved`, "POST")),
+    ).toBe("block_final_action");
+  });
+
+  it("blocks Recruitee's actual candidate endpoint even without a blacklist entry", () => {
+    const recruitee = {
+      origin: "https://synthetic.recruitee.com",
+      finalActionPaths: ["/candidates"],
+    };
+    expect(
+      classifyHandoffRequest(
+        recruitee,
+        request(`${recruitee.origin}/api/offers/engineer/candidates`, "POST"),
+      ),
+    ).toBe("block_final_action");
   });
 
   it("pins the loopback fixture with the same rules as a remote portal", () => {

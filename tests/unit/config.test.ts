@@ -12,6 +12,20 @@ describe("configuration fails closed", () => {
       ownerId: "synthetic-owner",
     });
   });
+  it("isolates each synthetic browser run without allowing private or arbitrary data overrides", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const config = loadConfig({ AUTOPILOT_E2E_RUN_ID: id });
+    expect(config.profile).toBe("demo");
+    expect(config.dataDir).toBe(resolve(process.cwd(), ".data/e2e", id));
+    expect(config.externalSubmissionEnabled).toBe(false);
+    expect(() => loadConfig({ AUTOPILOT_E2E_RUN_ID: "../private" })).toThrow();
+    expect(() =>
+      loadConfig({ AUTOPILOT_E2E_RUN_ID: id, AUTOPILOT_DATA_DIR: "D:/private" }),
+    ).toThrow();
+    expect(() => loadConfig({ AUTOPILOT_E2E_RUN_ID: id, AUTOPILOT_PROFILE: "local" })).toThrow(
+      /only supported in demo/,
+    );
+  });
   it("gives a synthetic demo vault key but never a private one", () => {
     const demo = loadConfig({});
     expect(demo.vaultKey).toMatch(/^[A-Za-z0-9+/]+=*$/);

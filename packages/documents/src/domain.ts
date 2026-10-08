@@ -103,6 +103,7 @@ function generateAnswers(input: PacketGenerationInput, facts: CandidateFact[]): 
       .filter(
         (answer) =>
           answer.semanticKey === request.semanticKey &&
+          answer.meaning === request.meaning &&
           answer.validFrom <= input.asOf &&
           answer.validUntil >= input.asOf &&
           (!answer.countries.length || answer.countries.includes(request.country)) &&
@@ -125,28 +126,8 @@ function generateAnswers(input: PacketGenerationInput, facts: CandidateFact[]): 
         approvedAnswerRevision: reusable.revision,
       };
     }
-    const authorization = facts.find(
-      (fact) => fact.value.kind === "work_authorization" && fact.value.country === request.country,
-    );
-    if (
-      /work.?authorization|right.?to.?work|sponsorship/i.test(request.semanticKey) &&
-      authorization
-    ) {
-      const value = authorization.value;
-      if (
-        value.kind === "work_authorization" &&
-        value.approvedWording.trim() &&
-        (!request.maxCharacters || value.approvedWording.trim().length <= request.maxCharacters)
-      )
-        return {
-          ...fields,
-          answer: value.approvedWording.trim(),
-          status: "deterministic" as const,
-          evidence: [ref(authorization)],
-          approvedAnswerId: null,
-          approvedAnswerRevision: null,
-        };
-    }
+    // Legal answers need approval for this exact question. General permit wording
+    // cannot answer both present and future sponsorship questions truthfully.
     const availability = facts.find((fact) => fact.value.kind === "availability");
     if (/availability|start.?date|notice/i.test(request.semanticKey) && availability) {
       const value = availability.value;

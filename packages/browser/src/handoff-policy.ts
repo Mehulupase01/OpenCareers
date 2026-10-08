@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { DomainError } from "../../contracts/src/index.js";
 
 /**
@@ -24,6 +25,7 @@ export interface HandoffCapability {
   readonly challengeSelector: string;
   /** Paths whose non-GET request is the final application action. */
   readonly finalActionPaths: readonly string[];
+  readonly challengeWritePaths?: readonly string[];
 }
 
 const MOCK_CHALLENGE: HandoffCapability = {
@@ -31,6 +33,7 @@ const MOCK_CHALLENGE: HandoffCapability = {
   navigation: "fixture-server",
   challengeSelector: "[data-challenge]:not([hidden])",
   finalActionPaths: ["/applications"],
+  challengeWritePaths: ["/challenge/verify"],
 };
 
 const HOSTED_CHALLENGE: HandoffCapability = {
@@ -39,6 +42,7 @@ const HOSTED_CHALLENGE: HandoffCapability = {
   challengeSelector:
     "[data-challenge]:not([hidden]), .g-recaptcha:not([hidden]), iframe[src*='recaptcha']",
   finalActionPaths: ["/jobs/submit", "/forms/submit", "/submit"],
+  challengeWritePaths: ["/challenge/verify"],
 };
 
 const API_CHALLENGE: HandoffCapability = {
@@ -47,6 +51,7 @@ const API_CHALLENGE: HandoffCapability = {
   challengeSelector:
     "[data-challenge]:not([hidden]), .g-recaptcha:not([hidden]), iframe[src*='recaptcha']",
   finalActionPaths: ["/candidates", "/api/candidates"],
+  challengeWritePaths: ["/challenge/verify"],
 };
 
 const CAPABILITIES = new Map<string, HandoffCapability>(
@@ -73,7 +78,11 @@ export function assertHandoffUrl(raw: string): URL {
     throw new DomainError("FORM_CHANGED", "The prepared handoff URL is not a valid URL.");
   }
   const loopback = url.hostname === "127.0.0.1";
-  if (url.protocol === "https:") {
+  if (
+    url.protocol === "https:" &&
+    !isIP(url.hostname.replace(/^\[|\]$/g, "")) &&
+    !/(^|\.)(localhost|local|internal)$/.test(url.hostname)
+  ) {
     // Any real portal page, resolved to exactly the URL that was inspected.
   } else if (url.protocol === "http:" && loopback) {
     // Plain HTTP is accepted only for the owned loopback test fixture.
@@ -97,13 +106,21 @@ export interface HandoffRequest {
 export interface HandoffPolicy {
   readonly origin: string;
   readonly finalActionPaths: readonly string[];
+  readonly challengeWritePaths?: readonly string[];
+  readonly pageUrl?: string;
 }
+
+const challengeResourceOrigins = new Set([
+  "https://www.google.com",
+  "https://www.gstatic.com",
+  "https://www.recaptcha.net",
+]);
 
 /**
  * A challenge widget legitimately loads scripts, images and iframes from its
- * vendor, so subresources are allowed cross-origin. What is never allowed is a
- * cross-origin write, and a cross-origin top-level navigation, which would mean
- * the session had drifted off the prepared page entirely.
+ * vendor, so reviewed HTTPS widget origins may serve subresources. Unknown
+ * writes are blocked even on the prepared origin; an endpoint blacklist cannot
+ * reliably identify every possible final action.
  */
 export function classifyHandoffRequest(
   policy: HandoffPolicy,
@@ -115,12 +132,35 @@ export function classifyHandoffRequest(
   } catch {
     return "block_offsite";
   }
+  if (
+    destination.username ||
+    destination.password ||
+    !["https:", "http:"].includes(destination.protocol)
+  )
+    return "block_offsite";
   const write = !["GET", "HEAD", "OPTIONS"].includes(request.method().toUpperCase());
   if (destination.origin !== policy.origin) {
     if (write) return "block_offsite";
     if (request.isMainFrame() && request.resourceType() === "document") return "block_offsite";
-    return "allow";
+    return challengeResourceOrigins.has(destination.origin) &&
+      destination.pathname.startsWith("/recaptcha/")
+      ? "allow"
+      : "block_offsite";
   }
-  if (write && policy.finalActionPaths.includes(destination.pathname)) return "block_final_action";
+  if (
+    policy.finalActionPaths.some(
+      (path) => destination.pathname === path || destination.pathname.startsWith(`${path}/`),
+    )
+  )
+    return "block_final_action";
+  if (write && !policy.challengeWritePaths?.includes(destination.pathname))
+    return "block_final_action";
+  if (
+    policy.pageUrl &&
+    request.isMainFrame() &&
+    request.resourceType() === "document" &&
+    destination.pathname !== new URL(policy.pageUrl).pathname
+  )
+    return "block_offsite";
   return "allow";
 }

@@ -10,7 +10,7 @@ export const makeJson =
       // A state-changing request through page.request does not carry the browser's
       // own cookie jar, so the trusted origin is passed explicitly. Without it the
       // API answers 403 and the spec looks broken for no real reason.
-      headers: { origin: testOrigin },
+      headers: { origin: page.url() === "about:blank" ? testOrigin : new URL(page.url()).origin },
       ...(body === undefined
         ? { method: "GET" }
         : { method: "POST", data: body as Record<string, unknown> }),

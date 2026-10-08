@@ -455,3 +455,35 @@ Next: repair exception approval/reconciliation/rebuild and consume durable inspe
 tasks. No real application has been sent and no private database has been reset,
 migrated or republished. Existing closed phases are historical labels, not authority
 to ignore defects; reopen affected gates when recording the corrective work.
+
+## 2026-10-09: Workflow Recovery Checkpoint
+
+Baseline commit 058b79b passed GitHub run 37852286732 on Windows, Ubuntu and
+PostgreSQL. The next repair checkpoint centralizes immutable scoped approval,
+fixes reconciliation/retry/rebuild tasks, consumes durable inspection work,
+renews task leases, prevents stale inspection from overwriting owner readiness,
+and tightens handoff writes/resources/navigation/lease expiry. Read
+`docs/evidence/WORKFLOW-RECOVERY.md` for delivered behavior and remaining limits.
+
+P10 is deliberately reopened: G3/G6/G7 and tickets 03/05 still require solved
+session continuation, complete exact-answer gates and all affected-form resumption.
+The ledger now has nine completed phases and 69/128 completed gates; this is a
+correction of overstated previous closure, not removed product scope. P08 still
+requires a real receipt, and P11-P18 remain open. No real employer action occurred.
+
+Full local check passed: 253 tests, 89 PostgreSQL skips, 38 files, build/typecheck/
+lint/ledger. Test storage is independent per run and desktop/mobile viewport;
+ports are 14317/14318 and 14319/14320. Previous shared-state failures exposed a
+stale-result race plus valid duplicate-history refusal; neither guard was weakened.
+Synthetic owner answers are approved explicitly before the browser final-click test.
+Private services and ordinary demo data stay untouched by the new harness.
+Final isolated browser run passed all 42 cases in 2.2 minutes. This checkpoint's
+post-push CI remains pending until its actual run completes.
+
+Next: finish actionable parked exceptions and affected-application resumption;
+encrypt session/document storage and implement restore blocking; then explicitly
+implement the owner-approved reviewed-provider privacy revision for LLM letters.
+Mailbox provider and OpenRouter key rotation were requested in chat without pausing
+unrelated work. Do not use a key previously pasted in chat for live inference.
+The old P11 plan's migration numbers and line references are historical; append
+to the actual current schema rather than adopting its obsolete v10 assumption.

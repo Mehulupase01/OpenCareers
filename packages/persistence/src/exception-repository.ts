@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { ApprovedAnswer } from "../../contracts/src/candidate.js";
 import {
   type ExceptionAction,
   type ExceptionBlocker,
@@ -16,6 +15,7 @@ import {
   type JobInput,
   jobInputSchema,
 } from "../../contracts/src/index.js";
+import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { HandoffRepository } from "./handoff-repository.js";
 import { Repository } from "./repository.js";
@@ -115,6 +115,8 @@ export class ExceptionRepository extends Repository {
       const row = await this.reload(tx, id);
       if (row.status === "resolved")
         throw new DomainError("STATE_INVALID", "This exception is already resolved.");
+      if (!ACTIONS[exceptionBlockerSchema.parse(row.blocker)].includes(input.action))
+        throw new DomainError("STATE_INVALID", "The exception blocker changed.");
       const applicationId = String(row.application_id ?? "");
       if (!applicationId)
         throw new DomainError("STATE_INVALID", "This exception is not attached to an application.");
@@ -128,14 +130,20 @@ export class ExceptionRepository extends Repository {
         );
 
       const requeued =
-        input.action === "retry" || input.action === "resolve_answer"
-          ? await this.requeue(tx, applicationId)
-          : 0;
+        input.action === "reconcile"
+          ? await this.queueReconciliation(tx, applicationId)
+          : input.action === "retry" || input.action === "resolve_answer"
+            ? await this.requeue(tx, applicationId)
+            : 0;
 
       await tx.query(
         "UPDATE exceptions SET status=$1,resolved_action=$2,note=$3,updated_at=$4 WHERE owner_id=$5 AND id=$6",
         [
-          input.action === "defer" ? "deferred" : "resolved",
+          input.action === "defer"
+            ? "deferred"
+            : input.action === "reconcile"
+              ? "open"
+              : "resolved",
           input.action,
           input.note ?? null,
           this.now(),
@@ -154,6 +162,40 @@ export class ExceptionRepository extends Repository {
         handoff: null,
       };
     });
+  }
+
+  private async queueReconciliation(tx: SqlExecutor, applicationId: string): Promise<number> {
+    const attempt = (
+      await tx.query(
+        "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND state='UNKNOWN' ORDER BY started_at DESC,id DESC LIMIT 1",
+        [this.ownerId, applicationId],
+      )
+    )[0];
+    const source = (
+      await tx.query(
+        "SELECT t.id,t.domain,t.payload FROM tasks t JOIN attempts a ON a.owner_id=t.owner_id AND a.application_id=t.application_id AND a.fence=t.fence WHERE t.owner_id=$1 AND t.application_id=$2 AND t.type='submit' AND a.state='UNKNOWN' ORDER BY a.started_at DESC,a.id DESC LIMIT 1",
+        [this.ownerId, applicationId],
+      )
+    )[0];
+    if (!attempt || !source)
+      throw new DomainError(
+        "STATE_INVALID",
+        "Reconciliation needs an unknown attempt and its original target.",
+      );
+    const active = await tx.query(
+      "SELECT id FROM tasks WHERE owner_id=$1 AND application_id=$2 AND type='reconcile' AND state IN ('ready','retry_wait','leased')",
+      [this.ownerId, applicationId],
+    );
+    if (active.length) return 0;
+    await this.enqueueIn(tx, {
+      type: "reconcile",
+      domain: String(source.domain),
+      applicationId,
+      dedupeKey: `owner-reconcile:${attempt.id}:${randomUUID()}`,
+      payload: JSON.parse(String(source.payload)),
+      priority: 100,
+    });
+    return 1;
   }
 
   /**
@@ -263,7 +305,6 @@ export class ExceptionRepository extends Repository {
   }
 
   /**
-  /**
    * Approval is written inside the caller's transaction, so it cannot deadlock
    * against a nested transaction and it cannot leave a half-approved answer if the
    * surrounding decision is rolled back.
@@ -292,80 +333,21 @@ export class ExceptionRepository extends Repository {
         "ANSWER_UNKNOWN",
         "The resolved meaning must be the exact question that was asked.",
       );
-    const candidateId = String(
-      (await tx.query("SELECT id FROM candidates WHERE owner_id=$1 LIMIT 1", [this.ownerId]))[0]
-        ?.id ?? "",
-    );
-    if (!candidateId) throw new DomainError("PROFILE_STALE", "No candidate profile is configured.");
-
-    const factIds = input.factIds ?? [];
     const today = this.now().slice(0, 10);
-    const evidence: Record<string, number> = {};
-    for (const factId of factIds) {
-      const head = (
-        await tx.query("SELECT revision FROM fact_heads WHERE owner_id=$1 AND id=$2", [
-          this.ownerId,
-          factId,
-        ])
-      )[0];
-      if (!head)
-        throw new DomainError("CLAIM_UNSUPPORTED", `Fact ${factId} is not part of this profile.`);
-      evidence[factId] = Number(head.revision);
-    }
-
-    const existing = (
-      await tx.query(
-        "SELECT id,revision FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2 ORDER BY revision DESC LIMIT 1",
-        [this.ownerId, String(block.semantic_key)],
-      )
-    )[0];
-    const answerId = existing ? String(existing.id) : randomUUID();
-    const revision = Number(existing?.revision ?? 0) + 1;
+    if (input.answer === undefined)
+      throw new DomainError("ANSWER_UNKNOWN", "Resolving a question requires the owner's answer.");
+    const job = await this.job(tx, String(block.application_id));
     const country = String(block.country ?? "");
-    const data = {
+    await new CandidateRepository(this.db, this.ownerId, this.clock).saveAnswerIn(tx, {
       semanticKey: String(block.semantic_key),
       meaning,
       answer: input.answer,
       validFrom: today,
-      validUntil: "2099-12-31",
-      employerIds: [],
+      validUntil: new Date(this.clock().getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
+      employerIds: [job.employerId],
       countries: country ? [country] : [],
-      evidenceFactIds: factIds,
-      evidenceRevisions: evidence,
-    };
-    if (existing)
-      await tx.query(
-        "UPDATE approved_answers SET revision=$1,data=$2,approved_at=$3 WHERE owner_id=$4 AND id=$5",
-        [revision, JSON.stringify(data), this.now(), this.ownerId, answerId],
-      );
-    else
-      await tx.query(
-        "INSERT INTO approved_answers(owner_id,id,candidate_id,semantic_key,revision,data,approved_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
-        [
-          this.ownerId,
-          answerId,
-          candidateId,
-          String(block.semantic_key),
-          revision,
-          JSON.stringify(data),
-          this.now(),
-        ],
-      );
-
-    await tx.query(
-      "UPDATE question_blocks SET resolved_answer_id=$1,meaning=$2 WHERE owner_id=$3 AND exception_id=$4",
-      [answerId, meaning, this.ownerId, exceptionId],
-    );
-    // Every semantically equivalent open question resolves with it, and only ones
-    // whose exact key, meaning and country match.
-    await tx.query(
-      "UPDATE question_blocks SET resolved_answer_id=$1 WHERE owner_id=$2 AND semantic_key=$3 AND meaning=$4 AND country=$5 AND resolved_answer_id IS NULL",
-      [answerId, this.ownerId, String(block.semantic_key), meaning, country],
-    );
-    await tx.query(
-      "UPDATE exceptions SET status='resolved',resolved_action='resolve_answer',updated_at=$1 WHERE owner_id=$2 AND id=$3 AND status<>'resolved'",
-      [this.now(), this.ownerId, exceptionId],
-    );
+      evidenceFactIds: input.factIds ?? [],
+    });
   }
   /**
    * Rebuilds a form from the saved packet and the active policy.
@@ -408,20 +390,29 @@ export class ExceptionRepository extends Repository {
         [this.now(), this.ownerId, applicationId],
       );
       await tx.query(
-        "UPDATE handoff_sessions SET state='cancelled' WHERE owner_id=$1 AND application_id=$2 AND state IN ('open','claimed','rebuilding')",
-        [this.ownerId, applicationId],
+        "UPDATE handoff_sessions SET state='cancelled',generation=generation+1,lease_owner=NULL,lease_until=NULL,completed_at=$1 WHERE owner_id=$2 AND application_id=$3 AND state IN ('open','claimed','rebuilding')",
+        [this.now(), this.ownerId, applicationId],
       );
+      const packet = (
+        await tx.query(
+          "SELECT p.id FROM packets p LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.application_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 1",
+          [this.ownerId, applicationId],
+        )
+      )[0];
+      if (!packet)
+        throw new DomainError("PROFILE_STALE", "Rebuilding requires a valid saved packet.");
       await tx.query(
-        "UPDATE applications SET state='INSPECTING',updated_at=$1 WHERE owner_id=$2 AND id=$3",
+        "UPDATE applications SET state='INSPECTING',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3",
         [this.now(), this.ownerId, applicationId],
       );
       await this.enqueueIn(tx, {
-        type: "prepare",
-        domain: "preparation",
+        type: "inspect",
+        domain: "browser",
         applicationId,
-        dedupeKey: `prepare:${applicationId}`,
+        dedupeKey: `inspect:${applicationId}:rebuild:${Number(row.revision) + 1}`,
+        payload: { schemaVersion: 1, packetId: String(packet.id) },
       });
-      await this.audit(tx, applicationId, "form.rebuilt", Number(row.revision));
+      await this.audit(tx, applicationId, "form.rebuild_queued", Number(row.revision) + 1);
       return { requeued: 1, reconciliationRequired: false };
     });
   }
@@ -437,15 +428,32 @@ export class ExceptionRepository extends Repository {
       )[0]?.state ?? "",
     );
     if (!RESUMABLE.includes(state)) return 0;
+    const ambiguous = await tx.query(
+      "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+      [this.ownerId, applicationId],
+    );
+    if (ambiguous.length)
+      throw new DomainError(
+        "DUPLICATE_SUSPECTED",
+        "A prior final action must be reconciled before retrying preparation.",
+      );
+    const assessment = (
+      await tx.query(
+        "SELECT m.id FROM match_assessments m JOIN candidates c ON c.owner_id=m.owner_id AND c.active_profile_id=m.profile_id WHERE m.owner_id=$1 AND m.application_id=$2 ORDER BY m.created_at DESC,m.revision DESC LIMIT 1",
+        [this.ownerId, applicationId],
+      )
+    )[0];
+    if (!assessment) return 0;
     await tx.query(
-      "UPDATE applications SET state='PREPARING',updated_at=$1 WHERE owner_id=$2 AND id=$3",
+      "UPDATE applications SET state='PREPARING',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3",
       [this.now(), this.ownerId, applicationId],
     );
     await this.enqueueIn(tx, {
       type: "prepare",
-      domain: "preparation",
+      domain: "documents",
       applicationId,
-      dedupeKey: `prepare:${applicationId}`,
+      dedupeKey: `prepare:${applicationId}:owner:${randomUUID()}`,
+      payload: { schemaVersion: 1, assessmentId: String(assessment.id), refreshAnswers: true },
     });
     return 1;
   }
@@ -542,7 +550,7 @@ export class ExceptionRepository extends Repository {
             resolvedAnswerId: block.resolved_answer_id ? String(block.resolved_answer_id) : null,
           }
         : null,
-      suggestedAnswer: await this.suggestion(tx, block),
+      suggestedAnswer: await this.suggestion(tx, block, applicationId),
       actions: ACTIONS[blocker],
       state:
         row.status === "deferred" ? "deferred" : row.status === "resolved" ? "resolved" : "open",
@@ -555,28 +563,22 @@ export class ExceptionRepository extends Repository {
    * A suggestion is offered only when an approved answer already exists for this
    * exact meaning, employer, country and date. It is never generated here.
    */
-  private async suggestion(tx: SqlExecutor, block: Row | undefined) {
+  private async suggestion(tx: SqlExecutor, block: Row | undefined, applicationId: string) {
     if (!block || block.resolved_answer_id) return null;
-    const row = (
-      await tx.query(
-        "SELECT id,revision,data,approved_at FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2 ORDER BY revision DESC",
-        [this.ownerId, String(block.semantic_key)],
-      )
-    ).find((candidate) => {
-      const answer = JSON.parse(String(candidate.data)) as ApprovedAnswer;
-      return answer.meaning === String(block.meaning);
-    });
-    if (!row) return null;
-    const answer = JSON.parse(String(row.data)) as ApprovedAnswer;
-    const country = String(block.country ?? "");
-    if (answer.countries.length && (!country || !answer.countries.includes(country))) return null;
-    const today = this.now().slice(0, 10);
-    if (answer.validFrom > today || answer.validUntil < today) return null;
+    const job = await this.job(tx, applicationId);
+    const answer = await new CandidateRepository(this.db, this.ownerId, this.clock).matchingAnswer(
+      tx,
+      String(block.semantic_key),
+      String(block.meaning),
+      job.employerId,
+      String(block.country ?? ""),
+    );
+    if (!answer) return null;
     return {
       semanticKey: answer.semanticKey,
-      answerId: String(row.id),
+      answerId: answer.id,
       answer: answer.answer,
-      approvedAt: String(row.approved_at),
+      approvedAt: answer.approvedAt,
     };
   }
 

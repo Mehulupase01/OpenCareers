@@ -13,6 +13,7 @@ interface ActiveHandoff {
   generation: number;
   challengeSelector: string;
   expiryTimer: ReturnType<typeof setTimeout>;
+  deadline: number;
 }
 
 export interface HandoffBrokerPort {
@@ -35,6 +36,12 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
   async open(session: HandoffSession, result: DryRunResult, leaseOwner: string): Promise<void> {
     if (this.active.has(session.id))
       throw new DomainError("STATE_INVALID", "Handoff browser is already open.");
+    const deadline = Math.min(
+      Date.parse(session.expiresAt),
+      Date.parse(session.leaseUntil ?? session.expiresAt),
+    );
+    if (!Number.isFinite(deadline) || deadline <= Date.now())
+      throw new DomainError("LEASE_STALE", "Handoff browser lease has expired.");
     const capability = handoffCapability(session.adapterId);
     if (
       !capability ||
@@ -57,22 +64,30 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
       browser = mock
         ? await launchDryRunBrowser(mock.url, visible)
         : await launchHandoffBrowser(
-            { origin: url.origin, finalActionPaths: capability.finalActionPaths },
+            {
+              origin: url.origin,
+              pageUrl: url.toString(),
+              finalActionPaths: capability.finalActionPaths,
+              challengeWritePaths: capability.challengeWritePaths ?? [],
+            },
             visible,
           );
       await browser.page.goto(url.toString());
       if ((await browser.page.locator(capability.challengeSelector).count()) !== 1)
         throw new DomainError("FORM_CHANGED", "The verification challenge is no longer present.");
       await this.options.onOpened?.(browser.page);
+      if (deadline <= Date.now())
+        throw new DomainError("LEASE_STALE", "Handoff lease expired while opening the browser.");
       this.active.set(session.id, {
         browser,
         mock,
         leaseOwner,
         generation: session.generation,
         challengeSelector: capability.challengeSelector,
+        deadline,
         expiryTimer: setTimeout(
           () => void this.close(session.id),
-          Math.max(0, Date.parse(session.expiresAt) - Date.now()),
+          Math.max(0, deadline - Date.now()),
         ),
       });
     } catch (error) {
@@ -86,6 +101,10 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
     const active = this.active.get(id);
     if (!active || active.generation !== generation)
       throw new DomainError("LEASE_STALE", "Handoff browser generation is stale.");
+    if (active.deadline <= Date.now()) {
+      await this.close(id);
+      throw new DomainError("LEASE_STALE", "Handoff browser lease has expired.");
+    }
     if (active.browser.blockedCommitCount > 0)
       throw new DomainError(
         "STATE_INVALID",

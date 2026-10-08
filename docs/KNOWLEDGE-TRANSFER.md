@@ -4,6 +4,8 @@
 Historical snapshot. For the 2026-10-09 resumption, read
 `docs/plans/PRODUCTION-COMPLETION.md` and `docs/evidence/BASELINE-RECOVERY.md`
 first. They correct CI, private-document inventory and browser-test port claims.
+Then read `docs/evidence/WORKFLOW-RECOVERY.md`: P10 is reopened, the worker now
+consumes inspection tasks, and each browser run uses fresh synthetic test storage.
 Target reader: an autonomous coding agent taking over the remaining work. This
 document is written to be acted on without re-deriving anything.
 

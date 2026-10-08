@@ -7,8 +7,8 @@ under a standing owner policy. There are no live-verified adapters yet.
 
 ## Current State
 
-The ledger records P00-P07, P09 and P10 complete, with P08 awaiting a genuine
-receipt and P11-P18 open. Existing behavior includes reviewed candidate evidence,
+The ledger records P00-P07 and P09 complete, with P08 awaiting a genuine
+receipt, P10 reopened for remaining recovery gates, and P11-P18 open. Existing behavior includes reviewed candidate evidence,
 standing authorization, durable SQLite/PostgreSQL work, three public ATS discovery
 families, evidence-bound matching and documents, guarded submission adapters,
 accounts, challenge handoffs and an exception inbox. Mock submissions are verified;
@@ -37,15 +37,20 @@ Commands: `dev`, `build`, `lint`, `typecheck`, `test:unit`, `test:integration`,
 `test:e2e`, `doctor`, `demo:reset`. Commands still under development must not be
 reported as verified; see the handoff for actual results.
 
-Browser tests use separate loopback ports 14317/14318 and never reuse an existing
-server. Override them with `AUTOPILOT_E2E_API_PORT` and `AUTOPILOT_E2E_WEB_PORT`
-if occupied. Your private service on 4317/4318 can remain running. Tests force the
+Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
+for mobile, and never reuse an existing server. Override them with
+`AUTOPILOT_E2E_API_PORT`, `AUTOPILOT_E2E_WEB_PORT`, `AUTOPILOT_E2E_MOBILE_API_PORT`
+and `AUTOPILOT_E2E_MOBILE_WEB_PORT` if occupied. Your private service on 4317/4318
+can remain running. Tests force the
 synthetic demo profile and refuse any server reporting a private profile.
+Each run and viewport project gets a fresh guarded `.data/e2e/<run-id>` database; your normal demo
+workspace is neither reset nor reused. These synthetic test files stay ignored.
 
 ## Validation
 
 Verification counts and exact commands are recorded in
-[baseline recovery](docs/evidence/BASELINE-RECOVERY.md), with PostgreSQL skips and
+[baseline recovery](docs/evidence/BASELINE-RECOVERY.md) and
+[workflow recovery](docs/evidence/WORKFLOW-RECOVERY.md), with PostgreSQL skips and
 local versus CI results distinguished. Earlier phase evidence remains historical;
 passing synthetic tests does not establish live employer support.
 

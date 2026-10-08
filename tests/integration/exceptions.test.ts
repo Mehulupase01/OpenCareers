@@ -46,6 +46,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       let applicationId: string;
       let jobId: string;
       let factId: string;
+      let assessmentId: string;
       let now: number;
 
       beforeEach(async () => {
@@ -81,6 +82,19 @@ for (const engine of ["sqlite", "postgres"] as const) {
           description: "Synthetic vacancy for the exception inbox.",
         });
         applicationId = (await repo.createApplication(jobId, snapshot.candidateId)).id;
+        assessmentId = randomUUID();
+        await db.query(
+          "INSERT INTO match_assessments(owner_id,id,job_id,profile_id,application_id,revision,data,sha256,created_at) VALUES($1,$2,$3,$4,$5,1,'{}',$6,$7)",
+          [
+            owner,
+            assessmentId,
+            jobId,
+            profile.id,
+            applicationId,
+            "a".repeat(64),
+            new Date(now).toISOString(),
+          ],
+        );
         await db.query("UPDATE applications SET state='NEEDS_INPUT' WHERE owner_id=$1 AND id=$2", [
           owner,
           applicationId,
@@ -135,6 +149,11 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const apps = await db.query("SELECT id,state FROM applications WHERE owner_id=$1", [owner]);
         expect(apps).toHaveLength(1);
         expect(String(apps[0]?.state)).toBe("PREPARING");
+        const task = (await db.query("SELECT payload FROM tasks WHERE owner_id=$1", [owner]))[0];
+        expect(JSON.parse(String(task?.payload))).toMatchObject({
+          assessmentId,
+          refreshAnswers: true,
+        });
         expect(
           await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR"),
         ).not.toBeNull();
@@ -158,7 +177,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             answer: 65000,
             factIds: ["nope"],
           }),
-        ).rejects.toThrow(/not part of this profile/i);
+        ).rejects.toMatchObject({ code: "CLAIM_UNSUPPORTED" });
         await expect(
           exceptions.resolve(item.id, { action: "open_session", note: "nope" }),
         ).rejects.toMatchObject({ code: "STATE_INVALID" });
@@ -180,6 +199,117 @@ for (const engine of ["sqlite", "postgres"] as const) {
         // A differently worded question gets no suggestion even though an answer
         // exists under the same key.
         expect(item?.suggestedAnswer).toBeNull();
+      });
+
+      it("refuses expired supporting facts without partially approving or requeueing", async () => {
+        const expired = await repo.saveFact({
+          ...identity,
+          key: "expired-evidence",
+          expiresOn: "2026-09-01",
+        });
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        const item = await salaryItem(exceptions);
+        await expect(
+          exceptions.resolve(item.id, {
+            action: "resolve_answer",
+            answer: 65000,
+            factIds: [expired.id],
+          }),
+        ).rejects.toMatchObject({ code: "CLAIM_UNSUPPORTED" });
+        expect((await exceptions.get(item.id)).state).toBe("open");
+        expect(
+          await db.query("SELECT id FROM approved_answers WHERE owner_id=$1", [owner]),
+        ).toHaveLength(0);
+        expect(await db.query("SELECT id FROM tasks WHERE owner_id=$1", [owner])).toHaveLength(0);
+      });
+
+      it("keeps approval revisions immutable and restricts exception answers to this employer", async () => {
+        const original = await repo.saveAnswer({
+          semanticKey: "salary.numeric",
+          meaning: "Net monthly salary in EUR",
+          answer: 4500,
+          validFrom: "2026-09-01",
+          validUntil: "2026-10-01",
+          employerIds: [],
+          countries: ["NL"],
+          evidenceFactIds: [factId],
+        });
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        const item = await salaryItem(exceptions);
+        await exceptions.resolve(item.id, {
+          action: "resolve_answer",
+          answer: 65000,
+          factIds: [factId],
+        });
+        const rows = await db.query(
+          "SELECT id,revision,data FROM approved_answers WHERE owner_id=$1 ORDER BY revision",
+          [owner],
+        );
+        expect(rows).toHaveLength(2);
+        expect(rows[0]?.id).toBe(original.id);
+        expect(rows[0]?.revision).toBe(1);
+        expect(JSON.parse(String(rows[0]?.data)).answer).toBe(4500);
+        expect(JSON.parse(String(rows[1]?.data))).toMatchObject({
+          employerIds: ["synthetic-employer"],
+          validUntil: "2026-10-28",
+        });
+        const otherJob = {
+          id: "other-employer-job",
+          employerId: "other-employer",
+          requisitionId: "other-req",
+          title: "Engineer",
+          company: "Another Synthetic Employer",
+          location: "Amsterdam",
+          countryCode: "NL",
+          url: "https://synthetic.example/other",
+          source: "fixture",
+          synthetic: true,
+          description: "Synthetic vacancy",
+        };
+        await repo.putJob(otherJob);
+        const otherApp = await repo.createApplication(
+          otherJob.id,
+          (await repo.snapshot()).candidateId,
+        );
+        expect(
+          await repo.resolveQuestion(otherApp.id, "salary.numeric", "Gross annual salary in EUR"),
+        ).toBeNull();
+        const otherItem = (await exceptions.inbox()).find(
+          (entry) => entry.applicationId === otherApp.id,
+        );
+        expect(otherItem?.suggestedAnswer).toBeNull();
+      });
+
+      it("excludes country-restricted answers when the vacancy country is unknown", async () => {
+        await repo.saveAnswer({
+          semanticKey: "salary.numeric",
+          meaning: "Gross annual salary in EUR",
+          answer: 65000,
+          validFrom: "2026-09-01",
+          validUntil: "2026-10-01",
+          employerIds: [],
+          countries: ["NL"],
+          evidenceFactIds: [factId],
+        });
+        expect(
+          await repo.scopedAnswers({ employerId: "synthetic-employer", asOf: "2026-09-28" }),
+        ).toEqual([]);
+      });
+
+      it("leaves a missing-assessment answer visible for recovery without queueing an invalid task", async () => {
+        await db.query("DELETE FROM match_assessments WHERE owner_id=$1", [owner]);
+        await repo.resolveQuestion(applicationId, "salary.numeric", "Gross annual salary in EUR");
+        const item = await salaryItem(exceptions);
+        const result = await exceptions.resolve(item.id, {
+          action: "resolve_answer",
+          answer: 65000,
+          factIds: [factId],
+        });
+        expect(result.requeued).toBe(0);
+        expect(await db.query("SELECT id FROM tasks WHERE owner_id=$1", [owner])).toHaveLength(0);
+        expect(
+          (await exceptions.inbox()).some((entry) => entry.applicationId === applicationId),
+        ).toBe(true);
       });
 
       it("skips and defers without inventing progress", async () => {

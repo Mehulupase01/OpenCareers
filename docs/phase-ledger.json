@@ -1046,7 +1046,7 @@
     {
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
-      "status": "complete",
+      "status": "in_progress",
       "dependsOn": ["P09"],
       "tickets": [
         {
@@ -1078,7 +1078,7 @@
         {
           "id": "P10-03",
           "text": "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route, and expire stale handles, without implementing CAPTCHA bypass.",
-          "status": "complete",
+          "status": "in_progress",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1087,7 +1087,7 @@
             "tests/e2e/handoff-broker.spec.ts",
             "tests/e2e/handoff-external.spec.ts"
           ],
-          "nextAction": null
+          "nextAction": "Preserve solved session state and prove adapter-specific live challenge continuation. See docs/evidence/WORKFLOW-RECOVERY.md."
         },
         {
           "id": "P10-04",
@@ -1104,7 +1104,7 @@
         {
           "id": "P10-05",
           "text": "Propagation and resumption. An approved answer resolves semantically equivalent pending questions within its scope, and the entire affected form is revalidated before commitment.",
-          "status": "complete",
+          "status": "in_progress",
           "acceptanceTests": ["T21", "T22", "T32"],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1112,7 +1112,7 @@
             "tests/integration/documents.test.ts",
             "tests/integration/handoff.test.ts"
           ],
-          "nextAction": null
+          "nextAction": "Resume all affected applications and validate exact answer meanings across every supported adapter."
         }
       ],
       "gates": [
@@ -1141,7 +1141,7 @@
         {
           "id": "P10-G3",
           "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
-          "status": "complete",
+          "status": "in_progress",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/handoff.test.ts",
@@ -1175,7 +1175,7 @@
         {
           "id": "P10-G6",
           "requirement": "Resolving one answer does not incorrectly propagate to differently worded legal or sponsorship questions.",
-          "status": "complete",
+          "status": "in_progress",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/candidate.test.ts",
@@ -1185,7 +1185,7 @@
         {
           "id": "P10-G7",
           "requirement": "A resumed expired form is rebuilt safely, while an ambiguous prior commit is reconciled first.",
-          "status": "complete",
+          "status": "in_progress",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/rebuild.test.ts",
@@ -1213,8 +1213,9 @@
         }
       ],
       "acceptanceTests": ["T21", "T22", "T32"],
-      "nextAction": null,
+      "nextAction": "Complete solved-session continuation, all-adapter exact answer gates and affected-application resumption; verify with synthetic CI before reclosing P10.",
       "evidence": [
+        "docs/evidence/WORKFLOW-RECOVERY.md",
         "docs/evidence/P10-closeout-checkpoint.md",
         "docs/evidence/P10-security-checkpoints.md"
       ]

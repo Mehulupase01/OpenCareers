@@ -18,6 +18,46 @@ const json = <T>(row: Row, key = "data") => JSON.parse(String(row[key])) as T;
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export class DocumentRepository extends Repository {
+  async get(packetId: string): Promise<PacketSnapshot> {
+    const row = (
+      await this.db.query(
+        "SELECT p.manifest,c.content,v.reason FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.id=$2",
+        [this.ownerId, packetId],
+      )
+    )[0];
+    if (!row) throw new DomainError("NOT_FOUND", "Packet was not found.");
+    return {
+      manifest: packetManifestSchema.parse(json(row, "manifest")),
+      content: packetContentSchema.parse(json(row, "content")),
+      valid: !row.reason,
+      invalidReason: (row.reason as string | null) ?? null,
+    };
+  }
+
+  async validPacket(assessmentId: string, requireLlm = false): Promise<PacketSnapshot | null> {
+    const rows = await this.db.query(
+      "SELECT p.id,p.manifest FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC",
+      [this.ownerId, assessmentId],
+    );
+    const row = rows.find(
+      (item) =>
+        !requireLlm ||
+        packetManifestSchema.parse(json(item, "manifest")).letterGeneration?.method === "llm",
+    );
+    return row ? this.get(String(row.id)) : null;
+  }
+
+  async queueInspection(packet: PacketSnapshot): Promise<void> {
+    if (!packet.valid || packet.manifest.validation.status !== "valid") return;
+    await this.enqueue({
+      type: "inspect",
+      domain: "browser",
+      applicationId: packet.manifest.applicationId,
+      dedupeKey: `inspect:packet:${packet.manifest.id}`,
+      payload: { schemaVersion: 1, packetId: packet.manifest.id },
+      priority: 30,
+    });
+  }
   async hasValidPacket(assessmentId: string, requireLlm = false): Promise<boolean> {
     const rows = await this.db.query(
       "SELECT p.manifest FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 100",

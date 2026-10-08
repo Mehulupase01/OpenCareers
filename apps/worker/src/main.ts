@@ -23,6 +23,7 @@ import { DocumentRepository } from "../../../packages/persistence/src/document-r
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import { SubmissionRepository } from "../../../packages/persistence/src/submission-repository.js";
+import { runInspectionTask } from "./inspection.js";
 
 const logger = createLogger();
 const controller = new AbortController();
@@ -65,23 +66,33 @@ try {
             "ready");
       const taskTypes: TaskType[] =
         config.profile === "demo"
-          ? ["demo_probe", "prepare", "submit", "reconcile"]
+          ? ["demo_probe", "prepare", "inspect", "submit", "reconcile"]
           : config.externalSubmissionEnabled
             ? canPrepare
-              ? ["prepare", "submit", "reconcile"]
-              : ["submit", "reconcile"]
+              ? ["prepare", "inspect", "submit", "reconcile"]
+              : ["inspect", "submit", "reconcile"]
             : canPrepare
               ? ["prepare"]
               : [];
       const task = await repository.claim(workerId, taskTypes);
       if (task) {
+        let renewPending: Promise<void> = Promise.resolve();
+        const renewTimer = setInterval(() => {
+          renewPending = renewPending
+            .then(() => repository.renew(task))
+            .catch((error: unknown) => {
+              logger.warn({ taskId: task.id, err: error }, "Task lease renewal failed");
+            });
+        }, 10_000);
         try {
           if (task.type === "prepare") {
             if (!task.applicationId || typeof task.payload.assessmentId !== "string")
               throw new DomainError("CONFIG_INVALID", "Prepare task payload is incomplete.");
-            if (
-              await documents.hasValidPacket(task.payload.assessmentId, config.profile !== "demo")
-            ) {
+            const retained = task.payload.refreshAnswers
+              ? null
+              : await documents.validPacket(task.payload.assessmentId, config.profile !== "demo");
+            if (retained) {
+              await documents.queueInspection(retained);
               logger.info(
                 { taskId: task.id, applicationId: task.applicationId },
                 "Existing valid packet retained",
@@ -104,7 +115,19 @@ try {
             const input = await documents.generationInput(
               task.applicationId,
               task.payload.assessmentId,
-              [],
+              (
+                await repository.db.query(
+                  "SELECT semantic_key,meaning,country FROM question_blocks WHERE owner_id=$1 AND application_id=$2",
+                  [repository.ownerId, task.applicationId],
+                )
+              )
+                .map((row) => ({
+                  semanticKey: String(row.semantic_key),
+                  meaning: String(row.meaning),
+                  country: String(row.country),
+                  maxCharacters: null,
+                }))
+                .filter((question) => /^[A-Z]{2}$/.test(question.country)),
               new Date().toISOString().slice(0, 10),
             );
             const letterDraft =
@@ -113,11 +136,24 @@ try {
                 : await letterDraftRunner?.draft(input, generatePacketContent(input));
             if (config.profile !== "demo" && !letterDraft)
               throw new DomainError("MODEL_ROUTE_INELIGIBLE", "LLM letter route is unavailable.");
-            await documents.savePacket(await buildPacket(artifacts, input, letterDraft), {
-              preserveValidAssessment: true,
-            });
+            const packet = await documents.savePacket(
+              await buildPacket(artifacts, input, letterDraft),
+              {
+                preserveValidAssessment: !task.payload.refreshAnswers,
+              },
+            );
+            await documents.queueInspection(packet);
             logger.info({ taskId: task.id, applicationId: task.applicationId }, "Packet prepared");
           }
+          if (task.type === "inspect")
+            await runInspectionTask(task, {
+              config,
+              repository,
+              documents,
+              browser,
+              artifacts,
+              adapters,
+            });
           if (task.type === "submit") {
             const packetId = task.payload.packetId;
             const preparationId = task.payload.preparationId;
@@ -127,9 +163,7 @@ try {
               typeof preparationId !== "string"
             )
               throw new DomainError("CONFIG_INVALID", "Submit task payload is incomplete.");
-            const packet = (await documents.snapshot()).find(
-              (item) => item.manifest.id === packetId,
-            );
+            const packet = await documents.get(packetId);
             const preparation = (await browser.snapshot()).find(
               (item) => item.id === preparationId,
             );
@@ -204,10 +238,9 @@ try {
                 [repository.ownerId, task.applicationId],
               )
             )[0];
-            const packet = (await documents.snapshot()).find(
-              (item) => item.manifest.id === row?.packet_id,
-            );
-            if (!packet) throw new DomainError("NOT_FOUND", "Reconciliation packet is missing.");
+            if (!row?.packet_id)
+              throw new DomainError("NOT_FOUND", "Reconciliation packet is missing.");
+            const packet = await documents.get(String(row.packet_id));
             const adapter = adapters.get(task.domain);
             let target: unknown;
             try {
@@ -232,6 +265,9 @@ try {
               : new DomainError("STORAGE_UNAVAILABLE", "Packet preparation failed.", true);
           await repository.fail(task, domain);
           logger.warn({ err: error, taskId: task.id }, "Worker task failed");
+        } finally {
+          clearInterval(renewTimer);
+          await renewPending;
         }
       }
       await runDiscovery(discovery, config.profile);
