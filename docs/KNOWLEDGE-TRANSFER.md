@@ -183,13 +183,20 @@ no per-package manifests. Cross-package imports are relative with `.js`
 extensions: `../../packages/contracts/src/index.js`.
 
 ```
-apps/api      Fastify server, route modules: account, browser, candidate,
-              discovery, documents, exception, handoff, matching, server
-apps/web      React + Vite dashboard. main.tsx shell; workspaces: candidate,
-              discovery, matching, documents, exceptions, accounts,
-              browser-preparation
-apps/worker   durable scheduler: discovery, matching, packets, letters,
-              browser adapters, submission, reconciliation
+apps/api      Fastify server. main.ts boots it, server.ts builds it. Route
+              modules: account, browser, candidate, discovery, documents,
+              exception, handoff, matching
+apps/web      React + Vite dashboard. main.tsx shell, api.ts fetch helper,
+              pdf-preview.tsx, styles.css. Workspaces: accounts, candidate,
+              discovery, documents, exceptions, matching, browser-preparation
+apps/worker   ONE FILE: main.ts, 246 lines. There are no worker-local modules.
+              It is a lease loop that imports the runners from the packages -
+              runDiscovery from packages/discovery/src/runner.js,
+              MatchingRunner and OpenRouterTransport from packages/inference,
+              buildPacket/generatePacketContent/LetterDraftRunner/ArtifactStore
+              from packages/documents, createAdapterRegistry from
+              packages/browser, and the persistence repositories. Scheduler
+              behaviour lives here; domain behaviour lives in the packages.
 packages/accounts     one-action employer signup (commitSignup)
 packages/browser      adapter SDK, adapter-sdk, runtime, prepare, commit-mock,
                       observe-mock, handoff-broker, handoff-policy, recruitee,
@@ -372,9 +379,9 @@ re-plan. Highest-value notes:
 - **P14**: hybrid mode keeps one authoritative database on the server; the local
   worker is a browser worker only; database and browser-control ports are never
   public. A profile switch requires explicit drain and reconciliation.
-- **P15**: `restoreBlocked` is honoured at every read site but has **no writer and
-  no test**; `Repository.setControl` omits it by type. A restored system older than
-  its last external submission must not be able to commit until reconciled.
+- **P15**: `restoreBlocked` is read in 6 sites but has **no writer and no test**
+  (section 10 has the file:line detail). A restored system older than its last
+  external submission must not be able to commit until reconciled.
 - **P16**: no rejection inferred from silence, no interview probability, no UI
   showing match score as selection probability, no policy change without a
   recorded owner policy revision.
@@ -516,13 +523,21 @@ warnings; read the remaining list.
 ## 10. Known tracked issues
 
 - **Dependency advisories.** `pnpm audit --prod --audit-level high` passes, but
-  4 moderate advisories exist in transitive deps, published after the last
-  supply-chain pass: `fast-uri` 3.1.7 and 4.1.4 (GHSA-hrr3-gc8f-f4qj,
-  GHSA-jvvf-x445-j334), `fastify` 5.12.4 (GHSA-4mh8-r7rc-xpvc). Reachability
-  analysis is in `docs/evidence/P10-closeout-checkpoint.md`. The fix
-  (fastify >= 5.12.5, fast-uri override) belongs to P15-04, which owns supply
-  chain, SBOM, and release scanning. Do not force a lockfile change in an
-  unrelated increment.
+  `pnpm audit --prod` reports **4 moderate findings across 3 distinct advisories**
+  in transitive deps, all published after the last supply-chain pass. Measured
+  2026-09-28; re-run the audit rather than trusting this list.
+
+  | Advisory | Package | Patched in |
+  |---|---|---|
+  | GHSA-hrr3-gc8f-f4qj host case normalization via percent-encoded octets | `fast-uri` 3.1.7 **and** 4.1.4 (two branches of one advisory) | 3.x `>= 3.1.8`, 4.x `>= 4.1.5` |
+  | GHSA-jvvf-x445-j334 mailto header injection via field-name desynchronization | `fast-uri` 4.1.4 | `>= 4.1.5` |
+  | GHSA-4mh8-r7rc-xpvc DoS via unhandled exception on HTTP/2 trailer responses | `fastify` 5.12.4 | `>= 5.12.5` |
+
+  All reach Fastify through `ajv-compiler`, `ajv-formats`, `ajv`,
+  `fast-json-stringify` and `fast-json-stringify-compiler`. The fix
+  (`fastify >= 5.12.5`, plus a `fast-uri` override that satisfies **both** the
+  3.x and 4.x branches) belongs to P15-04, which owns supply chain, SBOM and
+  release scanning. Do not force a lockfile change in an unrelated increment.
 - **`reconcile` is a no-op that silently resolves an exception (highest-priority
   bug found during handover, unfixed).** `exception-repository.ts:31` offers
   `reconcile` as a permitted action for the `needs_review` blocker, but
@@ -535,6 +550,16 @@ warnings; read the remaining list.
   failure the masterplan forbids. Fix by routing `reconcile` into the
   reconciliation path and refusing it until one exists, or by removing it from
   `ACTIONS.needs_review` until it can be honoured. Add a test either way.
+- **`restoreBlocked` has no writer and no test, and that is a live risk.** The
+  flag is *read* in 6 places - `candidate-repository.ts:503`,
+  `discovery-repository.ts:226` and `:254`, `repository.ts:358` and `:413`,
+  `submission-repository.ts:327` - so an honoured block would stop discovery and
+  submissions. But nothing can set it: `repository.ts:96` types the setter as
+  `Partial<Omit<Control, "restoreBlocked">>`, so `setControl` structurally cannot
+  accept it, and **no test anywhere references it**. A restored-from-backup system
+  older than its last external submission can therefore still commit. This is
+  scenario T26, marked missing. (`docs/masterplan-traceability.md` says "four read
+  sites"; the code has six. Minor doc drift, but do not trust the count.)
 - **Reconciliation is unimplemented for every non-mock adapter.** See section D.
   Until P11 lands, an ambiguous Recruitee or Greenhouse attempt ends in
   `ADAPTER_UNSUPPORTED` rather than being resolved. `reconcile()` on both
@@ -556,7 +581,7 @@ warnings; read the remaining list.
 | `docs/masterplan-traceability.md` | R01-R12 and T01-T32 mapped to real tests, with honest gaps. |
 | `docs/phase-ledger.json` | Machine-readable truth. `nextAction` per phase is authoritative. |
 | `docs/amendments.md` | Owner instructions and precedence. Items 6-12 are 2026-09-28. |
-| `docs/architecture.md` | ADR-001..ADR-011, four deployment profiles. |
+| `docs/architecture.md` | ADR-001..ADR-011. ADR-005 specifies **four** profiles (demo, local, server, hybrid) but only three are implemented; hybrid is design-only, which is why T27 is missing. |
 | `docs/requirements.md` | R01-R12 traceability. |
 | `docs/plans/*.md` | One decision-complete plan per phase. Execute, do not re-plan. |
 | `docs/evidence/*.md` | Per-phase verification records with real counts and boundaries. |
