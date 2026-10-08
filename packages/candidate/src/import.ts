@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { type Extraction, extractionSchema } from "../../contracts/src/candidate.js";
 import { DomainError } from "../../contracts/src/index.js";
 import type { CandidateRepository } from "../../persistence/src/candidate-repository.js";
+import { DocumentStorage, MAX_STORED_DOCUMENT_BYTES } from "../../security/src/document-storage.js";
 import { MAX_SOURCE_BYTES } from "./extract.js";
 
 export async function parseIsolated(
@@ -78,8 +79,10 @@ export class CandidateImporter {
   constructor(
     private readonly repository: CandidateRepository,
     private readonly dataDir: string,
+    private readonly storage = new DocumentStorage(repository.ownerId, "candidate_source", false),
   ) {}
   async import(bytes: Buffer, filename: string) {
+    this.storage.assertReady();
     if (this.active >= 2)
       throw new DomainError("RATE_LIMITED", "Two document imports are already running.");
     const name = basename(filename.replaceAll("\\", "/"));
@@ -93,6 +96,7 @@ export class CandidateImporter {
     this.active++;
     try {
       const extraction = await parseIsolated(bytes, format as "pdf" | "docx");
+      const encoded = this.storage.encode(bytes);
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const ownerKey = createHash("sha256").update(this.repository.ownerId).digest("hex");
       const storageKey = join("candidate-sources", ownerKey, sha256);
@@ -111,7 +115,7 @@ export class CandidateImporter {
       const temporary = `${target}.${randomUUID()}.pending`;
       const file = await open(temporary, "wx", 0o600);
       try {
-        await file.writeFile(bytes);
+        await file.writeFile(encoded);
         await file.sync();
       } finally {
         await file.close();
@@ -123,10 +127,13 @@ export class CandidateImporter {
       } finally {
         await unlink(temporary);
       }
+      const metadata = await lstat(target);
       if (
-        !(await lstat(target)).isFile() ||
+        !metadata.isFile() ||
+        metadata.isSymbolicLink() ||
+        metadata.size > MAX_STORED_DOCUMENT_BYTES ||
         createHash("sha256")
-          .update(await readFile(target))
+          .update(this.storage.decode(await readFile(target), sha256))
           .digest("hex") !== sha256
       )
         throw new DomainError("STORAGE_UNAVAILABLE", "Stored source checksum mismatch.");

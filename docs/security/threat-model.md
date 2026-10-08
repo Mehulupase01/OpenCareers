@@ -20,3 +20,10 @@ their actual configuration; the build request alone does not supply missing data
 Challenge/access behavior is tracked in docs/amendments.md following the owner's
 expanded request. Account ownership, destination validation, candidate truth and
 receipt requirements remain necessary for all implementations.
+
+2026-10-09: document/source files are AES-256-GCM encrypted in private profiles;
+database facts/extractions/ASTs are not. Restore quarantine blocks old applications
+at claim/intent/dispatch after an explicit startup checksum marker. Neither control
+proves a complete secure installation: legacy upgrades, consistent backups, old
+worker shutdown, signup/mailbox recovery and automatic detection remain operator
+or engineering prerequisites. See docs/evidence/ENCRYPTION-RESTORE.md.

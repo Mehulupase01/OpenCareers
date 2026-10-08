@@ -7,6 +7,7 @@ import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 
 const dryRunInput = z
   .object({
@@ -46,7 +47,10 @@ const recruiteeInput = z
 export async function browserRoutes(app: FastifyInstance, config: Config, repository: Repository) {
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
-  const store = new ArtifactStore(config.dataDir);
+  const store = new ArtifactStore(
+    config.dataDir,
+    DocumentStorage.fromConfig(config, "document_artifact"),
+  );
   const adapters = createAdapterRegistry(config.dataDir);
   await store.initialize();
   app.get("/v1/browser", () => browser.snapshot());

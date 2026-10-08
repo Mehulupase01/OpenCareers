@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +24,7 @@ import { ExceptionRepository } from "../../packages/persistence/src/exception-re
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { SubmissionRepository } from "../../packages/persistence/src/submission-repository.js";
+import { DocumentStorage } from "../../packages/security/src/document-storage.js";
 import {
   documentAssessment,
   documentAuthorization,
@@ -494,6 +495,27 @@ for (const engine of ["sqlite", "postgres"] as const) {
           valid: false,
           invalidReason: "ARTIFACT_HASH_MISMATCH",
         });
+      });
+
+      it("does not misclassify missing encryption configuration or legacy migration as packet corruption", async () => {
+        const built = await buildPacket(artifacts, {
+          ...documentGenerationInput(),
+          requestedAnswers: [],
+        });
+        await documents.savePacket(built);
+        const artifact = built.manifest.artifacts[0];
+        if (!artifact) throw new Error("Expected synthetic artifact");
+        for (const key of [undefined, randomBytes(32).toString("base64")]) {
+          const encrypted = new ArtifactStore(
+            dir,
+            new DocumentStorage(owner, "document_artifact", true, key),
+          );
+          await encrypted.initialize();
+          await expect(
+            documents.artifact(built.manifest.id, artifact.kind, encrypted),
+          ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+          expect((await documents.get(built.manifest.id)).valid).toBe(true);
+        }
       });
 
       it("stores a packet-bound browser dry run and reaches READY only with exact read-back", async () => {

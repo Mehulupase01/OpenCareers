@@ -13,6 +13,7 @@ import {
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 
 export async function candidateRoutes(
   app: FastifyInstance,
@@ -21,7 +22,11 @@ export async function candidateRoutes(
 ) {
   const candidates = new CandidateRepository(repository.db, repository.ownerId);
   await candidates.initialize();
-  const importer = new CandidateImporter(candidates, config.dataDir);
+  const importer = new CandidateImporter(
+    candidates,
+    config.dataDir,
+    DocumentStorage.fromConfig(config, "candidate_source"),
+  );
   await app.register(multipart, {
     limits: { files: 1, fields: 0, parts: 1, fileSize: MAX_SOURCE_BYTES },
   });

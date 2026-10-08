@@ -13,7 +13,10 @@ standing authorization, durable SQLite/PostgreSQL work, three public ATS discove
 families, evidence-bound matching and documents, guarded submission adapters,
 accounts, challenge handoffs and an exception inbox. Mock submissions are verified;
 Recruitee and Greenhouse application variants are fixture-tested, not live-verified.
-Known workflow and security gaps are being repaired before production activation.
+Private document/source encryption and an audited restore quarantine are implemented;
+existing plaintext files require an explicit offline upgrade. Database facts are not
+encrypted, and whole-installation restore/release gates remain open. Known workflow
+and security gaps are being repaired before production activation.
 See [production completion](docs/plans/PRODUCTION-COMPLETION.md) for the full scope.
 
 ## Development
@@ -53,6 +56,8 @@ Verification counts and exact commands are recorded in
 [workflow recovery](docs/evidence/WORKFLOW-RECOVERY.md), with PostgreSQL skips and
 local versus CI results distinguished. Earlier phase evidence remains historical;
 passing synthetic tests does not establish live employer support.
+See [encryption and restore](docs/evidence/ENCRYPTION-RESTORE.md) before upgrading
+legacy private files or booting an offline backup.
 
 ```powershell
 npx --yes pnpm@12.4.2 check

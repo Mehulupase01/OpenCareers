@@ -301,7 +301,8 @@ export class DocumentRepository extends Repository {
       const buffer = await store.read(String(row.storage_key), String(row.sha256));
       return { buffer, mimeType: String(row.mime_type), filename: String(row.filename) };
     } catch (error) {
-      await this.invalidate(packetId, "ARTIFACT_HASH_MISMATCH");
+      if (!(error instanceof DomainError && error.code === "CONFIG_INVALID"))
+        await this.invalidate(packetId, "ARTIFACT_HASH_MISMATCH");
       throw error;
     }
   }

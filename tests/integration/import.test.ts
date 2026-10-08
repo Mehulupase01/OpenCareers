@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { CandidateImporter, parseIsolated } from "../../packages/candidate/src/i
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
+import { DocumentStorage } from "../../packages/security/src/document-storage.js";
 import { syntheticDocx, syntheticPdf } from "../helpers/document-fixtures.js";
 
 it("preserves DOCX paragraphs, table cells, hyperlinks and original source bytes", async () => {
@@ -31,6 +32,41 @@ it("preserves DOCX paragraphs, table cells, hyperlinks and original source bytes
     const stored = (await db.query("SELECT storage_key FROM candidate_sources"))[0];
     expect(await readFile(join(dir, String(stored?.storage_key)))).toEqual(bytes);
     expect((await importer.import(bytes, "duplicate.docx")).id).toBe(source.id);
+  } finally {
+    await db.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 30000);
+it("encrypts source bytes before persistence without changing extraction or identity", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "opencareers-encrypted-import-"));
+  const db = await openSqlite(":memory:");
+  try {
+    await migrate(db);
+    const repo = new CandidateRepository(db, "synthetic-owner");
+    await repo.initialize();
+    const codec = new DocumentStorage(
+      repo.ownerId,
+      "candidate_source",
+      true,
+      randomBytes(32).toString("base64"),
+    );
+    const importer = new CandidateImporter(repo, dir, codec);
+    const bytes = await syntheticDocx();
+    const source = await importer.import(bytes, "synthetic.docx");
+    const row = (await db.query("SELECT storage_key FROM candidate_sources"))[0];
+    const stored = await readFile(join(dir, String(row?.storage_key)));
+    expect(stored).not.toEqual(bytes);
+    expect(stored.subarray(0, 2).toString()).not.toBe("PK");
+    expect(codec.decode(stored, source.sha256)).toEqual(bytes);
+    expect((await importer.import(bytes, "duplicate.docx")).id).toBe(source.id);
+    expect(source.blocks.some((block) => block.text.includes("Alex Example"))).toBe(true);
+    await expect(
+      new CandidateImporter(
+        repo,
+        dir,
+        new DocumentStorage(repo.ownerId, "candidate_source", true),
+      ).import(bytes, "synthetic.docx"),
+    ).rejects.toThrow("requires a vault key");
   } finally {
     await db.close();
     await rm(dir, { recursive: true, force: true });

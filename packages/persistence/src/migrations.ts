@@ -106,6 +106,12 @@ export const migrations = [
     // per (application, question) and is enforced by question_blocks, not here.
     "CREATE INDEX exception_application ON exceptions(owner_id,application_id,status)",
   ],
+  [
+    "CREATE TABLE restore_runs (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, snapshot_sha256 TEXT NOT NULL, state TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT, gap_evidence_sha256 TEXT, gap_from TEXT, gap_through TEXT, PRIMARY KEY(owner_id,id))",
+    "CREATE UNIQUE INDEX one_open_restore ON restore_runs(owner_id) WHERE state='open'",
+    "CREATE TABLE restore_reviews (owner_id TEXT NOT NULL, run_id TEXT NOT NULL, application_id TEXT NOT NULL, disposition TEXT NOT NULL, receipt_id TEXT, note TEXT NOT NULL DEFAULT '', reviewed_at TEXT, PRIMARY KEY(owner_id,run_id,application_id), FOREIGN KEY(owner_id,run_id) REFERENCES restore_runs(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,receipt_id) REFERENCES receipts(owner_id,id))",
+    "CREATE INDEX restore_application_barrier ON restore_reviews(owner_id,application_id,disposition)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

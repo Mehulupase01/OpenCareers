@@ -1625,7 +1625,7 @@
     {
       "id": "P15",
       "title": "Security, fault injection, restore, and release gates",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P14"],
       "tickets": [
         {
@@ -1647,18 +1647,18 @@
         {
           "id": "P15-03",
           "text": "Recovery drills. Back up, restore, rekey where supported, rotate credentials, revoke authorization, and simulate restoring a database older than external applications.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": [],
-          "nextAction": "P15-03"
+          "evidence": ["docs/evidence/ENCRYPTION-RESTORE.md", "tests/integration/restore.test.ts"],
+          "nextAction": "Complete whole-installation restore, signup/mailbox fencing and artifact consistency drills."
         },
         {
           "id": "P15-04",
           "text": "Supply-chain checks. Audit dependencies, pin CI actions where practical, generate an SBOM, scan release artifacts for secrets, and document the provenance of copied code.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": [],
-          "nextAction": "P15-04"
+          "evidence": ["docs/evidence/BASELINE-RECOVERY.md"],
+          "nextAction": "Generate and validate release SBOM and artifact scans; retain dependency audit checks."
         },
         {
           "id": "P15-05",
@@ -1691,8 +1691,8 @@
         {
           "id": "P15-G4",
           "requirement": "A restored system remains commit-disabled until the external-submission gap is reconciled.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["docs/evidence/ENCRYPTION-RESTORE.md", "tests/integration/restore.test.ts"]
         },
         {
           "id": "P15-G5",
@@ -1722,7 +1722,10 @@
       "remoteVerification": [],
       "acceptanceTests": ["T26", "T28", "T29"],
       "nextAction": "P15-01",
-      "evidence": ["docs/plans/P15-security-release-gates.md"]
+      "evidence": [
+        "docs/plans/P15-security-release-gates.md",
+        "docs/evidence/ENCRYPTION-RESTORE.md"
+      ]
     },
     {
       "id": "P16",

@@ -20,6 +20,7 @@ import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
+import { assertNoRestoreReplay } from "./restore-repository.js";
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
@@ -73,6 +74,10 @@ export class SubmissionRepository extends Repository {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       await this.assertLease(tx, task);
+      await assertNoRestoreReplay(tx, this.ownerId, applicationId);
+      const control = await this.readControl(tx);
+      if (control.restoreBlocked || control.stopped || control.submissionsPaused)
+        throw new DomainError("POLICY_REVOKED", "Submission controls prohibit a new intent.");
       let handoffBoundary = 0;
       const app = (
         await tx.query(
@@ -317,6 +322,7 @@ export class SubmissionRepository extends Repository {
       )
         throw new DomainError("FORM_CHANGED", "Commit intent binding changed.");
       const control = await this.readControl(tx);
+      await assertNoRestoreReplay(tx, this.ownerId, handle.applicationId);
       if (
         control.stopped ||
         control.submissionsPaused ||

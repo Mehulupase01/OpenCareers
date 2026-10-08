@@ -5,6 +5,7 @@ import type { Config } from "../../config/src/index.js";
 import { openPostgres, openSqlite } from "./database.js";
 import { migrate } from "./migrations.js";
 import { Repository } from "./repository.js";
+import { RestoreRepository } from "./restore-repository.js";
 
 const demoMarkerValue = "OpenCareers synthetic data v1";
 
@@ -63,6 +64,8 @@ export async function connect(config: Config): Promise<Repository> {
     await migrate(db);
     const repository = new Repository(db, config.ownerId);
     await repository.initialize();
+    if (config.restoreSnapshotSha256)
+      await new RestoreRepository(db, config.ownerId).block(config.restoreSnapshotSha256);
     return repository;
   } catch (error) {
     await db.close();

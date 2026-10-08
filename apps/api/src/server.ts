@@ -17,6 +17,7 @@ import { documentRoutes } from "./documents.js";
 import { exceptionRoutes } from "./exception.js";
 import { handoffRoutes } from "./handoff.js";
 import { matchingRoutes } from "./matching.js";
+import { restoreRoutes } from "./restore.js";
 
 export async function buildServer(
   config: Config,
@@ -201,6 +202,7 @@ export async function buildServer(
   await handoffRoutes(app, repository, dependencies.handoffBroker);
   await accountRoutes(app, config, repository, dependencies.signupRequest);
   await exceptionRoutes(app, repository);
+  await restoreRoutes(app, repository);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

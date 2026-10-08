@@ -23,6 +23,7 @@ import { DocumentRepository } from "../../../packages/persistence/src/document-r
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import { SubmissionRepository } from "../../../packages/persistence/src/submission-repository.js";
+import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 import { runInspectionTask } from "./inspection.js";
 
 const logger = createLogger();
@@ -41,7 +42,10 @@ const submissions = new SubmissionRepository(
   undefined,
   config.profile !== "demo",
 );
-const artifacts = new ArtifactStore(config.dataDir);
+const artifacts = new ArtifactStore(
+  config.dataDir,
+  DocumentStorage.fromConfig(config, "document_artifact"),
+);
 await artifacts.initialize();
 const adapters = createAdapterRegistry(config.dataDir);
 const matchingRepository = new MatchingRepository(repository.db, repository.ownerId);

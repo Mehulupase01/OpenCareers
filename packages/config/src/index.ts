@@ -14,6 +14,10 @@ const envSchema = z.object({
     .default("local-owner"),
   AUTOPILOT_OWNER_TOKEN: z.string().min(32).optional(),
   AUTOPILOT_VAULT_KEY: z.string().optional(),
+  AUTOPILOT_RESTORE_SNAPSHOT_SHA256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   AUTOPILOT_DATABASE_URL: z.string().optional(),
   AUTOPILOT_ALLOWED_ORIGINS: z.string().optional(),
   AUTOPILOT_OPENROUTER_API_KEY: z.string().min(20).max(512).optional(),
@@ -31,6 +35,7 @@ export interface Config {
   ownerId: string;
   ownerToken: string | undefined;
   vaultKey: string | undefined;
+  restoreSnapshotSha256?: string | undefined;
   databaseUrl: string | undefined;
   allowedOrigins: string[];
   inference: {
@@ -60,6 +65,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   }
   const e = parsed.data;
   const profile = e.AUTOPILOT_PROFILE;
+  if (profile === "demo" && e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256)
+    throw new DomainError(
+      "CONFIG_INVALID",
+      "Restore activation is only supported for private profiles.",
+    );
   if (e.AUTOPILOT_E2E_RUN_ID && profile !== "demo")
     throw new DomainError(
       "CONFIG_INVALID",
@@ -174,6 +184,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     ownerId: profile === "demo" ? "synthetic-owner" : e.AUTOPILOT_OWNER_ID,
     ownerToken: e.AUTOPILOT_OWNER_TOKEN,
     vaultKey,
+    restoreSnapshotSha256: e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
     inference: {

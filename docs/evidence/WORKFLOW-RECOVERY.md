@@ -43,7 +43,8 @@
 executes those cases against its dedicated PostgreSQL service.
 `corepack pnpm public:scan` and `git diff --check` passed before staging; the
 staged inventory is checked again before commit. The final isolated browser run
-passed all 42 desktop/mobile cases in 2.2 minutes. Post-push CI is pending.
+passed all 42 desktop/mobile cases in 2.2 minutes. GitHub run 37855268175 passed
+Windows, Ubuntu and PostgreSQL at 03c25c4040bf7eef4c6592b3e753e2b48b44aa8a.
 All fixtures are synthetic; no employer application or private migration was run.
 
 ## Remaining Gates

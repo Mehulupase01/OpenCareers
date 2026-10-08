@@ -12,6 +12,21 @@ describe("configuration fails closed", () => {
       ownerId: "synthetic-owner",
     });
   });
+  it("accepts a private restore checksum but rejects malformed and demo restore activation", () => {
+    const base = {
+      AUTOPILOT_PROFILE: "local",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-opencareers-restore-test"),
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+    };
+    expect(
+      loadConfig({ ...base, AUTOPILOT_RESTORE_SNAPSHOT_SHA256: "a".repeat(64) })
+        .restoreSnapshotSha256,
+    ).toBe("a".repeat(64));
+    expect(() => loadConfig({ ...base, AUTOPILOT_RESTORE_SNAPSHOT_SHA256: "invalid" })).toThrow();
+    expect(() => loadConfig({ AUTOPILOT_RESTORE_SNAPSHOT_SHA256: "a".repeat(64) })).toThrow(
+      "private profiles",
+    );
+  });
   it("isolates each synthetic browser run without allowing private or arbitrary data overrides", () => {
     const id = "00000000-0000-4000-8000-000000000001";
     const config = loadConfig({ AUTOPILOT_E2E_RUN_ID: id });

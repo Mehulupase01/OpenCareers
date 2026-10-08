@@ -477,8 +477,8 @@ ports are 14317/14318 and 14319/14320. Previous shared-state failures exposed a
 stale-result race plus valid duplicate-history refusal; neither guard was weakened.
 Synthetic owner answers are approved explicitly before the browser final-click test.
 Private services and ordinary demo data stay untouched by the new harness.
-Final isolated browser run passed all 42 cases in 2.2 minutes. This checkpoint's
-post-push CI remains pending until its actual run completes.
+Final isolated browser run passed all 42 cases in 2.2 minutes. Workflow commit
+03c25c4 passed all three lanes in GitHub run 37855268175.
 
 Next: finish actionable parked exceptions and affected-application resumption;
 encrypt session/document storage and implement restore blocking; then explicitly
@@ -487,3 +487,33 @@ Mailbox provider and OpenRouter key rotation were requested in chat without paus
 unrelated work. Do not use a key previously pasted in chat for live inference.
 The old P11 plan's migration numbers and line references are historical; append
 to the actual current schema rather than adopting its obsolete v10 assumption.
+
+## 2026-10-09: Encryption and Restore Checkpoint
+
+Private document/source writes are now authenticated ciphertext, with the same
+plaintext hashes/manifests and verified plaintext downloads. Missing keys and
+legacy files fail closed without falsely invalidating packets. The explicit
+`documents:encrypt` command is offline, preflighted, resumable and leaves processing
+stopped; it has not been run against private data. Existing files are not silently
+rewritten. Read `docs/evidence/ENCRYPTION-RESTORE.md` for the exact operator boundary.
+
+The new restore checksum startup marker persists a durable barrier before workers
+or the API can run. Old tasks/handoffs/forms/packets are retired; uncertain attempts
+remain UNKNOWN with original reconciliation payloads. All restored applications,
+even pre-intent ones, need owner review. Quarantine persists at claim/intent/dispatch
+after the general barrier is released. Only an existing validated confirmed receipt
+can settle a quarantine; no "assume unsent" or normal-control bypass exists.
+
+P15 recovery/supply-chain work is in progress, not complete. P10 is still open;
+whole-database encryption, complete backup/restore tools, signup/mailbox fencing,
+solved-session continuation, automatic restore detection and real soaks remain.
+Full check passed (274 tests, 94 PostgreSQL skips, 41 files), as did all 42 isolated
+desktop/mobile browser cases in 2.8 minutes. Lint/typecheck/build/ledger, public scan
+and production audit passed. Post-push CI is pending; no live support is claimed.
+
+Owner answered the pending chat questions: Gmail is the mailbox provider and the
+previously exposed OpenRouter key has been rotated in the local .env. Gmail OAuth
+desktop-app credentials are already saved locally; their path is not yet supplied.
+Never print
+the key. Next inference work must explicitly implement the earlier approved
+reviewed-provider/minimized-facts privacy amendment; strict routing is still active.

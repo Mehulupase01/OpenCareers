@@ -1,9 +1,19 @@
-import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
+import { DocumentStorage } from "../../packages/security/src/document-storage.js";
 
 describe("artifact storage trust boundaries", () => {
   let root: string;
@@ -36,6 +46,44 @@ describe("artifact storage trust boundaries", () => {
     await expect(new ArtifactStore(root).initialize()).rejects.toMatchObject({
       code: "STORAGE_UNAVAILABLE",
     });
+  });
+
+  it("stores encrypted bytes and verifies concurrent content-addressed writes", async () => {
+    const codec = new DocumentStorage(
+      "synthetic-owner",
+      "document_artifact",
+      true,
+      randomBytes(32).toString("base64"),
+    );
+    const store = new ArtifactStore(root, codec);
+    await store.initialize();
+    const bytes = Buffer.from("%PDF-1.7 Synthetic confidential letter");
+    const [first, second] = await Promise.all([store.put(bytes), store.put(bytes)]);
+    expect(first).toEqual(second);
+    const physical = join(root, "artifacts", ...first.storageKey.split("/"));
+    expect((await readFile(physical)).includes(bytes)).toBe(false);
+    expect(first.bytes).toBe(bytes.length);
+    expect(await store.read(first.storageKey, first.sha256)).toEqual(bytes);
+    await writeFile(physical, bytes);
+    await expect(store.put(bytes)).rejects.toThrow("explicit offline migration");
+    expect(await readFile(physical)).toEqual(bytes);
+    await expect(store.read(first.storageKey, first.sha256)).rejects.toThrow(
+      "explicit offline migration",
+    );
+  });
+
+  it("allows initialization without a private key but blocks reads and writes", async () => {
+    const store = new ArtifactStore(
+      root,
+      new DocumentStorage("synthetic-owner", "document_artifact", true),
+    );
+    await store.initialize();
+    await expect(store.put(Buffer.from("Synthetic"))).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
+    });
+    await expect(
+      store.read(store.storageKey("0".repeat(64)), "0".repeat(64)),
+    ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
   });
 
   it("rejects a redirected hash directory", async () => {

@@ -1,14 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { link, lstat, mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { DomainError } from "../../contracts/src/index.js";
+import { DocumentStorage, MAX_STORED_DOCUMENT_BYTES } from "../../security/src/document-storage.js";
 
 const digest = (buffer: Buffer) => createHash("sha256").update(buffer).digest("hex");
 
 export class ArtifactStore {
   private root: string;
   private readonly dataDir: string;
-  constructor(dataDir: string) {
+  constructor(
+    dataDir: string,
+    private readonly storage = new DocumentStorage("synthetic-owner", "document_artifact", false),
+  ) {
     this.dataDir = resolve(dataDir);
     this.root = join(this.dataDir, "artifacts");
   }
@@ -43,6 +47,7 @@ export class ArtifactStore {
   }
 
   async put(buffer: Buffer): Promise<{ sha256: string; storageKey: string; bytes: number }> {
+    const encoded = this.storage.encode(buffer);
     const sha256 = digest(buffer);
     const storageKey = this.storageKey(sha256);
     const target = this.path(storageKey);
@@ -53,9 +58,14 @@ export class ArtifactStore {
     await mkdir(dirname(target), { recursive: true });
     await this.assertDirectory(dirname(target));
     try {
-      if (!(await lstat(target)).isFile())
+      const metadata = await lstat(target);
+      if (
+        !metadata.isFile() ||
+        metadata.isSymbolicLink() ||
+        metadata.size > MAX_STORED_DOCUMENT_BYTES
+      )
         throw new DomainError("STORAGE_UNAVAILABLE", "Artifact is not a regular file.");
-      const existing = await readFile(target);
+      const existing = this.storage.decode(await readFile(target), sha256);
       if (digest(existing) !== sha256 || existing.length !== buffer.length)
         throw new DomainError("STORAGE_UNAVAILABLE", "Content-addressed artifact is corrupted.");
       return { sha256, storageKey, bytes: buffer.length };
@@ -64,27 +74,41 @@ export class ArtifactStore {
     }
     const temporary = `${target}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporary, buffer, { flag: "wx", mode: 0o600 });
-      await rename(temporary, target).catch(async (error: NodeJS.ErrnoException) => {
+      const file = await open(temporary, "wx", 0o600);
+      try {
+        await file.writeFile(encoded);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      await link(temporary, target).catch(async (error: NodeJS.ErrnoException) => {
         if (error.code !== "EEXIST") throw error;
       });
     } finally {
       await rm(temporary, { force: true }).catch(() => undefined);
     }
-    const written = await readFile(target);
+    const written = this.storage.decode(await readFile(target), sha256);
     if (digest(written) !== sha256 || written.length !== buffer.length)
       throw new DomainError("STORAGE_UNAVAILABLE", "Artifact verification failed after write.");
     return { sha256, storageKey, bytes: buffer.length };
   }
 
   async read(storageKey: string, expectedSha256: string): Promise<Buffer> {
+    this.storage.assertReady();
+    if (storageKey !== this.storageKey(expectedSha256))
+      throw new DomainError("NOT_FOUND", "Artifact key does not match its identity.");
     const target = this.path(storageKey);
     await this.assertDirectory(this.root);
     await this.assertDirectory(join(this.root, "sha256"));
     await this.assertDirectory(dirname(target));
     const metadata = await lstat(target);
-    if (!metadata.isFile()) throw new DomainError("NOT_FOUND", "Artifact is not a regular file.");
-    const buffer = await readFile(target);
+    if (
+      !metadata.isFile() ||
+      metadata.isSymbolicLink() ||
+      metadata.size > MAX_STORED_DOCUMENT_BYTES
+    )
+      throw new DomainError("NOT_FOUND", "Artifact is not a regular file.");
+    const buffer = this.storage.decode(await readFile(target), expectedSha256);
     if (digest(buffer) !== expectedSha256)
       throw new DomainError("STORAGE_UNAVAILABLE", "Artifact hash verification failed.");
     return buffer;

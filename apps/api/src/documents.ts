@@ -7,12 +7,16 @@ import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 
 const artifactKind = z.enum(["cv_docx", "cv_pdf", "letter_docx", "letter_pdf", "answers_json"]);
 
 export async function documentRoutes(app: FastifyInstance, config: Config, repository: Repository) {
   const documents = new DocumentRepository(repository.db, repository.ownerId);
-  const store = new ArtifactStore(config.dataDir);
+  const store = new ArtifactStore(
+    config.dataDir,
+    DocumentStorage.fromConfig(config, "document_artifact"),
+  );
   await store.initialize();
 
   app.get("/v1/documents", () => documents.snapshot());

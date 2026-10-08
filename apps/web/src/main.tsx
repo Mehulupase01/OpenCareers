@@ -545,6 +545,9 @@ function App() {
               {view === "settings" && (
                 <section className="controls-section">
                   <h2>Processing</h2>
+                  {summary.control.restoreBlocked && (
+                    <p role="alert">Restore review pending. Final actions are blocked.</p>
+                  )}
                   {(["discovery", "preparation", "submissions"] as const).map((stage) => (
                     <div className="control-row" key={stage}>
                       <div>
@@ -567,7 +570,7 @@ function App() {
                         role="switch"
                         aria-label={stage}
                         aria-checked={!summary.control[`${stage}Paused`]}
-                        disabled={busy || stage === "submissions"}
+                        disabled={busy || stage === "submissions" || summary.control.restoreBlocked}
                         onClick={() => {
                           void command("/v1/control/pause", {
                             stage,

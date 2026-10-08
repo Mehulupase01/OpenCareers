@@ -96,9 +96,10 @@ export class Repository extends OwnerScope {
     patch: Partial<Omit<Control, "restoreBlocked">>,
     actor = "system",
   ): Promise<Control> {
+    const validated = controlSchema.omit({ restoreBlocked: true }).partial().strict().parse(patch);
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
-      const control = controlSchema.parse({ ...(await this.readControl(tx)), ...patch });
+      const control = controlSchema.parse({ ...(await this.readControl(tx)), ...validated });
       const rows = await tx.query(
         "UPDATE controls SET data=$1, revision=revision+1 WHERE owner_id=$2 RETURNING revision",
         [JSON.stringify(control), this.ownerId],
@@ -366,7 +367,7 @@ export class Repository extends OwnerScope {
       if (active.length >= concurrency) return null;
       const placeholders = allowed.map((_, i) => `$${i + 3}`).join(",");
       const rows = await tx.query(
-        `SELECT t.* FROM tasks t WHERE t.owner_id=$1 AND t.state IN ('ready','retry_wait') AND t.run_after <= $2 AND t.type IN (${placeholders}) AND NOT EXISTS (SELECT 1 FROM tasks a WHERE a.owner_id=t.owner_id AND a.state='leased' AND (a.domain=t.domain OR (a.application_id IS NOT NULL AND a.application_id=t.application_id))) AND NOT (t.type='submit' AND EXISTS (SELECT 1 FROM applications a WHERE a.owner_id=t.owner_id AND a.id=t.application_id AND a.state IN ('IN_FLIGHT','UNKNOWN','RECONCILING','NEEDS_REVIEW','CONFIRMED','HISTORICAL_SUBMITTED','CLOSED','SKIPPED','DUPLICATE'))) ORDER BY t.priority DESC,t.created_at,t.id LIMIT 1${tx.dialect === "postgres" ? " FOR UPDATE OF t SKIP LOCKED" : ""}`,
+        `SELECT t.* FROM tasks t WHERE t.owner_id=$1 AND t.state IN ('ready','retry_wait') AND t.run_after <= $2 AND t.type IN (${placeholders}) AND NOT EXISTS (SELECT 1 FROM tasks a WHERE a.owner_id=t.owner_id AND a.state='leased' AND (a.domain=t.domain OR (a.application_id IS NOT NULL AND a.application_id=t.application_id))) AND NOT (t.type='submit' AND EXISTS (SELECT 1 FROM applications a WHERE a.owner_id=t.owner_id AND a.id=t.application_id AND a.state IN ('IN_FLIGHT','UNKNOWN','RECONCILING','NEEDS_REVIEW','CONFIRMED','HISTORICAL_SUBMITTED','CLOSED','SKIPPED','DUPLICATE'))) AND NOT (t.type='submit' AND EXISTS (SELECT 1 FROM restore_reviews r JOIN restore_runs s ON s.owner_id=r.owner_id AND s.id=r.run_id WHERE r.owner_id=t.owner_id AND r.application_id=t.application_id AND (r.disposition<>'receipt' OR s.state='open'))) ORDER BY t.priority DESC,t.created_at,t.id LIMIT 1${tx.dialect === "postgres" ? " FOR UPDATE OF t SKIP LOCKED" : ""}`,
         [this.ownerId, this.now(), ...allowed],
       );
       if (!rows[0]) return null;

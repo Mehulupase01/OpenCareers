@@ -10,6 +10,7 @@ import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
+import { RestoreRepository } from "../../packages/persistence/src/restore-repository.js";
 import { identity } from "../helpers/candidate-fixtures.js";
 
 const cleanup: Array<() => Promise<void>> = [];
@@ -40,6 +41,61 @@ async function setup(profile: "demo" | "local" = "demo") {
 }
 
 describe("API trust boundary", () => {
+  it("requires an owner session and exact request bodies for restore review and release", async () => {
+    const { app, headers, db, repository } = await setup();
+    const runId = await new RestoreRepository(db, repository.ownerId).block("a".repeat(64));
+    expect((await app.inject({ url: "/v1/restores", headers })).statusCode).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/restores/${runId}/release`,
+          headers,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(401);
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    const status = await app.inject({ url: "/v1/restores", headers: authenticated });
+    expect(status.json().control.restoreBlocked).toBe(true);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/restores/${runId}/release`,
+          headers: authenticated,
+          payload: { force: true },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/restores/${runId}/release`,
+          headers: authenticated,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/restores/${runId}/release`,
+          headers: authenticated,
+          payload: {
+            externalHistoryReviewedAndImported: true,
+            evidenceSha256: "c".repeat(64),
+            from: "2020-01-01T00:00:00.000Z",
+            through: new Date().toISOString(),
+          },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect((await repository.getControl()).submissionsPaused).toBe(true);
+  });
   it("protects candidate reads, writes and uploads and rejects oversized input", async () => {
     const { app, headers } = await setup();
     for (const url of [
