@@ -1,0 +1,567 @@
+import { createHash, randomUUID } from "node:crypto";
+import type { ApprovedAnswer } from "../../contracts/src/candidate.js";
+import {
+  type ExceptionAction,
+  type ExceptionBlocker,
+  type ExceptionResolved,
+  type ExceptionResolveInput,
+  exceptionBlockerSchema,
+  exceptionResolveInputSchema,
+  type OwnerException,
+  ownerExceptionSchema,
+} from "../../contracts/src/exception.js";
+import {
+  DomainError,
+  errorCodeSchema,
+  type JobInput,
+  jobInputSchema,
+} from "../../contracts/src/index.js";
+import { CandidateRepository } from "./candidate-repository.js";
+import type { Database, Row, SqlExecutor } from "./database.js";
+import { HandoffRepository } from "./handoff-repository.js";
+import { Repository } from "./repository.js";
+
+/**
+ * The actions offered for each blocker. Offering an action that cannot succeed is
+ * worse than offering none, so the set is derived from the blocker rather than
+ * stored or passed in by the caller.
+ */
+const ACTIONS: Record<ExceptionBlocker, ExceptionAction[]> = {
+  answer_unknown: ["resolve_answer", "defer", "skip"],
+  challenge_required: ["open_session", "defer", "skip"],
+  needs_review: ["reconcile", "defer", "skip"],
+  needs_input: ["resolve_answer", "defer", "skip"],
+  unsupported_form: ["defer", "skip"],
+  task_failed: ["retry", "defer", "skip"],
+  account_blocked: ["defer", "skip"],
+};
+
+const STATE_BLOCKER: Record<string, ExceptionBlocker> = {
+  CHALLENGE_REQUIRED: "challenge_required",
+  NEEDS_REVIEW: "needs_review",
+  NEEDS_INPUT: "needs_input",
+  UNSUPPORTED: "unsupported_form",
+};
+
+const PARKED = new Set(Object.keys(STATE_BLOCKER));
+
+const RESUMABLE = [
+  "NEEDS_INPUT",
+  "CHALLENGE_REQUIRED",
+  "NEEDS_REVIEW",
+  "UNSUPPORTED",
+  "RETRY_WAIT",
+  "PAUSED",
+];
+
+const appendDigest = (exceptionId: string, previous: string, entry: string) =>
+  createHash("sha256").update(`${previous}\n${exceptionId}\n${entry}`).digest("hex");
+
+export class ExceptionRepository extends Repository {
+  constructor(db: Database, ownerId: string, clock?: () => Date) {
+    super(db, ownerId, clock);
+  }
+
+  async inbox(): Promise<OwnerException[]> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const rows = await tx.query(
+        "SELECT * FROM exceptions WHERE owner_id=$1 AND status<>'resolved' ORDER BY created_at ASC,id ASC",
+        [this.ownerId],
+      );
+      const out: OwnerException[] = [];
+      for (const row of rows) out.push(await this.present(tx, row));
+
+      // An application parked without a recorded exception still needs the owner,
+      // so the inbox is a view over both sources rather than over one table.
+      const parked = await tx.query(
+        "SELECT a.id,a.state,a.created_at,a.updated_at,j.data AS job_data FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1",
+        [this.ownerId],
+      );
+      for (const row of parked) {
+        const state = String(row.state);
+        if (!PARKED.has(state)) continue;
+        if (out.some((item) => item.applicationId === String(row.id))) continue;
+        out.push(await this.presentParked(row, state));
+      }
+      return out;
+    });
+  }
+
+  async get(id: string): Promise<OwnerException> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = (
+        await tx.query("SELECT * FROM exceptions WHERE owner_id=$1 AND id=$2", [this.ownerId, id])
+      )[0];
+      if (!row) throw new DomainError("NOT_FOUND", "Exception was not found.");
+      return this.present(tx, row);
+    });
+  }
+
+  async resolve(id: string, raw: ExceptionResolveInput): Promise<ExceptionResolved> {
+    const input = exceptionResolveInputSchema.parse(raw);
+    const blocker = await this.blockerFor(id);
+    if (!ACTIONS[blocker].includes(input.action))
+      throw new DomainError(
+        "STATE_INVALID",
+        `"${input.action}" is not supported for a ${blocker} blocker.`,
+      );
+    // Only now that the action is known to be permitted for this blocker may it
+    // reach a path with a side effect such as minting a handoff token.
+    const opened = input.action === "open_session" ? await this.openSession(id, input) : null;
+    if (opened) return opened;
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = await this.reload(tx, id);
+      if (row.status === "resolved")
+        throw new DomainError("STATE_INVALID", "This exception is already resolved.");
+      const applicationId = String(row.application_id ?? "");
+      if (!applicationId)
+        throw new DomainError("STATE_INVALID", "This exception is not attached to an application.");
+
+      if (input.action === "resolve_answer") await this.approveForBlock(tx, id, input);
+
+      if (input.action === "skip")
+        await tx.query(
+          "UPDATE applications SET state='SKIPPED',updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state IN ('NEEDS_INPUT','CHALLENGE_REQUIRED','NEEDS_REVIEW','UNSUPPORTED','PAUSED','RETRY_WAIT')",
+          [this.now(), this.ownerId, applicationId],
+        );
+
+      const requeued =
+        input.action === "retry" || input.action === "resolve_answer"
+          ? await this.requeue(tx, applicationId)
+          : 0;
+
+      await tx.query(
+        "UPDATE exceptions SET status=$1,resolved_action=$2,note=$3,updated_at=$4 WHERE owner_id=$5 AND id=$6",
+        [
+          input.action === "defer" ? "deferred" : "resolved",
+          input.action,
+          input.note ?? null,
+          this.now(),
+          this.ownerId,
+          id,
+        ],
+      );
+      await this.append(tx, id, input.action, input.note ?? "");
+      await this.audit(tx, applicationId, `exception.${input.action}`, Number(row.revision ?? 1), {
+        exceptionId: id,
+        blocker,
+      });
+      return {
+        exception: await this.present(tx, await this.reload(tx, id)),
+        requeued,
+        handoff: null,
+      };
+    });
+  }
+
+  /**
+   * A handoff is a separate one-time credential, so it is created in its own
+   * transaction and the token is returned exactly once here.
+   */
+  /** Reads the blocker and refuses an unknown exception before any action runs. */
+  private async blockerFor(id: string): Promise<ExceptionBlocker> {
+    const row = (
+      await this.db.query("SELECT blocker,status FROM exceptions WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        id,
+      ])
+    )[0];
+    if (!row) throw new DomainError("NOT_FOUND", "Exception was not found.");
+    if (row.status === "resolved")
+      throw new DomainError("STATE_INVALID", "This exception is already resolved.");
+    return exceptionBlockerSchema.parse(String(row.blocker ?? "task_failed"));
+  }
+
+  private async openSession(id: string, input: ExceptionResolveInput): Promise<ExceptionResolved> {
+    const row = (
+      await this.db.query("SELECT * FROM exceptions WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        id,
+      ])
+    )[0];
+    if (!row) throw new DomainError("NOT_FOUND", "Exception was not found.");
+    const applicationId = String(row.application_id ?? "");
+    if (!applicationId)
+      throw new DomainError("STATE_INVALID", "This exception is not attached to an application.");
+    const preparation = (
+      await this.db.query(
+        "SELECT id FROM browser_preparations WHERE owner_id=$1 AND application_id=$2 AND status='challenge' ORDER BY created_at DESC LIMIT 1",
+        [this.ownerId, applicationId],
+      )
+    )[0];
+    if (!preparation)
+      throw new DomainError(
+        "CHALLENGE_REQUIRED",
+        "No challenged browser preparation is available to resume. Rebuild the form first.",
+      );
+    const target = await this.db.query(
+      "SELECT result FROM browser_preparations WHERE owner_id=$1 AND id=$2",
+      [this.ownerId, String(preparation.id)],
+    );
+    const parsed = JSON.parse(String(target[0]?.result ?? "{}")) as {
+      adapter?: { targetFingerprint?: string };
+    };
+    if (!parsed.adapter?.targetFingerprint)
+      throw new DomainError("FORM_CHANGED", "The challenged preparation has no adapter binding.");
+    const handoffs = new HandoffRepository(this.db, this.ownerId, this.clock);
+    const created = await handoffs.create({
+      applicationId,
+      preparationId: String(preparation.id),
+      adapterId: String((parsed.adapter as { id?: string }).id ?? ""),
+      targetFingerprint: parsed.adapter.targetFingerprint,
+    });
+    await this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await tx.query(
+        "UPDATE exceptions SET status='resolved',resolved_action='open_session',note=$1,updated_at=$2 WHERE owner_id=$3 AND id=$4",
+        [input.note ?? null, this.now(), this.ownerId, id],
+      );
+      await this.append(tx, id, "open_session", input.note ?? "");
+      await this.audit(tx, applicationId, "exception.open_session", 1, { exceptionId: id });
+    });
+    return {
+      exception: await this.get(id),
+      requeued: 0,
+      handoff: { sessionId: created.session.id, token: created.token },
+    };
+  }
+
+  /** Records a structured blocker for an application the owner must act on. */
+  async record(input: {
+    applicationId: string;
+    blocker: ExceptionBlocker;
+    code: string;
+    reason: string;
+  }): Promise<string> {
+    const blocker = exceptionBlockerSchema.parse(input.blocker);
+    const code = errorCodeSchema.parse(input.code);
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const existing = (
+        await tx.query(
+          "SELECT id FROM exceptions WHERE owner_id=$1 AND application_id=$2 AND blocker=$3 AND status<>'resolved'",
+          [this.ownerId, input.applicationId, blocker],
+        )
+      )[0];
+      if (existing) {
+        await tx.query(
+          "UPDATE exceptions SET code=$1,reason=$2,updated_at=$3 WHERE owner_id=$4 AND id=$5",
+          [code, input.reason, this.now(), this.ownerId, String(existing.id)],
+        );
+        return String(existing.id);
+      }
+      const id = randomUUID();
+      await tx.query(
+        "INSERT INTO exceptions(id,owner_id,application_id,code,blocker,reason,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'open',$7,$7)",
+        [id, this.ownerId, input.applicationId, code, blocker, input.reason, this.now()],
+      );
+      await this.append(tx, id, "record", input.reason);
+      return id;
+    });
+  }
+
+  /**
+  /**
+   * Approval is written inside the caller's transaction, so it cannot deadlock
+   * against a nested transaction and it cannot leave a half-approved answer if the
+   * surrounding decision is rolled back.
+   *
+   * The same checks the ordinary owner answer path applies are applied here: an
+   * exact meaning, a validity window, and evidence that is still usable at the
+   * revision it was approved against. The system will not invent an answer and
+   * will not approve an unsupported one.
+   */
+  private async approveForBlock(
+    tx: SqlExecutor,
+    exceptionId: string,
+    input: ExceptionResolveInput,
+  ): Promise<void> {
+    const block = (
+      await tx.query("SELECT * FROM question_blocks WHERE owner_id=$1 AND exception_id=$2", [
+        this.ownerId,
+        exceptionId,
+      ])
+    )[0];
+    if (!block)
+      throw new DomainError("STATE_INVALID", "This exception is not an unanswered question.");
+    const meaning = input.meaning ?? String(block.meaning);
+    if (meaning !== String(block.meaning))
+      throw new DomainError(
+        "ANSWER_UNKNOWN",
+        "The resolved meaning must be the exact question that was asked.",
+      );
+    const candidateId = String(
+      (await tx.query("SELECT id FROM candidates WHERE owner_id=$1 LIMIT 1", [this.ownerId]))[0]
+        ?.id ?? "",
+    );
+    if (!candidateId) throw new DomainError("PROFILE_STALE", "No candidate profile is configured.");
+
+    const factIds = input.factIds ?? [];
+    const today = this.now().slice(0, 10);
+    const evidence: Record<string, number> = {};
+    for (const factId of factIds) {
+      const head = (
+        await tx.query("SELECT revision FROM fact_heads WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          factId,
+        ])
+      )[0];
+      if (!head)
+        throw new DomainError("CLAIM_UNSUPPORTED", `Fact ${factId} is not part of this profile.`);
+      evidence[factId] = Number(head.revision);
+    }
+
+    const existing = (
+      await tx.query(
+        "SELECT id,revision FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2 ORDER BY revision DESC LIMIT 1",
+        [this.ownerId, String(block.semantic_key)],
+      )
+    )[0];
+    const answerId = existing ? String(existing.id) : randomUUID();
+    const revision = Number(existing?.revision ?? 0) + 1;
+    const country = String(block.country ?? "");
+    const data = {
+      semanticKey: String(block.semantic_key),
+      meaning,
+      answer: input.answer,
+      validFrom: today,
+      validUntil: "2099-12-31",
+      employerIds: [],
+      countries: country ? [country] : [],
+      evidenceFactIds: factIds,
+      evidenceRevisions: evidence,
+    };
+    if (existing)
+      await tx.query(
+        "UPDATE approved_answers SET revision=$1,data=$2,approved_at=$3 WHERE owner_id=$4 AND id=$5",
+        [revision, JSON.stringify(data), this.now(), this.ownerId, answerId],
+      );
+    else
+      await tx.query(
+        "INSERT INTO approved_answers(owner_id,id,candidate_id,semantic_key,revision,data,approved_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          this.ownerId,
+          answerId,
+          candidateId,
+          String(block.semantic_key),
+          revision,
+          JSON.stringify(data),
+          this.now(),
+        ],
+      );
+
+    await tx.query(
+      "UPDATE question_blocks SET resolved_answer_id=$1,meaning=$2 WHERE owner_id=$3 AND exception_id=$4",
+      [answerId, meaning, this.ownerId, exceptionId],
+    );
+    // Every semantically equivalent open question resolves with it, and only ones
+    // whose exact key, meaning and country match.
+    await tx.query(
+      "UPDATE question_blocks SET resolved_answer_id=$1 WHERE owner_id=$2 AND semantic_key=$3 AND meaning=$4 AND country=$5 AND resolved_answer_id IS NULL",
+      [answerId, this.ownerId, String(block.semantic_key), meaning, country],
+    );
+    await tx.query(
+      "UPDATE exceptions SET status='resolved',resolved_action='resolve_answer',updated_at=$1 WHERE owner_id=$2 AND id=$3 AND status<>'resolved'",
+      [this.now(), this.ownerId, exceptionId],
+    );
+  }
+  /** Requeues only the affected application, never the whole queue. */
+  private async requeue(tx: SqlExecutor, applicationId: string): Promise<number> {
+    const state = String(
+      (
+        await tx.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          applicationId,
+        ])
+      )[0]?.state ?? "",
+    );
+    if (!RESUMABLE.includes(state)) return 0;
+    await tx.query(
+      "UPDATE applications SET state='PREPARING',updated_at=$1 WHERE owner_id=$2 AND id=$3",
+      [this.now(), this.ownerId, applicationId],
+    );
+    await this.enqueueIn(tx, {
+      type: "prepare",
+      domain: "preparation",
+      applicationId,
+      dedupeKey: `prepare:${applicationId}`,
+    });
+    return 1;
+  }
+
+  private async append(
+    tx: SqlExecutor,
+    exceptionId: string,
+    action: string,
+    note: string,
+  ): Promise<void> {
+    const previous = (
+      await tx.query(
+        "SELECT required_append,seq FROM exception_actions WHERE owner_id=$1 AND exception_id=$2 ORDER BY seq DESC LIMIT 1",
+        [this.ownerId, exceptionId],
+      )
+    )[0];
+    const seq = Number(previous?.seq ?? 0) + 1;
+    const digest = appendDigest(
+      exceptionId,
+      String(previous?.required_append ?? ""),
+      `${action}:${note}`,
+    );
+    await tx.query(
+      "INSERT INTO exception_actions(owner_id,id,exception_id,action,note,seq,actor,occurred_at,required_append) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [
+        this.ownerId,
+        randomUUID(),
+        exceptionId,
+        action,
+        note,
+        seq,
+        `owner:${this.ownerId}`,
+        this.now(),
+        digest,
+      ],
+    );
+  }
+
+  /**
+   * Re-verifies the decision chain. Each digest covers the previous one and the
+   * entry text, so an edited or removed row is detectable. This is tamper
+   * evidence for an accidental edit of a locally owned database, not a claim
+   * that the store is tamper-proof.
+   */
+  async history(id: string): Promise<{ action: string; note: string; intact: boolean }[]> {
+    const rows = await this.db.query(
+      "SELECT action,note,required_append FROM exception_actions WHERE owner_id=$1 AND exception_id=$2 ORDER BY seq ASC",
+      [this.ownerId, id],
+    );
+    const out: { action: string; note: string; intact: boolean }[] = [];
+    let previous = "";
+    for (const row of rows) {
+      const action = String(row.action);
+      const note = String(row.note ?? "");
+      out.push({
+        action,
+        note,
+        intact: appendDigest(id, previous, `${action}:${note}`) === String(row.required_append),
+      });
+      previous = String(row.required_append);
+    }
+    return out;
+  }
+
+  private async reload(tx: SqlExecutor, id: string): Promise<Row> {
+    const row = (
+      await tx.query("SELECT * FROM exceptions WHERE owner_id=$1 AND id=$2", [this.ownerId, id])
+    )[0];
+    if (!row) throw new DomainError("STORAGE_UNAVAILABLE", "Exception was not stored.");
+    return row;
+  }
+
+  private async present(tx: SqlExecutor, row: Row): Promise<OwnerException> {
+    const blocker = exceptionBlockerSchema.parse(String(row.blocker ?? "task_failed"));
+    const applicationId = String(row.application_id ?? "");
+    const block = (
+      await tx.query(
+        "SELECT semantic_key,meaning,resolved_answer_id FROM question_blocks WHERE owner_id=$1 AND exception_id=$2",
+        [this.ownerId, String(row.id)],
+      )
+    )[0];
+    return ownerExceptionSchema.parse({
+      id: String(row.id),
+      blocker,
+      code: errorCodeSchema.parse(String(row.code)),
+      reason: String(row.reason ?? String(row.code)),
+      applicationId,
+      job: await this.job(tx, applicationId),
+      question: block
+        ? {
+            semanticKey: String(block.semantic_key),
+            meaning: String(block.meaning),
+            answered: Boolean(block.resolved_answer_id),
+            resolvedAnswerId: block.resolved_answer_id ? String(block.resolved_answer_id) : null,
+          }
+        : null,
+      suggestedAnswer: await this.suggestion(tx, block),
+      actions: ACTIONS[blocker],
+      state:
+        row.status === "deferred" ? "deferred" : row.status === "resolved" ? "resolved" : "open",
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at ?? row.created_at),
+    });
+  }
+
+  /**
+   * A suggestion is offered only when an approved answer already exists for this
+   * exact meaning, employer, country and date. It is never generated here.
+   */
+  private async suggestion(tx: SqlExecutor, block: Row | undefined) {
+    if (!block || block.resolved_answer_id) return null;
+    const row = (
+      await tx.query(
+        "SELECT id,revision,data,approved_at FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2 ORDER BY revision DESC",
+        [this.ownerId, String(block.semantic_key)],
+      )
+    ).find((candidate) => {
+      const answer = JSON.parse(String(candidate.data)) as ApprovedAnswer;
+      return answer.meaning === String(block.meaning);
+    });
+    if (!row) return null;
+    const answer = JSON.parse(String(row.data)) as ApprovedAnswer;
+    const country = String(block.country ?? "");
+    if (answer.countries.length && (!country || !answer.countries.includes(country))) return null;
+    const today = this.now().slice(0, 10);
+    if (answer.validFrom > today || answer.validUntil < today) return null;
+    return {
+      semanticKey: answer.semanticKey,
+      answerId: String(row.id),
+      answer: answer.answer,
+      approvedAt: String(row.approved_at),
+    };
+  }
+
+  private async presentParked(row: Row, state: string): Promise<OwnerException> {
+    const blocker = STATE_BLOCKER[state] ?? "needs_input";
+    const job = jobInputSchema.parse(JSON.parse(String(row.job_data))) as JobInput;
+    return ownerExceptionSchema.parse({
+      id: `parked:${String(row.id)}:${state}`,
+      blocker,
+      code: state === "CHALLENGE_REQUIRED" ? "CHALLENGE_REQUIRED" : "ANSWER_UNKNOWN",
+      reason: `The application is parked in ${state} and needs an owner decision.`,
+      applicationId: String(row.id),
+      job: {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        employerId: job.employerId,
+        ...(job.countryCode ? { countryCode: job.countryCode } : {}),
+      },
+      question: null,
+      suggestedAnswer: null,
+      actions: ACTIONS[blocker],
+      state: "open",
+      createdAt: String(row.created_at ?? this.now()),
+      updatedAt: String(row.updated_at ?? this.now()),
+    });
+  }
+
+  private async job(tx: SqlExecutor, applicationId: string) {
+    const row = (
+      await tx.query(
+        "SELECT j.data FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1 AND a.id=$2",
+        [this.ownerId, applicationId],
+      )
+    )[0];
+    if (!row) throw new DomainError("NOT_FOUND", "Application job was not found.");
+    const job = jobInputSchema.parse(JSON.parse(String(row.data))) as JobInput;
+    return {
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      employerId: job.employerId,
+      ...(job.countryCode ? { countryCode: job.countryCode } : {}),
+    };
+  }
+}

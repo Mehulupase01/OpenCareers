@@ -91,6 +91,50 @@ The handoff broker browser test hardcoded an absolute session expiry of
 silently started failing on any run after that instant. The timestamps are now
 derived from the clock.
 
+## Exception Inbox
+
+`CandidateRepository.resolveQuestion` existed, was correct, and was unreachable:
+no route, no worker path, and no UI. An `ANSWER_UNKNOWN` exception could therefore
+never be created in a running system, and the dashboard showed only a count.
+
+Packet generation now records an exception for every requested answer that answer
+memory cannot satisfy. That is the case the inbox exists for, and it makes the
+primitive reachable from ordinary operation rather than only from a test.
+
+The inbox is a view over two sources, not one table: explicit exception rows and
+applications parked in a blocking state with no row at all. Each item names the
+blocker, the exact question and its meaning, the affected job and employer, and
+only the actions valid for that blocker. Resolution requires the owner's wording
+*and* the facts that support it; the system will not invent an answer to an
+unknown question, and will not approve an unsupported one. A suggestion appears
+only when an approved answer already exists for that exact meaning, employer,
+country and date. Resolving requeues the affected application only, through an
+application-scoped dedupe key.
+
+Every owner decision is written as a hash-chained append. `history()` re-verifies
+the chain, so an edited or removed row is detectable. This is tamper evidence for
+an accidental edit of a locally owned database, not a claim that the store is
+tamper-proof.
+
+## Known Tracked Advisories
+
+`pnpm audit --prod --audit-level high` passes. The audit also reports four
+moderate advisories in transitive dependencies that were published after the last
+supply-chain pass and that no dependency change in these increments introduced:
+
+- `fast-uri` 3.1.7 and 4.1.4, patched in >=3.1.8 and >=4.1.5
+  (GHSA-hrr3-gc8f-f4qj host case normalisation, GHSA-jvvf-x445-j334 mailto header
+  injection). Neither is reachable here: the system parses only its own configured
+  ATS URLs and never accepts a `mailto:` or percent-encoded host from a portal.
+- `fastify` 5.12.4, patched in >=5.12.5 (GHSA-4mh8-r7rc-xpvc DoS via unhandled
+  exception on HTTP/2 trailer responses). The API serves HTTP/1.1 on loopback and
+  TLS; HTTP/2 is not enabled.
+
+These are recorded rather than force-patched because a late lockfile change to an
+unrelated increment is the wrong place to take a supply-chain risk decision.
+Bumping `fastify` and overriding `fast-uri` belongs to P15-04, which owns
+dependency audit, SBOM generation, and release artifact scanning.
+
 ## Verification
 
 `pnpm check` passed: lint, typecheck, ledger validation, 214 tests with 70

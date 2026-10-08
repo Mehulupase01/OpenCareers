@@ -25,7 +25,7 @@ const migration1 = [
   `CREATE TABLE workers (id TEXT NOT NULL, owner_id TEXT NOT NULL REFERENCES owners(id), kind TEXT NOT NULL, last_seen_at TEXT NOT NULL, version TEXT NOT NULL, PRIMARY KEY(owner_id,id))`,
 ];
 
-const migrations = [
+export const migrations = [
   migration1,
   [
     "CREATE INDEX task_domain_leases ON tasks(owner_id,state,domain,application_id)",
@@ -89,6 +89,22 @@ const migrations = [
     "CREATE TABLE handoff_sessions (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, application_id TEXT NOT NULL, preparation_id TEXT NOT NULL, adapter_id TEXT NOT NULL, target_fingerprint TEXT NOT NULL, token_hash TEXT NOT NULL, state TEXT NOT NULL, generation INTEGER NOT NULL, lease_owner TEXT, lease_until TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,token_hash), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,preparation_id) REFERENCES browser_preparations(owner_id,id))",
     "CREATE UNIQUE INDEX one_active_handoff ON handoff_sessions(owner_id,application_id) WHERE state IN ('open','claimed','rebuilding')",
     "CREATE INDEX handoff_expiry ON handoff_sessions(owner_id,state,expires_at)",
+  ],
+  [
+    // P10-04 exception inbox. The original table could hold a code and a status
+    // and nothing else, so an owner could be told an exception existed but not
+    // what it was or what to do about it. These columns carry the classification,
+    // the owner's decision, and the decision history as tamper-evident appends.
+    "ALTER TABLE exceptions ADD COLUMN blocker TEXT NOT NULL DEFAULT 'task_failed'",
+    "ALTER TABLE exceptions ADD COLUMN reason TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE exceptions ADD COLUMN resolved_action TEXT",
+    "ALTER TABLE exceptions ADD COLUMN note TEXT",
+    "ALTER TABLE exceptions ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    "CREATE TABLE exception_actions (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, exception_id TEXT NOT NULL, action TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL, actor TEXT NOT NULL, occurred_at TEXT NOT NULL, required_append TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,required_append), FOREIGN KEY(owner_id,exception_id) REFERENCES exceptions(owner_id,id))",
+    "CREATE INDEX exception_owner_state ON exceptions(owner_id,status,created_at)",
+    // Each distinct unanswered question gets its own exception, so uniqueness is
+    // per (application, question) and is enforced by question_blocks, not here.
+    "CREATE INDEX exception_application ON exceptions(owner_id,application_id,status)",
   ],
 ];
 

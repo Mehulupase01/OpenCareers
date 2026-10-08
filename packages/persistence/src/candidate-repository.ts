@@ -754,6 +754,44 @@ export class CandidateRepository extends Repository {
       return answer;
     });
   }
+  /**
+   * Writes one tamper-evident entry onto an exception's decision chain. The
+   * digest covers the previous entry and this one, so an edited or removed row is
+   * detectable. This is evidence against an accidental edit of a locally owned
+   * database, not a claim that the store is tamper-proof.
+   */
+  private async appendExceptionAction(
+    tx: SqlExecutor,
+    exceptionId: string,
+    action: string,
+    note: string,
+  ): Promise<void> {
+    const previous = (
+      await tx.query(
+        "SELECT required_append,seq FROM exception_actions WHERE owner_id=$1 AND exception_id=$2 ORDER BY seq DESC LIMIT 1",
+        [this.ownerId, exceptionId],
+      )
+    )[0];
+    const seq = Number(previous?.seq ?? 0) + 1;
+    const digest = createHash("sha256")
+      .update(`${String(previous?.required_append ?? "")}\n${exceptionId}\n${action}:${note}`)
+      .digest("hex");
+    await tx.query(
+      "INSERT INTO exception_actions(owner_id,id,exception_id,action,note,seq,actor,occurred_at,required_append) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [
+        this.ownerId,
+        randomUUID(),
+        exceptionId,
+        action,
+        note,
+        seq,
+        `owner:${this.ownerId}`,
+        this.now(),
+        digest,
+      ],
+    );
+  }
+
   async resolveQuestion(
     applicationId: string,
     semanticKey: string,
@@ -784,11 +822,15 @@ export class CandidateRepository extends Repository {
         )
       )[0];
       const exceptionId = String(block?.exception_id ?? randomUUID());
-      if (!block)
+      if (!block) {
+        const reason = `No approved answer for "${meaning}" at ${job.company}.`;
         await tx.query(
-          "INSERT INTO exceptions(id,owner_id,application_id,code,status,created_at) VALUES($1,$2,$3,'ANSWER_UNKNOWN','open',$4)",
-          [exceptionId, this.ownerId, applicationId, this.now()],
+          "INSERT INTO exceptions(id,owner_id,application_id,code,blocker,reason,status,created_at,updated_at) VALUES($1,$2,$3,'ANSWER_UNKNOWN','answer_unknown',$4,'open',$5,$5)",
+          [exceptionId, this.ownerId, applicationId, reason, this.now()],
         );
+        // Record the decision trail so the inbox shows when the exception appeared.
+        await this.appendExceptionAction(tx, exceptionId, "record", reason);
+      }
       await tx.query(
         "INSERT INTO question_blocks(owner_id,application_id,semantic_key,meaning,country,exception_id,resolved_answer_id) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(owner_id,application_id,semantic_key) DO UPDATE SET meaning=excluded.meaning,country=excluded.country,resolved_answer_id=excluded.resolved_answer_id",
         [
@@ -801,12 +843,16 @@ export class CandidateRepository extends Repository {
           answer?.id ?? null,
         ],
       );
-      await tx.query("UPDATE exceptions SET status=$1,resolved_at=$2 WHERE owner_id=$3 AND id=$4", [
-        answer ? "resolved" : "open",
-        answer ? this.now() : null,
-        this.ownerId,
-        exceptionId,
-      ]);
+      await tx.query(
+        "UPDATE exceptions SET status=$1,resolved_action=$2,updated_at=$3 WHERE owner_id=$4 AND id=$5",
+        [
+          answer ? "resolved" : "open",
+          answer ? "resolve_answer" : null,
+          this.now(),
+          this.ownerId,
+          exceptionId,
+        ],
+      );
       await this.audit(
         tx,
         applicationId,

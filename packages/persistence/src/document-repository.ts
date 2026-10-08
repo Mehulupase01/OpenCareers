@@ -56,6 +56,19 @@ export class DocumentRepository extends Repository {
         "Assessment does not use the active profile revision.",
       );
     const job = jobInputSchema.strip().parse(json<JobInput>(row, "job_data"));
+    const candidates = new CandidateRepository(this.db, this.ownerId, this.clock);
+    const scoped = await candidates.scopedAnswers({
+      employerId: String(row.employer_id),
+      ...(job.countryCode ? { country: job.countryCode } : {}),
+      asOf,
+    });
+    // A question the form will ask but that answer memory cannot satisfy is the
+    // exact case the exception inbox exists for, so it is recorded here rather
+    // than discovered later as an unexplained stall. This is what makes the inbox
+    // reachable from ordinary operation.
+    for (const requested of requestedAnswers) {
+      await candidates.resolveQuestion(applicationId, requested.semanticKey, requested.meaning);
+    }
     return {
       job,
       profile: candidate.profile,
@@ -65,15 +78,7 @@ export class DocumentRepository extends Repository {
       // country, an earlier date, or evidence that has since been revised must
       // not reach this packet, because a filled control is already an answer
       // given to that employer.
-      approvedAnswers: await new CandidateRepository(
-        this.db,
-        this.ownerId,
-        this.clock,
-      ).scopedAnswers({
-        employerId: String(row.employer_id),
-        ...(job.countryCode ? { country: job.countryCode } : {}),
-        asOf,
-      }),
+      approvedAnswers: scoped,
       requestedAnswers,
       asOf,
       generatedAt: this.now(),

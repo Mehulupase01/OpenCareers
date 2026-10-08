@@ -1998,3 +1998,119 @@ td:last-child {
   gap: 6px;
   padding: 8px 14px;
 }
+
+.exceptions-panel {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+.exceptions-panel .section-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.exceptions-panel .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.exceptions-panel .section-title h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.exception-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.exception-list li {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #89939b;
+  border-radius: 4px;
+  background: #fff;
+}
+.exception-list li[data-blocker="answer_unknown"],
+.exception-list li[data-blocker="needs_input"] {
+  border-left-color: #9a6a1c;
+}
+.exception-list li[data-blocker="challenge_required"] {
+  border-left-color: #2f6f8f;
+}
+.exception-list li[data-state="deferred"] {
+  opacity: 0.72;
+}
+.exception-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.exception-code {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: lowercase;
+}
+.exception-deferred {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.exception-reason {
+  margin: 6px 0 2px;
+}
+.exception-job {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.exception-question {
+  margin: 0 0 6px;
+}
+.question-key {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #edf2f4;
+  font-size: 0.78rem;
+}
+.exception-suggestion {
+  margin: 0 0 8px;
+  padding: 6px 9px;
+  border-left: 3px solid #3f7d5c;
+  background: #edf5f0;
+}
+.exception-answer {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 8px;
+  max-width: 60ch;
+}
+.exception-answer label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.exception-answer input,
+.exception-answer select {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.exception-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.exception-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+}

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { openPostgres, openSqlite } from "../../packages/persistence/src/database.js";
-import { migrate } from "../../packages/persistence/src/migrations.js";
+import { migrate, migrations } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 
 for (const engine of ["sqlite", "postgres"] as const) {
@@ -160,9 +160,11 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await migrate(db);
         expect((await repository.summary("demo")).applications[0]).toEqual(app);
         expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
+        // Derived from the migration list so adding a migration does not require
+        // editing an unrelated assertion.
         expect(
           (await db.query("SELECT MAX(version) AS version FROM schema_migrations"))[0]?.version,
-        ).toBe(9);
+        ).toBe(migrations.length);
       } finally {
         await db.close();
         if (admin) {

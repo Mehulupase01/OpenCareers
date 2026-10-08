@@ -30,6 +30,7 @@ import { request } from "./api.js";
 import { CandidateWorkspace } from "./candidate.js";
 import { DiscoveryWorkspace } from "./discovery.js";
 import { DocumentsWorkspace } from "./documents.js";
+import { ExceptionsPanel } from "./exceptions.js";
 import { MatchingWorkspace } from "./matching.js";
 import "./styles.css";
 
@@ -343,6 +344,7 @@ function App() {
                   </div>
                 </section>
               )}
+              {(view === "applications" || view === "queue") && <ExceptionsPanel />}
               {view === "candidate" && candidate && (
                 <CandidateWorkspace snapshot={candidate} refresh={refresh} />
               )}

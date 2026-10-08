@@ -480,8 +480,16 @@ export class Repository extends OwnerScope {
 
   private async deadLetter(tx: SqlExecutor, task: Task, code: ErrorCode) {
     await tx.query(
-      "INSERT INTO exceptions(id,owner_id,application_id,task_id,code,status,created_at) VALUES($1,$2,$3,$4,$5,'open',$6)",
-      [randomUUID(), this.ownerId, task.applicationId, task.id, code, this.now()],
+      "INSERT INTO exceptions(id,owner_id,application_id,task_id,code,blocker,reason,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'task_failed',$6,'open',$7,$7)",
+      [
+        randomUUID(),
+        this.ownerId,
+        task.applicationId,
+        task.id,
+        code,
+        `The ${task.type} task exhausted its retries (${code}).`,
+        this.now(),
+      ],
     );
   }
 
