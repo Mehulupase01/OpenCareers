@@ -571,3 +571,18 @@ Public catalogue review found Nemotron Ultra lacks advertised structured outputs
 NVIDIA's linked trial terms restrict production and personal-data use. Do not
 silently waive those constraints. Novita currently serves a structured-output free
 route; recheck endpoint availability and pin reviewed terms before activation.
+
+## 2026-10-09: Reviewed Inference Revision
+
+Execution-order step 4 now has an explicit, expiring Novita-only privacy revision
+for minimized matching and mandatory LLM letters. Both builders share controls;
+the transport refuses weaker or altered controls before HTTP. Endpoint-level free
+pricing/capabilities, zero-price ceilings, stale-route invalidation, privacy-hash
+audit and durable quotas remain enforced. Read `docs/evidence/REVIEWED-INFERENCE.md`
+for reviewed terms, exact nonsecret configuration and disclosure limitations.
+
+No private `.env`, process, migration, key or inference call was changed. Strict
+privacy remains the default. This implements the approved amendment, not another
+phase closure; model quality and a live activation/application remain unverified.
+Next: P11 Gmail integration with minimal read-only correlation and encrypted OAuth;
+desktop credentials exist but their path is still pending in chat.

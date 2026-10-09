@@ -48,6 +48,8 @@ export const routeDecisionSchema = z
     provider: z.string().max(120).nullable(),
     reasons: z.array(z.string().max(240)).max(50),
     catalogueFetchedAt: z.iso.datetime(),
+    privacyBinding: z.string().max(80).optional(),
+    endpointEvidence: z.unknown().optional(),
   })
   .strict();
 export type RouteDecision = z.infer<typeof routeDecisionSchema>;
@@ -164,6 +166,7 @@ export interface MatchingSnapshot {
     lastCatalogueAt: string | null;
     backoffUntil: string | null;
     reason: string;
+    privacyBinding?: string | null;
   };
   budget: { day: string; limit: number; used: number; reserved: number };
   assessments: MatchAssessment[];

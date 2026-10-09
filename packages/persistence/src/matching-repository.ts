@@ -46,6 +46,8 @@ export class MatchingRepository extends Repository {
         modelId: decision.eligible ? decision.modelId : null,
         provider: decision.eligible ? decision.provider : null,
         reason: decision.eligible ? "Eligible free route is ready." : decision.reasons.join(" "),
+        privacyBinding: decision.privacyBinding ?? null,
+        endpointEvidence: decision.endpointEvidence ?? null,
       };
       await tx.query(
         "INSERT INTO inference_state(owner_id,status,data,catalogue_id,updated_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(owner_id) DO UPDATE SET status=excluded.status,data=excluded.data,catalogue_id=excluded.catalogue_id,backoff_until=NULL,updated_at=excluded.updated_at",
@@ -64,6 +66,10 @@ export class MatchingRepository extends Repository {
       await this.audit(tx, catalogueId, "inference.catalogue_checked", 1, {
         eligible: decision.eligible ? 1 : 0,
       });
+      if (decision.eligible && decision.privacyBinding)
+        await this.audit(tx, catalogueId, "inference.privacy_bound", 1, {
+          binding: decision.privacyBinding,
+        });
     });
   }
 
@@ -106,6 +112,7 @@ export class MatchingRepository extends Repository {
     provider: string,
     dailyLimit: number,
     applicationId: string | null = null,
+    expectedPrivacyBinding?: string,
   ): Promise<Reservation> {
     if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 50)
       throw new DomainError("CONFIG_INVALID", "Invalid inference daily limit.");
@@ -136,6 +143,18 @@ export class MatchingRepository extends Repository {
         );
       if (state.backoff_until && String(state.backoff_until) > this.now())
         throw new DomainError("RATE_LIMITED", "Free inference route is in bounded backoff.", true);
+      if (expectedPrivacyBinding) {
+        const route = json<{ modelId: string; provider: string; privacyBinding?: string }>(state);
+        if (
+          route.modelId !== modelId ||
+          route.provider !== provider ||
+          route.privacyBinding !== expectedPrivacyBinding
+        )
+          throw new DomainError(
+            "MODEL_ROUTE_INELIGIBLE",
+            "Reviewed route changed before quota reservation.",
+          );
+      }
       const id = randomUUID();
       await tx.query(
         "INSERT INTO inference_reservations(owner_id,id,day,state,application_id,model_id,provider,created_at,expires_at) VALUES($1,$2,$3,'reserved',$4,$5,$6,$7,$8)",
@@ -154,16 +173,47 @@ export class MatchingRepository extends Repository {
     });
   }
 
-  async markSent(id: string, requestHash: string) {
+  async markSent(id: string, requestHash: string, expectedPrivacyBinding?: string) {
     if (!/^[a-f0-9]{64}$/.test(requestHash))
       throw new DomainError("CONFIG_INVALID", "Invalid redacted request hash.");
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
+      if (expectedPrivacyBinding) {
+        const reservation = (
+          await tx.query("SELECT * FROM inference_reservations WHERE owner_id=$1 AND id=$2", [
+            this.ownerId,
+            id,
+          ])
+        )[0];
+        const state = (
+          await tx.query("SELECT * FROM inference_state WHERE owner_id=$1", [this.ownerId])
+        )[0];
+        const route = state
+          ? json<{ modelId: string; provider: string; privacyBinding?: string }>(state)
+          : null;
+        if (
+          !reservation ||
+          String(reservation.expires_at) <= this.now() ||
+          state?.status !== "ready" ||
+          route?.privacyBinding !== expectedPrivacyBinding ||
+          route.modelId !== reservation.model_id ||
+          route.provider !== reservation.provider
+        )
+          throw new DomainError(
+            "MODEL_ROUTE_INELIGIBLE",
+            "Reviewed disclosure authorization changed or expired before sending.",
+          );
+      }
       const rows = await tx.query(
         "UPDATE inference_reservations SET state='sent',request_hash=$1 WHERE owner_id=$2 AND id=$3 AND state='reserved' RETURNING id",
         [requestHash, this.ownerId, id],
       );
       if (!rows.length) throw new DomainError("REVISION_STALE", "Inference reservation is stale.");
+      if (expectedPrivacyBinding)
+        await this.audit(tx, id, "inference.disclosure_authorized", 1, {
+          binding: expectedPrivacyBinding,
+          requestHash,
+        });
     });
   }
 
@@ -343,7 +393,12 @@ export class MatchingRepository extends Repository {
         await tx.query("SELECT * FROM inference_state WHERE owner_id=$1", [this.ownerId])
       )[0];
       const data = state
-        ? json<{ modelId: string | null; provider: string | null; reason: string }>(state)
+        ? json<{
+            modelId: string | null;
+            provider: string | null;
+            reason: string;
+            privacyBinding?: string;
+          }>(state)
         : { modelId: null, provider: null, reason: "Inference is not configured." };
       const day = localDay(this.clock());
       const reservations = await tx.query(
@@ -375,6 +430,7 @@ export class MatchingRepository extends Repository {
             : null,
           backoffUntil: (state?.backoff_until as string | null) ?? null,
           reason: data.reason,
+          privacyBinding: "privacyBinding" in data ? (data.privacyBinding ?? null) : null,
         },
         budget: { day, limit: dailyLimit, used, reserved },
         assessments: latest.map((row) => assessmentSchema.parse(json(row))),

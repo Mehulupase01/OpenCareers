@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { z } from "zod";
 import { DomainError } from "../../contracts/src/index.js";
+import type { PrivacyRevision } from "../../inference/src/privacy.js";
 
 const envSchema = z.object({
   AUTOPILOT_PROFILE: z.enum(["demo", "local", "server"]).default("demo"),
@@ -24,6 +25,9 @@ const envSchema = z.object({
   AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: z.string().optional(),
   AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: z.string().optional(),
   AUTOPILOT_INFERENCE_DAILY_LIMIT: z.coerce.number().int().min(1).max(50).default(40),
+  AUTOPILOT_INFERENCE_PRIVACY_REVISION: z
+    .enum(["strict-zdr-v1", "reviewed-career-facts-v1"])
+    .default("strict-zdr-v1"),
   AUTOPILOT_EXTERNAL_SUBMISSION: z.enum(["true", "false"]).default("false"),
 });
 
@@ -44,6 +48,7 @@ export interface Config {
     dailyLimit: number;
     modelAllowlist: string[];
     providerAllowlist: string[];
+    privacyRevision?: PrivacyRevision;
   };
   externalSubmissionEnabled: boolean;
 }
@@ -151,6 +156,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     );
   if (profile === "demo" && e.AUTOPILOT_OPENROUTER_API_KEY)
     throw new DomainError("CONFIG_INVALID", "Demo cannot use an external inference key.");
+  if (
+    e.AUTOPILOT_INFERENCE_PRIVACY_REVISION !== "strict-zdr-v1" &&
+    (profile === "demo" || !e.AUTOPILOT_OPENROUTER_API_KEY)
+  )
+    throw new DomainError(
+      "CONFIG_INVALID",
+      "Reviewed privacy requires a configured private inference profile.",
+    );
   const externalSubmissionEnabled = e.AUTOPILOT_EXTERNAL_SUBMISSION === "true";
   if (profile === "demo" && externalSubmissionEnabled)
     throw new DomainError("CONFIG_INVALID", "Demo cannot enable external submissions.");
@@ -193,6 +206,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
       dailyLimit: e.AUTOPILOT_INFERENCE_DAILY_LIMIT,
       modelAllowlist,
       providerAllowlist,
+      privacyRevision: e.AUTOPILOT_INFERENCE_PRIVACY_REVISION,
     },
     externalSubmissionEnabled,
   };

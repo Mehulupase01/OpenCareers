@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../../packages/config/src/index.js";
 import { sourceInputSchema } from "../../packages/contracts/src/discovery.js";
 import { DomainError } from "../../packages/contracts/src/index.js";
-import { MatchingRunner } from "../../packages/inference/src/gateway.js";
+import { fixtureProposal, MatchingRunner } from "../../packages/inference/src/gateway.js";
+import { privacyBinding } from "../../packages/inference/src/privacy.js";
+import type { CompletionRequest } from "../../packages/inference/src/transport.js";
 import { deterministicGates, scoreMatch } from "../../packages/matching/src/domain.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import {
@@ -45,6 +47,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       });
 
       afterEach(async () => {
+        vi.useRealTimers();
         await db?.close();
       });
 
@@ -119,6 +122,189 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await expect(
           restarted.reserve("synthetic/model:free", "synthetic-provider", 3),
         ).rejects.toMatchObject({ code: "MODEL_QUOTA_EXHAUSTED" });
+      });
+
+      it("binds reviewed provider evidence durably and replaces a strict cached route before sending", async () => {
+        vi.setSystemTime(new Date("2026-10-09T12:00:00.000Z"));
+        const { jobId } = await profileAndJob();
+        const model = "apodex/apodex-1.1-mini:free";
+        const catalogue = {
+          data: [
+            {
+              id: model,
+              context_length: 262144,
+              architecture: { input_modalities: ["text"], output_modalities: ["text"] },
+              pricing: { prompt: "0", completion: "0" },
+              supported_parameters: ["structured_outputs", "response_format"],
+            },
+          ],
+        };
+        await matching.setRoute(catalogue, {
+          eligible: true,
+          modelId: model,
+          provider: "novita",
+          reasons: [],
+          catalogueFetchedAt: new Date().toISOString(),
+          privacyBinding: "strict-zdr-v1",
+        });
+        const input = await matching.input(jobId);
+        const transport = {
+          catalogue: vi.fn(async () => catalogue),
+          endpoints: vi.fn(async () => ({
+            data: {
+              endpoints: [
+                {
+                  model_id: model,
+                  provider_name: "Novita",
+                  tag: "novita/bf16",
+                  context_length: 262144,
+                  status: 0,
+                  pricing: { prompt: "0", completion: "0" },
+                  supported_parameters: ["structured_outputs", "response_format"],
+                },
+              ],
+            },
+          })),
+          complete: vi.fn(async (_request: CompletionRequest) => ({
+            model,
+            provider: "novita",
+            content: JSON.stringify(fixtureProposal(input)),
+            usage: { promptTokens: 50, completionTokens: 20 },
+          })),
+        };
+        const config = {
+          ...loadConfig({}),
+          profile: "local" as const,
+          inference: {
+            enabled: true,
+            apiKey: "synthetic-private-key-not-real",
+            dailyLimit: 5,
+            modelAllowlist: [model],
+            providerAllowlist: ["novita"],
+            privacyRevision: "reviewed-career-facts-v1" as const,
+          },
+        };
+        const runner = new MatchingRunner(matching, config, transport);
+        expect((await runner.assessNow(jobId)).outcome).toBe("auto_eligible");
+        expect(transport.catalogue).toHaveBeenCalledOnce();
+        expect(transport.endpoints).toHaveBeenCalledOnce();
+        expect(transport.complete.mock.calls[0]?.[0].provider).toMatchObject({
+          only: ["novita"],
+          data_collection: "allow",
+          zdr: false,
+          max_price: { prompt: 0, completion: 0 },
+        });
+        const snapshot = await new MatchingRepository(db, owner, () => new Date(now)).snapshot(5);
+        expect(snapshot.route.privacyBinding).toBe(privacyBinding("reviewed-career-facts-v1"));
+        expect(snapshot.budget.used).toBe(1);
+        expect(
+          await db.query(
+            "SELECT id FROM audit_events WHERE owner_id=$1 AND action='inference.privacy_bound' AND payload LIKE $2",
+            [owner, `%${privacyBinding("reviewed-career-facts-v1")}%`],
+          ),
+        ).toHaveLength(1);
+      });
+
+      it("parks an unqualified reviewed endpoint without sending, consuming quota or polling it every tick", async () => {
+        vi.setSystemTime(new Date("2026-10-09T12:00:00.000Z"));
+        const model = "apodex/apodex-1.1-mini:free";
+        const transport = {
+          catalogue: vi.fn(async () => ({
+            data: [
+              {
+                id: model,
+                context_length: 262144,
+                architecture: { input_modalities: ["text"], output_modalities: ["text"] },
+                pricing: { prompt: "0", completion: "0" },
+                supported_parameters: ["structured_outputs", "response_format"],
+              },
+            ],
+          })),
+          endpoints: vi.fn(async () => ({ data: { endpoints: [] } })),
+          complete: vi.fn(async () => {
+            throw new Error("Must not send.");
+          }),
+        };
+        const config = {
+          ...loadConfig({}),
+          profile: "local" as const,
+          inference: {
+            enabled: true,
+            apiKey: "synthetic-private-key-not-real",
+            dailyLimit: 5,
+            modelAllowlist: [model],
+            providerAllowlist: ["novita"],
+            privacyRevision: "reviewed-career-facts-v1" as const,
+          },
+        };
+        const runner = new MatchingRunner(matching, config, transport);
+        await runner.run();
+        await runner.run();
+        expect(transport.catalogue).toHaveBeenCalledOnce();
+        expect(transport.endpoints).toHaveBeenCalledOnce();
+        expect(transport.complete).not.toHaveBeenCalled();
+        expect((await matching.snapshot(5)).route.status).toBe("paused");
+        expect((await matching.snapshot(5)).budget.used).toBe(0);
+      });
+
+      it("rechecks a reviewed route transactionally when reserving and recording a disclosure", async () => {
+        const model = "apodex/apodex-1.1-mini:free";
+        const binding = privacyBinding("reviewed-career-facts-v1");
+        const catalogue = {
+          data: [
+            {
+              id: model,
+              architecture: { input_modalities: ["text"], output_modalities: ["text"] },
+              pricing: { prompt: "0", completion: "0" },
+              supported_parameters: ["structured_outputs"],
+            },
+          ],
+        };
+        const decision = {
+          eligible: true,
+          modelId: model,
+          provider: "novita",
+          reasons: [],
+          catalogueFetchedAt: new Date(now).toISOString(),
+          privacyBinding: binding,
+        };
+        await matching.setRoute(catalogue, decision);
+        await expect(
+          matching.reserve("other/model:free", "novita", 5, null, binding),
+        ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+        const reservation = await matching.reserve(model, "novita", 5, null, binding);
+        await matching.setRoute(catalogue, { ...decision, privacyBinding: "strict-zdr-v1" });
+        await expect(
+          matching.markSent(reservation.id, "e".repeat(64), binding),
+        ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+        expect(
+          (
+            await db.query("SELECT state FROM inference_reservations WHERE owner_id=$1 AND id=$2", [
+              owner,
+              reservation.id,
+            ])
+          )[0]?.state,
+        ).toBe("reserved");
+        await matching.setRoute(catalogue, decision);
+        now += 61000;
+        await expect(
+          matching.markSent(reservation.id, "e".repeat(64), binding),
+        ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+        expect(
+          await db.query(
+            "SELECT id FROM audit_events WHERE owner_id=$1 AND action='inference.disclosure_authorized'",
+            [owner],
+          ),
+        ).toHaveLength(0);
+        await matching.release(reservation.id);
+        const fresh = await matching.reserve(model, "novita", 5, null, binding);
+        await matching.markSent(fresh.id, "f".repeat(64), binding);
+        expect(
+          await db.query(
+            "SELECT id FROM audit_events WHERE owner_id=$1 AND action='inference.disclosure_authorized'",
+            [owner],
+          ),
+        ).toHaveLength(1);
       });
 
       it("releases only unsent expired reservations and keeps sent attempts counted", async () => {

@@ -55,7 +55,8 @@ const letterDraftRunner = config.inference.apiKey
   ? new LetterDraftRunner(
       matchingRepository,
       config.inference.dailyLimit,
-      new OpenRouterTransport(config.inference.apiKey),
+      new OpenRouterTransport(config.inference.apiKey, fetch, config.inference.privacyRevision),
+      config.inference.privacyRevision,
     )
   : null;
 const workerId = `scheduler-${randomUUID().slice(0, 8)}`;

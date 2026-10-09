@@ -19,6 +19,14 @@ import {
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
 import { assertNoTools, selectRoute } from "./policy.js";
 import {
+  assertPrivacyRoute,
+  assertReviewedEndpoint,
+  careerTextMinimizer,
+  type PrivacyRevision,
+  privacyBinding,
+  providerPrivacy,
+} from "./privacy.js";
+import {
   type CompletionRequest,
   type CompletionResponse,
   OpenRouterTransport,
@@ -27,6 +35,7 @@ import {
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export interface InferenceTransport {
   catalogue(): Promise<unknown>;
+  endpoints?(model: string): Promise<unknown>;
   complete(request: CompletionRequest): Promise<CompletionResponse>;
 }
 
@@ -59,15 +68,36 @@ export function buildRequest(
   input: MatchingInput,
   model: string,
   provider: string,
+  privacyRevision: PrivacyRevision = "strict-zdr-v1",
 ): CompletionRequest {
+  const minimize =
+    privacyRevision === "reviewed-career-facts-v1"
+      ? careerTextMinimizer(input.facts)
+      : (value: string) => value;
+  const facts = inferenceFacts(input.facts).filter(
+    (fact) => privacyRevision === "strict-zdr-v1" || fact.value.kind !== "availability",
+  );
+  if (facts.some((fact) => minimize(fact.id) !== fact.id))
+    throw new DomainError(
+      "MODEL_ROUTE_INELIGIBLE",
+      "Inference evidence identifiers contain private identity.",
+    );
   const payload = {
-    vacancy: { title: input.job.title, description: input.job.description },
-    facts: inferenceFacts(input.facts).map((fact) => ({
+    vacancy: { title: minimize(input.job.title), description: minimize(input.job.description) },
+    facts: facts.map((fact) => ({
       id: fact.id,
       kind: fact.value.kind,
-      evidence: factSummary(fact),
+      evidence: minimize(factSummary(fact)),
     })),
   };
+  if (
+    privacyRevision === "reviewed-career-facts-v1" &&
+    Buffer.byteLength(JSON.stringify(payload), "utf8") > 24000
+  )
+    throw new DomainError(
+      "MODEL_ROUTE_INELIGIBLE",
+      "Minimized career prompt exceeds the reviewed disclosure budget.",
+    );
   const request: CompletionRequest = {
     model,
     messages: [
@@ -88,13 +118,7 @@ export function buildRequest(
     },
     temperature: 0,
     max_tokens: 1800,
-    provider: {
-      only: [provider],
-      allow_fallbacks: false,
-      require_parameters: true,
-      data_collection: "deny",
-      zdr: true,
-    },
+    provider: providerPrivacy(model, provider, privacyRevision),
   };
   assertNoTools(request);
   return request;
@@ -167,7 +191,9 @@ export class MatchingRunner {
   ) {
     this.transport =
       transport ??
-      (config.inference.apiKey ? new OpenRouterTransport(config.inference.apiKey) : null);
+      (config.inference.apiKey
+        ? new OpenRouterTransport(config.inference.apiKey, fetch, config.inference.privacyRevision)
+        : null);
   }
 
   private async route() {
@@ -191,7 +217,24 @@ export class MatchingRunner {
     const fresh =
       current.route.lastCatalogueAt &&
       Date.now() - Date.parse(current.route.lastCatalogueAt) < 6 * 3600000;
-    if (fresh && ["ready", "paused"].includes(current.route.status)) return;
+    const binding = privacyBinding(this.config.inference.privacyRevision);
+    if (
+      fresh &&
+      ["ready", "paused"].includes(current.route.status) &&
+      current.route.privacyBinding === binding
+    ) {
+      if (current.route.status === "ready" && current.route.modelId && current.route.provider)
+        try {
+          providerPrivacy(
+            current.route.modelId,
+            current.route.provider,
+            this.config.inference.privacyRevision,
+          );
+        } catch {
+          await this.repo.setUnavailable("paused", "Inference privacy review expired or changed.");
+        }
+      return;
+    }
     try {
       const catalogue = await this.transport.catalogue();
       const fetchedAt = new Date().toISOString();
@@ -206,6 +249,36 @@ export class MatchingRunner {
         },
         fetchedAt,
       );
+      decision.privacyBinding = binding;
+      if (decision.eligible && decision.provider) {
+        try {
+          providerPrivacy(
+            decision.modelId,
+            decision.provider,
+            this.config.inference.privacyRevision,
+          );
+          if (this.config.inference.privacyRevision === "reviewed-career-facts-v1") {
+            if (!this.transport.endpoints)
+              throw new DomainError(
+                "MODEL_ROUTE_INELIGIBLE",
+                "Reviewed route requires provider endpoint evidence.",
+              );
+            decision.endpointEvidence = assertReviewedEndpoint(
+              await this.transport.endpoints(decision.modelId),
+              decision.modelId,
+              decision.provider,
+            );
+          }
+        } catch (error) {
+          if (error instanceof DomainError && error.code === "RATE_LIMITED") throw error;
+          decision.eligible = false;
+          decision.reasons = [
+            error instanceof DomainError
+              ? error.message
+              : "Provider endpoint review failed closed.",
+          ];
+        }
+      }
       await this.repo.setRoute(catalogue, decision);
     } catch (error) {
       await this.repo.setUnavailable(
@@ -298,10 +371,25 @@ export class MatchingRunner {
         snapshot.route.modelId,
         snapshot.route.provider,
         this.config.inference.dailyLimit,
+        ...(!fixture && this.config.inference.privacyRevision === "reviewed-career-facts-v1"
+          ? ([null, privacyBinding(this.config.inference.privacyRevision)] as const)
+          : []),
       );
-      const request = buildRequest(input, snapshot.route.modelId, snapshot.route.provider);
+      if (!fixture) assertPrivacyRoute(snapshot.route, this.config.inference.privacyRevision);
+      const request = buildRequest(
+        input,
+        snapshot.route.modelId,
+        snapshot.route.provider,
+        fixture ? "strict-zdr-v1" : this.config.inference.privacyRevision,
+      );
       const requestContent = JSON.stringify(request);
-      await this.repo.markSent(reservation.id, digest(requestContent));
+      await this.repo.markSent(
+        reservation.id,
+        digest(requestContent),
+        ...(!fixture && this.config.inference.privacyRevision === "reviewed-career-facts-v1"
+          ? ([privacyBinding(this.config.inference.privacyRevision)] as const)
+          : []),
+      );
       sent = true;
       if (fixture) {
         proposal = fixtureProposal(input);

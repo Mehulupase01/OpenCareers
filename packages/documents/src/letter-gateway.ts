@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import type { PacketContent } from "../../contracts/src/documents.js";
 import { DomainError } from "../../contracts/src/index.js";
+import {
+  assertPrivacyRoute,
+  type PrivacyRevision,
+  privacyBinding,
+} from "../../inference/src/privacy.js";
 import type { OpenRouterTransport } from "../../inference/src/transport.js";
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
 import type { PacketGenerationInput } from "./domain.js";
@@ -16,22 +21,39 @@ export class LetterDraftRunner {
     >,
     private readonly dailyLimit: number,
     private readonly transport: Pick<OpenRouterTransport, "complete">,
+    private readonly privacyRevision: PrivacyRevision = "strict-zdr-v1",
   ) {}
 
   async draft(input: PacketGenerationInput, content: PacketContent) {
     const route = (await this.ledger.snapshot(this.dailyLimit)).route;
     if (route.status !== "ready" || !route.modelId || !route.provider)
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "No reviewed free letter route is ready.");
-    const request = buildLetterRequest(input, content, route.modelId, route.provider);
+    assertPrivacyRoute(route, this.privacyRevision);
+    const request = buildLetterRequest(
+      input,
+      content,
+      route.modelId,
+      route.provider,
+      this.privacyRevision,
+    );
     const reservation = await this.ledger.reserve(
       route.modelId,
       route.provider,
       this.dailyLimit,
       input.assessment.applicationId ?? undefined,
+      ...(this.privacyRevision === "reviewed-career-facts-v1"
+        ? ([privacyBinding(this.privacyRevision)] as const)
+        : []),
     );
     let sent = false;
     try {
-      await this.ledger.markSent(reservation.id, digest(JSON.stringify(request)));
+      await this.ledger.markSent(
+        reservation.id,
+        digest(JSON.stringify(request)),
+        ...(this.privacyRevision === "reviewed-career-facts-v1"
+          ? ([privacyBinding(this.privacyRevision)] as const)
+          : []),
+      );
       sent = true;
       const response = await this.transport.complete(request);
       if (

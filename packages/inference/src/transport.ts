@@ -1,4 +1,5 @@
 import { DomainError } from "../../contracts/src/index.js";
+import { type PrivacyRevision, providerPrivacy } from "./privacy.js";
 
 export interface CompletionRequest {
   model: string;
@@ -13,8 +14,9 @@ export interface CompletionRequest {
     only: string[];
     allow_fallbacks: false;
     require_parameters: true;
-    data_collection: "deny";
-    zdr: true;
+    data_collection: "deny" | "allow";
+    zdr: boolean;
+    max_price?: { prompt: number; completion: number; request: number; image: number };
   };
 }
 
@@ -59,13 +61,14 @@ export class OpenRouterTransport {
   constructor(
     private readonly apiKey: string,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly privacyRevision: PrivacyRevision = "strict-zdr-v1",
   ) {}
 
-  private async call(path: "/models" | "/chat/completions", init?: RequestInit) {
+  private async call(path: string, init?: RequestInit) {
     const response = await this.fetcher(`https://openrouter.ai/api/v1${path}`, {
       ...init,
       redirect: "error",
-      signal: AbortSignal.timeout(path === "/models" ? 15000 : 30000),
+      signal: AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         Accept: "application/json",
@@ -98,7 +101,23 @@ export class OpenRouterTransport {
     return this.call("/models");
   }
 
+  endpoints(model: string) {
+    if (!/^[a-zA-Z0-9_.~-]+\/[a-zA-Z0-9_.~:-]+:free$/.test(model))
+      throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Invalid free endpoint model.");
+    return this.call(`/models/${model}/endpoints`);
+  }
+
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
+    const expected = providerPrivacy(
+      request.model,
+      request.provider.only[0] ?? "",
+      this.privacyRevision,
+    );
+    if (JSON.stringify(request.provider) !== JSON.stringify(expected))
+      throw new DomainError(
+        "MODEL_ROUTE_INELIGIBLE",
+        "Inference privacy controls differed from the recorded revision.",
+      );
     const raw = (await this.call("/chat/completions", {
       method: "POST",
       body: JSON.stringify(request),

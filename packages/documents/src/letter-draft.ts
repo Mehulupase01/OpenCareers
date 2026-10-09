@@ -6,6 +6,11 @@ import {
 } from "../../contracts/src/documents.js";
 import { DomainError } from "../../contracts/src/index.js";
 import { assertNoTools } from "../../inference/src/policy.js";
+import {
+  careerTextMinimizer,
+  type PrivacyRevision,
+  providerPrivacy,
+} from "../../inference/src/privacy.js";
 import type { CompletionRequest } from "../../inference/src/transport.js";
 import type { PacketGenerationInput } from "./domain.js";
 
@@ -37,12 +42,25 @@ export function buildLetterRequest(
   content: PacketContent,
   model: string,
   provider: string,
+  privacyRevision: PrivacyRevision = "strict-zdr-v1",
 ): CompletionRequest {
   assertBound(input, content);
   if (!model.endsWith(":free") || !provider)
     throw new DomainError(
       "MODEL_ROUTE_INELIGIBLE",
       "Letter drafting requires a pinned free route.",
+    );
+  const minimize =
+    privacyRevision === "reviewed-career-facts-v1"
+      ? careerTextMinimizer(input.profile.facts)
+      : (value: string) => value;
+  if (
+    minimize(content.letter.opening) !== content.letter.opening ||
+    content.letter.contributions.some((claim) => minimize(claim.id) !== claim.id)
+  )
+    throw new DomainError(
+      "MODEL_ROUTE_INELIGIBLE",
+      "Letter routing would disclose private identity.",
     );
   const request: CompletionRequest = {
     model,
@@ -55,17 +73,18 @@ export function buildLetterRequest(
       {
         role: "user",
         content: JSON.stringify({
-          company: input.job.company,
-          role: input.job.title,
-          vacancyDescription: input.job.description.slice(0, 6000),
+          company: minimize(input.job.company),
+          role: minimize(input.job.title),
+          vacancyDescription: minimize(input.job.description.slice(0, 6000)),
           requiredOpening: content.letter.opening,
           requirements: input.assessment.requirements
             .filter((item) => item.status === "met")
             .slice(0, 8)
-            .map((item) => item.span.quote),
+            .map((item) => minimize(item.span.quote))
+            .filter((quote) => quote.trim()),
           contributions: content.letter.contributions.map((claim) => ({
             id: claim.id,
-            text: claim.text,
+            text: minimize(claim.text),
           })),
         }),
       },
@@ -80,13 +99,7 @@ export function buildLetterRequest(
     },
     temperature: 0,
     max_tokens: 500,
-    provider: {
-      only: [provider],
-      allow_fallbacks: false,
-      require_parameters: true,
-      data_collection: "deny",
-      zdr: true,
-    },
+    provider: providerPrivacy(model, provider, privacyRevision),
   };
   assertNoTools(request);
   return request;
