@@ -549,3 +549,25 @@ audit passed. GitHub run 37859677291 passed Windows, Ubuntu and PostgreSQL at
 P10 and P15 remain in progress: no additional phase is claimed complete. Gmail
 credentials exist locally; their path was requested in chat, never their contents.
 No real employer action, private migration, key change or service restart occurred.
+
+## 2026-10-09: P10 Verified Closeout
+
+P10 is complete against owned fixtures after canonical answer validation before
+fill and transactional dispatch, encrypted owner-bound ordinary-cookie recovery,
+generation/expiry fencing, fresh-browser inspection and receipt-backed mock commit.
+Details and exclusions: `docs/evidence/P10-verified-recovery.md`.
+
+GitHub run 37864831023 passed Windows, Ubuntu and PostgreSQL at
+50ad0608b9d7c89e4c4a48b0b4d55d5561e01a1d: 41 unit/integration files on each OS,
+19 integration files in the PostgreSQL lane, and all 44 browser cases on each OS.
+Lint, typecheck, public scan, build and production audit passed. The ledger records
+10/19 phases and 72/128 gates complete. Production authentication-cookie allowlists
+remain empty; fixture evidence is not live ATS certification. Private services,
+data and keys were untouched. P08 live receipts and P11-P18 release work stay open.
+
+Next is execution-order step 4: the explicit owner-approved reviewed-provider
+privacy revision for minimized OpenRouter matching and mandatory LLM letters.
+Public catalogue review found Nemotron Ultra lacks advertised structured outputs;
+NVIDIA's linked trial terms restrict production and personal-data use. Do not
+silently waive those constraints. Novita currently serves a structured-output free
+route; recheck endpoint availability and pin reviewed terms before activation.

@@ -1,7 +1,8 @@
 # P10 Recovery Closeout
 
-2026-10-09. This supersedes the overstated historical P10 closure. Verification
-is being completed before the ledger is closed; live portal support is not claimed.
+2026-10-09. This supersedes the overstated historical P10 closure. GitHub run
+37864831023 passed Windows, Ubuntu and PostgreSQL at
+`50ad0608b9d7c89e4c4a48b0b4d55d5561e01a1d`; live portal support is not claimed.
 
 ## Delivered
 
@@ -46,8 +47,11 @@ reconciliation before any rebuild. The external fixture additionally rejects a
 vanished application form. The desktop/mobile suite covers the owner UI and actual
 mock final actions without contacting employers.
 
-Final local totals and GitHub run evidence are recorded in HANDOFF and the ledger
-after verification completes.
+All 41 unit/integration files passed on Windows and Ubuntu, and all 19 integration
+files passed in the dedicated PostgreSQL lane. All 44 desktop/mobile browser cases
+passed on each operating system. Lint, typecheck, public-source scan, build and
+production dependency audit passed. The phase ledger now records 10 of 19 phases
+and 72 of 128 gates complete.
 
 ## Boundaries
 

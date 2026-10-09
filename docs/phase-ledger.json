@@ -1046,7 +1046,7 @@
     {
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
-      "status": "code_complete_verification_pending",
+      "status": "complete",
       "dependsOn": ["P09"],
       "tickets": [
         {
@@ -1078,7 +1078,7 @@
         {
           "id": "P10-03",
           "text": "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route, and expire stale handles, without implementing CAPTCHA bypass.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1087,7 +1087,7 @@
             "tests/e2e/handoff-broker.spec.ts",
             "tests/e2e/handoff-external.spec.ts"
           ],
-          "nextAction": "Verify encrypted continuation and fresh-context recovery across CI lanes. Live portal certification remains separate coverage work."
+          "nextAction": null
         },
         {
           "id": "P10-04",
@@ -1104,7 +1104,7 @@
         {
           "id": "P10-05",
           "text": "Propagation and resumption. An approved answer resolves semantically equivalent pending questions within its scope, and the entire affected form is revalidated before commitment.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": ["T21", "T22", "T32"],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1112,7 +1112,7 @@
             "tests/integration/documents.test.ts",
             "tests/integration/handoff.test.ts"
           ],
-          "nextAction": "Verify canonical pre-fill and transactional dispatch validation across CI lanes."
+          "nextAction": null
         }
       ],
       "gates": [
@@ -1141,8 +1141,9 @@
         {
           "id": "P10-G3",
           "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": [
+            "docs/evidence/P10-verified-recovery.md",
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/handoff.test.ts",
             "tests/integration/handoff-external.test.ts",
@@ -1175,8 +1176,9 @@
         {
           "id": "P10-G6",
           "requirement": "Resolving one answer does not incorrectly propagate to differently worded legal or sponsorship questions.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": [
+            "docs/evidence/P10-verified-recovery.md",
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/candidate.test.ts",
             "tests/integration/documents.test.ts"
@@ -1185,8 +1187,9 @@
         {
           "id": "P10-G7",
           "requirement": "A resumed expired form is rebuilt safely, while an ambiguous prior commit is reconciled first.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": [
+            "docs/evidence/P10-verified-recovery.md",
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/rebuild.test.ts",
             "tests/integration/documents.test.ts",
@@ -1199,8 +1202,18 @@
         "status": "not_required",
         "note": "Every P10 gate is satisfiable against owned fixtures and loopback servers."
       },
-      "lastVerifiedCommit": "84acb1a6685a7da78da489ed60cc8eecdb3fe78f",
+      "lastVerifiedCommit": "50ad0608b9d7c89e4c4a48b0b4d55d5561e01a1d",
       "remoteVerification": [
+        {
+          "runId": "37864831023",
+          "commit": "50ad0608b9d7c89e4c4a48b0b4d55d5561e01a1d",
+          "lanes": [
+            "local-contract:ubuntu-latest",
+            "local-contract:windows-latest",
+            "postgres-contract"
+          ],
+          "covers": "P10 recovery closeout: canonical pre-fill and transactional dispatch answer validation, encrypted owner-bound continuations, generation/expiry refusal, fresh-browser reinspection and one correlated owned-fixture receipt. All three CI lanes passed; 44 browser cases passed on both Windows and Ubuntu. No live portal certification."
+        },
         {
           "runId": "36457888701",
           "commit": "8b2a40b6ae386b8ff106e0093390530e7aeef73d",
@@ -1213,7 +1226,7 @@
         }
       ],
       "acceptanceTests": ["T21", "T22", "T32"],
-      "nextAction": "Finish local and cross-platform verification before closing workflow-engine acceptance; no live portal support is claimed.",
+      "nextAction": null,
       "evidence": [
         "docs/evidence/P10-verified-recovery.md",
         "docs/evidence/INBOX-RESUMPTION.md",
