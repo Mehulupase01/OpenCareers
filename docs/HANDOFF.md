@@ -543,7 +543,8 @@ See `docs/evidence/INBOX-RESUMPTION.md` for verification and remaining gates.
 
 Full check passed (281 tests, 101 PostgreSQL skips, 41 files), as did all 44 isolated
 desktop/mobile browser cases in 2.4 minutes. Public-source scan and production
-audit passed. Post-push CI is pending; no live adapter support is claimed.
+audit passed. GitHub run 37859677291 passed Windows, Ubuntu and PostgreSQL at
+477d02d649cb5279fd7ec27db651e83508824f92; no live adapter support is claimed.
 
 P10 and P15 remain in progress: no additional phase is claimed complete. Gmail
 credentials exist locally; their path was requested in chat, never their contents.

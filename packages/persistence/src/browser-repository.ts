@@ -18,6 +18,7 @@ export class BrowserRepository extends Repository {
     options: {
       queueSubmit?: { adapterId: string; target: Record<string, unknown> };
       expectedRevision?: number;
+      handoffId?: string;
     } = {},
   ): Promise<BrowserPreparation> {
     if (options.queueSubmit && !/^[a-z][a-z0-9-]{0,79}$/.test(options.queueSubmit.adapterId))
@@ -175,6 +176,44 @@ export class BrowserRepository extends Repository {
         state = next;
       };
       if (state !== "INSPECTING") await transition("INSPECTING");
+      if (options.handoffId) {
+        const handoff = (
+          await tx.query(
+            "SELECT h.generation,h.completed_at,h.expires_at,k.generation AS continuation_generation,k.packet_id FROM handoff_sessions h JOIN handoff_continuations k ON k.owner_id=h.owner_id AND k.handoff_id=h.id WHERE h.owner_id=$1 AND h.id=$2 AND h.application_id=$3 AND h.state='rebuilding' AND h.adapter_id=$4 AND h.target_fingerprint=$5",
+            [
+              this.ownerId,
+              options.handoffId,
+              result.applicationId,
+              result.adapter?.id ?? null,
+              result.adapter?.targetFingerprint ?? null,
+            ],
+          )
+        )[0];
+        if (
+          !handoff ||
+          handoff.generation !== handoff.continuation_generation ||
+          handoff.packet_id !== result.packetId ||
+          String(handoff.expires_at) <= this.now() ||
+          String(handoff.completed_at) >= this.now()
+        )
+          throw new DomainError(
+            "SESSION_EXPIRED",
+            "Handoff changed or expired during fresh inspection.",
+          );
+        await tx.query(
+          "UPDATE handoff_sessions SET state='completed' WHERE owner_id=$1 AND id=$2 AND generation=$3 AND state='rebuilding'",
+          [this.ownerId, options.handoffId, handoff.generation ?? null],
+        );
+        if (result.snapshots.every((snapshot) => snapshot.blocker === "none")) {
+          await tx.query(
+            "UPDATE exceptions SET status='resolved',resolved_action='session_completed',resolved_at=$1,updated_at=$1 WHERE owner_id=$2 AND application_id=$3 AND blocker='challenge_required' AND status IN ('open','deferred')",
+            [this.now(), this.ownerId, result.applicationId],
+          );
+        }
+        await this.audit(tx, options.handoffId, "handoff.reinspected", Number(handoff.generation), {
+          status: result.status,
+        });
+      }
       const next: ApplicationState =
         result.status === "ready"
           ? "READY"
@@ -215,6 +254,7 @@ export class BrowserRepository extends Repository {
             schemaVersion: 1,
             packetId: result.packetId,
             preparationId: id,
+            ...(options.handoffId ? { handoffId: options.handoffId } : {}),
             ...options.queueSubmit.target,
           },
           priority: 50,

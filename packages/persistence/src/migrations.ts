@@ -112,6 +112,9 @@ export const migrations = [
     "CREATE TABLE restore_reviews (owner_id TEXT NOT NULL, run_id TEXT NOT NULL, application_id TEXT NOT NULL, disposition TEXT NOT NULL, receipt_id TEXT, note TEXT NOT NULL DEFAULT '', reviewed_at TEXT, PRIMARY KEY(owner_id,run_id,application_id), FOREIGN KEY(owner_id,run_id) REFERENCES restore_runs(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,receipt_id) REFERENCES receipts(owner_id,id))",
     "CREATE INDEX restore_application_barrier ON restore_reviews(owner_id,application_id,disposition)",
   ],
+  [
+    "CREATE TABLE handoff_continuations (owner_id TEXT NOT NULL, handoff_id TEXT NOT NULL, secret_id TEXT NOT NULL, generation INTEGER NOT NULL, packet_id TEXT NOT NULL, profile_id TEXT NOT NULL, authorization_id TEXT NOT NULL, authorization_revision INTEGER NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,handoff_id), FOREIGN KEY(owner_id,handoff_id) REFERENCES handoff_sessions(owner_id,id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

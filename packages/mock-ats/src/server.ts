@@ -38,8 +38,8 @@ export interface MockApplication {
   receivedAt: string;
 }
 
-function page(fixture: string, jobId: string): string {
-  const challenge = fixture === "challenge";
+function page(fixture: string, jobId: string, sessionReady = false): string {
+  const challenge = fixture === "challenge" && !sessionReady;
   const question =
     fixture === "changed-question"
       ? "Do you need visa sponsorship now?"
@@ -79,7 +79,7 @@ document.getElementById('next').addEventListener('click',()=>{first.hidden=true;
 document.getElementById('back').addEventListener('click',()=>{second.hidden=true;first.hidden=false;});
 document.getElementById('sponsorship').addEventListener('change',e=>{const detail=document.getElementById('sponsorship-detail');detail.hidden=e.target.value!=='yes';detail.querySelector('textarea').required=e.target.value==='yes';});
 if(fixture==='implicit-submit')document.getElementById('location').addEventListener('change',()=>HTMLFormElement.prototype.submit.call(form));
-document.getElementById('solve')?.addEventListener('click',()=>{document.querySelector('[data-challenge]').hidden=true;});
+document.getElementById('solve')?.addEventListener('click',()=>{document.cookie='mock_owner_session='+encodeURIComponent(form.dataset.jobId)+'; Path=/jobs/challenge; SameSite=Strict';document.querySelector('[data-challenge]').hidden=true;});
 document.getElementById('cv').addEventListener('change',async e=>{const output=document.getElementById('upload-status');const file=e.target.files?.[0];if(!file)return;output.dataset.uploadStatus='selected';output.textContent='Selected';await new Promise(r=>setTimeout(r,30));output.dataset.uploadStatus='uploading';output.textContent='Uploading';try{const body=new FormData();body.append('file',file);const response=await fetch('/uploads?fixture='+fixture,{method:'POST',body});if(!response.ok)throw new Error('Upload rejected');const result=await response.json();document.getElementById('upload-id').value=result.id;output.dataset.uploadStatus='accepted';output.textContent='Accepted';}catch{output.dataset.uploadStatus='failed';output.textContent='Upload failed';}});
 form.addEventListener('submit',e=>{if(!document.getElementById('upload-id').value)e.preventDefault();});
 </script></body></html>`;
@@ -118,7 +118,12 @@ export async function buildMockAts(recordDir?: string) {
     if (!fixtures.has(fixture)) return reply.code(404).send({ error: "Unknown synthetic fixture" });
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(jobId))
       return reply.code(400).send({ error: "Invalid synthetic job ID" });
-    return reply.type("text/html; charset=utf-8").send(page(fixture, jobId));
+    const sessionReady =
+      request.headers.cookie
+        ?.split(";")
+        .some((value) => value.trim() === `mock_owner_session=${encodeURIComponent(jobId)}`) ??
+      false;
+    return reply.type("text/html; charset=utf-8").send(page(fixture, jobId, sessionReady));
   });
   app.post("/uploads", async (request, reply) => {
     const fixture = (request.query as { fixture?: string }).fixture ?? "standard";

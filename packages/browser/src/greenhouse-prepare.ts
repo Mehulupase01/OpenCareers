@@ -8,7 +8,9 @@ import {
   type FormSnapshot,
   fillReportSchema,
 } from "../../contracts/src/browser.js";
+import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
+import { type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 import {
   type GreenhouseTarget,
   greenhouseUrl,
@@ -51,9 +53,10 @@ export function greenhousePreparationResult(
   snapshot: FormSnapshot,
   blockedWriteCount: number,
   fillReport?: FillReport,
+  validatedPlan?: FieldPlan,
 ): DryRunResult {
   packetCv(target, packet, cvPdf);
-  const plan = planGreenhouseFields(snapshot, packet, approvedValues);
+  const plan = validatedPlan ?? planGreenhouseFields(snapshot, packet, approvedValues);
   const issues = [
     ...plan.unresolved.map((key) => `Required answer unresolved: ${key}`),
     ...(snapshot.blocker === "challenge" ? ["Verification challenge is present."] : []),
@@ -223,6 +226,8 @@ export async function prepareGreenhousePacket(
   cvPdf: Buffer,
   approvedValues: Record<string, string | boolean>,
   configureContext?: (context: BrowserContext) => Promise<void>,
+  validateAnswers: FormAnswerGuard = packetEvidenceGuard(packet),
+  browserSession?: BrowserSessionState,
 ): Promise<DryRunResult> {
   packetCv(target, packet, cvPdf);
   const url = greenhouseUrl(target);
@@ -236,6 +241,7 @@ export async function prepareGreenhousePacket(
       viewport: { width: 1280, height: 900 },
     });
     context.setDefaultTimeout(10000);
+    if (browserSession) await context.addCookies(browserSession.cookies);
     context.setDefaultNavigationTimeout(20000);
     await configureContext?.(context);
     await installGreenhouseReadOnlyRoutes(context, () => {
@@ -244,7 +250,11 @@ export async function prepareGreenhousePacket(
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
     const snapshot = await inspectGreenhouseForm(page, target);
-    const plan = planGreenhouseFields(snapshot, packet, approvedValues);
+    snapshot.jobId = packet.manifest.jobId;
+    const plan = await validateAnswers(
+      snapshot,
+      planGreenhouseFields(snapshot, packet, approvedValues),
+    );
     const fillReport =
       snapshot.blocker === "none" && !plan.unresolved.length && !blockedWriteCount
         ? await fillGreenhouseForm(page, target, snapshot, plan, packet, cvPdf)
@@ -257,6 +267,7 @@ export async function prepareGreenhousePacket(
       snapshot,
       blockedWriteCount,
       fillReport,
+      plan,
     );
   } finally {
     await browser.close();

@@ -2,9 +2,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runInspectionTask } from "../../apps/worker/src/inspection.js";
 import { AdapterRegistry, createAdapterRegistry } from "../../packages/browser/src/adapter-sdk.js";
+import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import type { DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { DomainError } from "../../packages/contracts/src/index.js";
@@ -21,6 +22,7 @@ import {
 } from "../../packages/persistence/src/database.js";
 import { DocumentRepository } from "../../packages/persistence/src/document-repository.js";
 import { ExceptionRepository } from "../../packages/persistence/src/exception-repository.js";
+import { HandoffRepository } from "../../packages/persistence/src/handoff-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { SubmissionRepository } from "../../packages/persistence/src/submission-repository.js";
@@ -149,6 +151,40 @@ for (const engine of ["sqlite", "postgres"] as const) {
       let documents: DocumentRepository;
       let artifacts: ArtifactStore;
 
+      async function seedProfileFacts() {
+        for (const fact of documentFacts) {
+          await db.query(
+            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              owner,
+              fact.id,
+              fact.revision,
+              documentProfile.candidateId,
+              JSON.stringify(fact),
+              fact.recordedAt,
+            ],
+          );
+          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
+            owner,
+            fact.id,
+            fact.revision,
+          ]);
+        }
+      }
+
+      async function approveMockScreening(clock: () => Date) {
+        await new CandidateRepository(db, owner, clock).saveAnswer({
+          semanticKey: "sponsorship_required",
+          meaning: "Sponsorship",
+          answer: "no",
+          validFrom: "2026-09-01",
+          validUntil: "2026-10-01",
+          employerIds: [documentJob.employerId],
+          countries: ["NL"],
+          evidenceFactIds: ["fact-work-nl"],
+        });
+      }
+
       beforeEach(async () => {
         dir = await mkdtemp(join(tmpdir(), "opencareers-documents-"));
         db =
@@ -229,6 +265,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       });
 
       afterEach(async () => {
+        vi.restoreAllMocks();
         await db?.close();
         if (dir) await rm(dir, { recursive: true, force: true });
       });
@@ -332,6 +369,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       });
 
       it("inspects the real mock browser and records an unknown question without submitting", async () => {
+        await seedProfileFacts();
         const clock = () => new Date("2026-09-17T09:00:00.000Z");
         const queue = new Repository(db, owner, clock);
         const packet = await documents.savePacket(
@@ -358,6 +396,486 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
           0,
         );
+      });
+
+      it("resumes an encrypted owner handoff in fresh contexts and submits only through a new permit", async () => {
+        await seedProfileFacts();
+        let now = Date.parse("2026-09-17T09:00:00.000Z");
+        const clock = () => new Date(now);
+        const timer = vi.spyOn(Date, "now").mockImplementation(() => now);
+        const key = randomBytes(32).toString("base64");
+        const queue = new Repository(db, owner, clock);
+        const candidates = new CandidateRepository(db, owner, clock);
+        const definitions = [
+          {
+            semanticKey: "country",
+            meaning: "Country",
+            answer: "NL",
+            evidenceFactIds: ["fact-work-nl"],
+          },
+          {
+            semanticKey: "sponsorship_required",
+            meaning: "Will you need sponsorship in the future?",
+            answer: "no",
+            evidenceFactIds: ["fact-work-nl"],
+          },
+          {
+            semanticKey: "available_from",
+            meaning: "Available from",
+            answer: "2026-11-01",
+            evidenceFactIds: ["fact-availability"],
+          },
+          {
+            semanticKey: "remote_preference",
+            meaning: "Remote preference",
+            answer: "yes",
+            evidenceFactIds: ["fact-identity"],
+          },
+          {
+            semanticKey: "terms",
+            meaning: "I confirm these details are accurate",
+            answer: true,
+            evidenceFactIds: ["fact-identity"],
+          },
+        ];
+        const approvedAnswers = [];
+        for (const definition of definitions)
+          approvedAnswers.push(
+            await candidates.saveAnswer({
+              ...definition,
+              validFrom: "2026-09-01",
+              validUntil: "2026-10-01",
+              countries: ["NL"],
+              employerIds: [documentJob.employerId],
+            }),
+          );
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, {
+            ...documentGenerationInput(),
+            approvedAnswers,
+            requestedAnswers: definitions.map(({ semanticKey, meaning }) => ({
+              semanticKey,
+              meaning,
+              maxCharacters: null,
+              country: "NL",
+            })),
+          }),
+        );
+        const adapters = createAdapterRegistry(dir);
+        const adapter = adapters.get("mock-ats");
+        const cv = await documents.artifact(packet.manifest.id, "cv_pdf", artifacts);
+        const browser = new BrowserRepository(db, owner, clock);
+        const result = await adapter.prepare({
+          packet,
+          cvPdf: cv.buffer,
+          approvedValues: {},
+          target: { fixture: "challenge" },
+          validateAnswers: (snapshot, plan) => candidates.validateFormPlan(packet, snapshot, plan),
+        });
+        expect(result.status).toBe("challenge");
+        const preparation = await browser.save(result);
+        const handoffs = new HandoffRepository(db, owner, clock, key);
+        const created = await handoffs.create({
+          applicationId: packet.manifest.applicationId,
+          preparationId: preparation.id,
+          adapterId: "mock-ats",
+          targetFingerprint: result.adapter?.targetFingerprint ?? "",
+        });
+        const session = await handoffs.claimHandoff(
+          created.session.id,
+          created.token,
+          "browser:fixture",
+        );
+        const broker = new VisibleHandoffBroker({
+          visible: false,
+          onOpened: async (page) => {
+            await page.getByRole("button", { name: "Continue", exact: true }).click();
+          },
+        });
+        try {
+          await broker.open(session, result, "browser:fixture");
+          const solved = await broker.verify(session.id, session.generation);
+          const cookie = solved.browserSession.cookies[0];
+          if (!cookie) throw new Error("Expected a scoped synthetic employer session.");
+          await expect(
+            handoffs.completeHandoff(session.id, solved.leaseOwner, session.generation, {
+              ...solved.browserSession,
+              cookies: [{ ...cookie, name: "cf_clearance" }],
+            }),
+          ).rejects.toMatchObject({ code: "ORIGIN_DENIED" });
+          await handoffs.completeHandoff(
+            session.id,
+            solved.leaseOwner,
+            session.generation,
+            solved.browserSession,
+          );
+          await broker.closeAll();
+          const encrypted = await db.query(
+            "SELECT envelope FROM vault_secrets WHERE owner_id=$1 AND purpose='browser_storage'",
+            [owner],
+          );
+          expect(encrypted).toHaveLength(1);
+          expect(JSON.stringify(encrypted)).not.toContain("mock_owner_session");
+          await expect(
+            handoffs.continuation(session.id, packet.manifest.applicationId, "wrong-packet"),
+          ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
+          await db.query(
+            "UPDATE handoff_sessions SET target_fingerprint=$1 WHERE owner_id=$2 AND id=$3",
+            ["f".repeat(64), owner, session.id],
+          );
+          await expect(
+            handoffs.continuation(session.id, packet.manifest.applicationId, packet.manifest.id),
+          ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+          await db.query(
+            "UPDATE handoff_sessions SET target_fingerprint=$1 WHERE owner_id=$2 AND id=$3",
+            [session.targetFingerprint, owner, session.id],
+          );
+          await db.query("UPDATE authorizations SET revoked_at=$1 WHERE owner_id=$2 AND id=$3", [
+            clock().toISOString(),
+            owner,
+            documentAuthorization.id,
+          ]);
+          await expect(
+            handoffs.continuation(session.id, packet.manifest.applicationId, packet.manifest.id),
+          ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
+          await db.query("UPDATE authorizations SET revoked_at=NULL WHERE owner_id=$1 AND id=$2", [
+            owner,
+            documentAuthorization.id,
+          ]);
+          now += 1000;
+          const inspect = await queue.claim("resumed-worker", ["inspect"]);
+          if (!inspect) throw new Error("Expected handoff inspection.");
+          const raced = new AdapterRegistry([
+            {
+              id: adapter.id,
+              version: adapter.version,
+              parseTarget: (input) => adapter.parseTarget(input),
+              prepare: async (input) => {
+                const fresh = await adapter.prepare(input);
+                await db.query(
+                  "UPDATE handoff_sessions SET generation=generation+1 WHERE owner_id=$1 AND id=$2",
+                  [owner, session.id],
+                );
+                return fresh;
+              },
+              commit: (input) => adapter.commit(input),
+              reconcile: (input) => adapter.reconcile(input),
+            },
+          ]);
+          await expect(
+            runInspectionTask(inspect, {
+              config: { profile: "demo", externalSubmissionEnabled: false, vaultKey: key },
+              repository: queue,
+              documents,
+              browser,
+              artifacts,
+              adapters: raced,
+              clock,
+            }),
+          ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
+          expect((await browser.snapshot()).some((item) => item.status === "ready")).toBe(false);
+          expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
+            0,
+          );
+          await db.query("UPDATE handoff_sessions SET generation=$1 WHERE owner_id=$2 AND id=$3", [
+            session.generation + 1,
+            owner,
+            session.id,
+          ]);
+          await runInspectionTask(inspect, {
+            config: { profile: "demo", externalSubmissionEnabled: false, vaultKey: key },
+            repository: queue,
+            documents,
+            browser,
+            artifacts,
+            adapters,
+            clock,
+          });
+          await queue.complete(inspect);
+          expect((await handoffs.snapshot()).find((item) => item.id === session.id)?.state).toBe(
+            "completed",
+          );
+          const ready = (await browser.snapshot()).find((item) => item.status === "ready");
+          if (!ready)
+            throw new Error(
+              `Expected fresh readiness after the owner handoff: ${JSON.stringify((await browser.snapshot()).map((item) => ({ status: item.status, issues: item.result.issues, unresolved: item.result.plans.map((plan) => plan.unresolved) })))}`,
+            );
+          expect(ready.result.snapshots.every((item) => item.blocker === "none")).toBe(true);
+          expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
+            0,
+          );
+          await queue.setControl({ submissionsPaused: false });
+          const task = await queue.claim("submission-worker", ["submit"]);
+          if (!task) throw new Error("Expected separately authorized submit work.");
+          const revision = Number(
+            (
+              await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+                owner,
+                packet.manifest.applicationId,
+              ])
+            )[0]?.revision,
+          );
+          const submissions = new SubmissionRepository(db, owner, clock);
+          const handle = await submissions.begin(task, {
+            packetId: packet.manifest.id,
+            preparationId: ready.id,
+            expectedRevision: revision,
+          });
+          const outcome = await adapter.commit({
+            packet,
+            cvPdf: cv.buffer,
+            preparation: ready,
+            target: { fixture: "challenge" },
+            browserSession: await handoffs.continuation(
+              session.id,
+              packet.manifest.applicationId,
+              packet.manifest.id,
+            ),
+            validateAnswers: (snapshot, plan) =>
+              candidates.validateFormPlan(packet, snapshot, plan, handle),
+            authorizeDispatch: () => submissions.authorizeDispatch(task, handle),
+          });
+          if (outcome.status !== "confirmed")
+            throw new Error("Expected a synthetic server receipt.");
+          await submissions.confirmReceipt(task, handle, outcome.evidence);
+          await queue.complete(task);
+          expect(await db.query("SELECT id FROM receipts WHERE owner_id=$1", [owner])).toHaveLength(
+            1,
+          );
+          now += 16 * 60 * 1000;
+          await expect(
+            handoffs.continuation(session.id, packet.manifest.applicationId, packet.manifest.id),
+          ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
+        } finally {
+          await broker.closeAll();
+          timer.mockRestore();
+        }
+      });
+
+      it("regenerates a packet when its exact answer approval was superseded", async () => {
+        await seedProfileFacts();
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const candidates = new CandidateRepository(db, owner, clock);
+        const input = {
+          semanticKey: "country",
+          meaning: "Country",
+          answer: "NL",
+          validFrom: "2026-09-01",
+          validUntil: "2026-10-01",
+          countries: ["NL"],
+          employerIds: [documentJob.employerId],
+          evidenceFactIds: ["fact-work-nl"],
+        };
+        const approved = await candidates.saveAnswer(input);
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, {
+            ...documentGenerationInput(),
+            approvedAnswers: [approved],
+            requestedAnswers: [
+              {
+                semanticKey: input.semanticKey,
+                meaning: input.meaning,
+                maxCharacters: null,
+                country: "NL",
+              },
+            ],
+          }),
+        );
+        await candidates.saveAnswer({ ...input, answer: "DE" });
+        await documents.queueInspection(packet);
+        const queue = new Repository(db, owner, clock);
+        const task = await queue.claim("inspection-worker", ["inspect"]);
+        if (!task) throw new Error("Expected inspection task.");
+        const browser = new BrowserRepository(db, owner, clock);
+        await runInspectionTask(task, {
+          config: { profile: "demo", externalSubmissionEnabled: false },
+          repository: queue,
+          documents,
+          browser,
+          artifacts,
+          adapters: createAdapterRegistry(dir),
+          clock,
+        });
+        await queue.complete(task);
+        const refresh = await db.query(
+          "SELECT payload FROM tasks WHERE owner_id=$1 AND type='prepare'",
+          [owner],
+        );
+        expect(refresh).toHaveLength(1);
+        expect(JSON.parse(String(refresh[0]?.payload))).toMatchObject({
+          refreshAnswers: true,
+          assessmentId: packet.manifest.assessmentId,
+        });
+        expect(
+          (await browser.snapshot())[0]?.result.plans[0]?.entries.some(
+            (entry) => entry.semanticKey === "country",
+          ),
+        ).toBe(false);
+        expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
+          0,
+        );
+      });
+
+      it.each([
+        {
+          name: "exact approval",
+          meaning: "Do you require sponsorship?",
+          employerIds: [documentJob.employerId],
+          countries: ["NL"],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: true,
+        },
+        {
+          name: "future sponsorship wording",
+          meaning: "Will you require future employer sponsorship in NL?",
+          employerIds: [],
+          countries: [],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "current work authorization",
+          meaning: "Are you currently authorized to work?",
+          employerIds: [],
+          countries: [],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "nationality wording",
+          meaning: "What is your nationality?",
+          employerIds: [],
+          countries: [],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "other employer",
+          meaning: "Do you require sponsorship?",
+          employerIds: ["another-employer"],
+          countries: [],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "other country",
+          meaning: "Do you require sponsorship?",
+          employerIds: [],
+          countries: ["DE"],
+          validUntil: "2026-10-01",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "expired approval",
+          meaning: "Do you require sponsorship?",
+          employerIds: [],
+          countries: [],
+          validUntil: "2026-09-16",
+          value: "no",
+          accepted: false,
+        },
+        {
+          name: "contradictory map value",
+          meaning: "Do you require sponsorship?",
+          employerIds: [],
+          countries: [],
+          validUntil: "2026-10-01",
+          value: "yes",
+          accepted: false,
+        },
+      ])(
+        "checks $name before any field is filled",
+        async ({ meaning, employerIds, countries, validUntil, value, accepted }) => {
+          await seedProfileFacts();
+          const candidates = new CandidateRepository(
+            db,
+            owner,
+            () => new Date("2026-09-17T09:00:00.000Z"),
+          );
+          const packet = await documents.savePacket(
+            await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+          );
+          await candidates.saveAnswer({
+            semanticKey: "sponsorship_required",
+            meaning,
+            answer: "no",
+            employerIds,
+            countries,
+            validFrom: "2026-09-01",
+            validUntil,
+            evidenceFactIds: ["fact-work-nl"],
+          });
+          const snapshot = readyBrowserResult(packet).snapshots[1];
+          const field = snapshot?.fields[0];
+          if (!snapshot || !field) throw new Error("Expected screening step.");
+          field.label = "Do you require sponsorship?";
+          field.options = [
+            { label: "No", value: "no" },
+            { label: "Yes", value: "yes" },
+          ];
+          const checked = await candidates.validateFormPlan(packet, snapshot, {
+            fingerprint: snapshot.fingerprint,
+            unresolved: [],
+            entries: [
+              {
+                name: "sponsorship",
+                semanticKey: "sponsorship_required",
+                expected: value,
+                evidence: ["fact-work-nl"],
+              },
+            ],
+          });
+          expect(checked.entries).toHaveLength(accepted ? 1 : 0);
+          expect(checked.unresolved).toEqual(accepted ? [] : ["sponsorship_required"]);
+          if (accepted) {
+            const fact = documentFacts.find((item) => item.id === "fact-work-nl");
+            if (!fact) throw new Error("Expected work authorization evidence.");
+            await db.query(
+              "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,2,$3,$4,$5)",
+              [
+                owner,
+                fact.id,
+                documentProfile.candidateId,
+                JSON.stringify({ ...fact, revision: 2 }),
+                fact.recordedAt,
+              ],
+            );
+            await db.query("UPDATE fact_heads SET revision=2 WHERE owner_id=$1 AND id=$2", [
+              owner,
+              "fact-work-nl",
+            ]);
+            await expect(
+              candidates.validateFormPlan(packet, snapshot, checked),
+            ).rejects.toMatchObject({ code: "PROFILE_STALE" });
+          }
+        },
+      );
+
+      it("does not treat an identity semantic key as approval for different wording", async () => {
+        await seedProfileFacts();
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        const result = readyBrowserResult(packet);
+        const snapshot = result.snapshots[0];
+        const field = snapshot?.fields[0];
+        const plan = result.plans[0];
+        if (!snapshot || !field || !plan) throw new Error("Expected identity step.");
+        field.label = "What is your nationality?";
+        const candidates = new CandidateRepository(
+          db,
+          owner,
+          () => new Date("2026-09-17T09:00:00.000Z"),
+        );
+        const checked = await candidates.validateFormPlan(packet, snapshot, plan);
+        expect(checked.entries.map((entry) => entry.semanticKey)).toEqual(["cv"]);
+        expect(checked.unresolved).toContain("full_name");
       });
 
       it("excludes an approved answer that is scoped to a different employer", async () => {
@@ -648,6 +1166,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         await expect(
           submissions.begin(
@@ -665,6 +1184,27 @@ for (const engine of ["sqlite", "postgres"] as const) {
           expectedRevision: Number(app?.revision),
         });
         expect(handle.fence).toBe(task.fence);
+        const candidates = new CandidateRepository(db, owner, clock);
+        await candidates.saveAnswer({
+          semanticKey: "sponsorship_required",
+          meaning: "Sponsorship",
+          answer: "yes",
+          validFrom: "2026-09-01",
+          validUntil: "2026-10-01",
+          employerIds: [documentJob.employerId],
+          countries: ["NL"],
+          evidenceFactIds: ["fact-work-nl"],
+        });
+        await expect(submissions.authorizeDispatch(task, handle)).rejects.toMatchObject({
+          code: "ANSWER_UNKNOWN",
+        });
+        expect(
+          await db.query("SELECT dispatch_started_at FROM attempts WHERE owner_id=$1 AND id=$2", [
+            owner,
+            handle.attemptId,
+          ]),
+        ).toEqual([{ dispatch_started_at: null }]);
+        await approveMockScreening(clock);
         expect(await submissions.authorizeDispatch(task, handle)).toMatchObject({
           expiresAt: "2026-09-17T09:00:10.000Z",
         });
@@ -734,6 +1274,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const packet = await documents.savePacket(built);
         const browser = new BrowserRepository(db, owner, clock);
         const first = await browser.save(readyBrowserResult(packet));
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         const lease = async (preparationId: string) => {
           await queue.enqueue({
@@ -910,6 +1451,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         await expect(
           submissions.begin(
@@ -1019,6 +1561,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         const handoffId = randomUUID();
         await db.query(
@@ -1148,6 +1691,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         const handle = await submissions.begin(task, {
           packetId: packet.manifest.id,
@@ -1247,6 +1791,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         const handle = await submissions.begin(task, {
           packetId: packet.manifest.id,
@@ -1348,6 +1893,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             packet.manifest.applicationId,
           ])
         )[0];
+        await approveMockScreening(clock);
         const submissions = new SubmissionRepository(db, owner, clock);
         const handle = await submissions.begin(task, {
           packetId: packet.manifest.id,

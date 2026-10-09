@@ -156,17 +156,30 @@ describe("phase ledger", () => {
     }
   });
 
-  it("reopens P10 when later workflow evidence contradicts the previous closure", () => {
+  it("requires new recovery evidence before P10 can close again", () => {
     const p10 = byId.get("P10");
-    expect(p10?.status).toBe("in_progress");
-    expect(p10?.gates.filter((gate) => gate.status !== "complete").map((gate) => gate.id)).toEqual([
-      "P10-G3",
-      "P10-G6",
-      "P10-G7",
-    ]);
+    if (!p10) throw new Error("P10 is missing.");
+    expect(["code_complete_verification_pending", "complete"]).toContain(p10.status);
+    if (p10.status === "complete") {
+      expect(p10.gates.every((gate) => gate.status === "complete")).toBe(true);
+      expect(
+        p10.remoteVerification.some(
+          (run) =>
+            run.commit === p10.lastVerifiedCommit &&
+            run.covers.includes("P10 recovery closeout") &&
+            run.lanes.length === 3,
+        ),
+      ).toBe(true);
+      expect(p10.nextAction).toBeNull();
+    } else {
+      expect(p10.gates.filter((gate) => gate.status !== "complete").map((gate) => gate.id)).toEqual(
+        ["P10-G3", "P10-G6", "P10-G7"],
+      );
+      expect(p10.nextAction).toBeTruthy();
+    }
     expect(p10?.gates).toHaveLength(7);
-    expect(p10?.nextAction).toBeTruthy();
     expect(p10?.evidence).toContain("docs/evidence/WORKFLOW-RECOVERY.md");
+    expect(p10.evidence).toContain("docs/evidence/P10-verified-recovery.md");
     expect(p10?.lastVerifiedCommit).toMatch(/^[0-9a-f]{40}$/);
     for (const gate of p10?.gates ?? [])
       for (const entry of gate.evidence) expect(existsSync(resolve(root, entry))).toBe(true);

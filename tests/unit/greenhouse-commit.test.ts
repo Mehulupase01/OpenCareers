@@ -120,6 +120,44 @@ function fixture(status = 200, changed = false) {
 }
 
 describe("Greenhouse synthetic commit", () => {
+  it("preserves rejected approval in preparation and never requests a final permit", async () => {
+    const portal = fixture();
+    const adapter = createAdapterRegistry(root, {
+      greenhouseCommit: { configureContext: portal.configureContext },
+    }).get("greenhouse");
+    const result = await adapter.prepare({
+      target,
+      packet,
+      cvPdf,
+      approvedValues: { question_123: "Synthetic reviewed answer." },
+      validateAnswers: async (_snapshot, plan) => ({
+        ...plan,
+        entries: plan.entries.filter((entry) => entry.semanticKey !== "question_123"),
+        unresolved: ["question_123"],
+      }),
+    });
+    expect(result.status).toBe("needs_input");
+    expect(result.plans[0]?.unresolved).toEqual(["question_123"]);
+    expect(result.plans[0]?.entries.some((entry) => entry.semanticKey === "question_123")).toBe(
+      false,
+    );
+    let permits = 0;
+    await expect(
+      commitGreenhousePacket(
+        target,
+        packet,
+        cvPdf,
+        prepared,
+        async () => {
+          permits++;
+          return { expiresAt: "2099-01-01T00:00:00.000Z" };
+        },
+        { configureContext: portal.configureContext },
+      ),
+    ).rejects.toMatchObject({ reason: "OTHER_FORM_CHANGED" });
+    expect({ permits, posts: portal.posts() }).toEqual({ permits: 0, posts: 0 });
+  });
+
   it("performs one permitted final action and returns correlated receipt evidence", async () => {
     const portal = fixture();
     const adapter = createAdapterRegistry(root, {
@@ -130,6 +168,7 @@ describe("Greenhouse synthetic commit", () => {
       packet,
       cvPdf,
       approvedValues: { question_123: "Synthetic reviewed answer." },
+      validateAnswers: async (_snapshot, plan) => plan,
     });
     const adapterPreparation: BrowserPreparation = {
       ...prepared,
@@ -140,6 +179,7 @@ describe("Greenhouse synthetic commit", () => {
     let permits = 0;
     await expect(
       adapter.commit({
+        validateAnswers: async (_snapshot, plan) => plan,
         target: { ...target, postingId: "654321" },
         packet,
         cvPdf,
@@ -152,6 +192,7 @@ describe("Greenhouse synthetic commit", () => {
     ).rejects.toThrow("changed after preparation");
     expect({ permits, posts: portal.posts() }).toEqual({ permits: 0, posts: 0 });
     const outcome = await adapter.commit({
+      validateAnswers: async (_snapshot, plan) => plan,
       target,
       packet,
       cvPdf,
@@ -203,7 +244,10 @@ describe("Greenhouse synthetic commit", () => {
         cvPdf,
         prepared,
         async () => ({ expiresAt: "2099-01-01T00:00:00.000Z" }),
-        { configureContext: rejected.configureContext },
+        {
+          configureContext: rejected.configureContext,
+          validateAnswers: async (_snapshot, plan) => plan,
+        },
       ),
     ).rejects.toBeInstanceOf(GreenhouseDefinitiveRejection);
     expect(rejected.posts()).toBe(1);
@@ -216,7 +260,10 @@ describe("Greenhouse synthetic commit", () => {
         cvPdf,
         prepared,
         async () => ({ expiresAt: "2099-01-01T00:00:00.000Z" }),
-        { configureContext: unknown.configureContext },
+        {
+          configureContext: unknown.configureContext,
+          validateAnswers: async (_snapshot, plan) => plan,
+        },
       ),
     ).rejects.toThrow("outcome is unknown");
     expect(unknown.posts()).toBe(1);

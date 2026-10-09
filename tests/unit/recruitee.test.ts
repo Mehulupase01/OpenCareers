@@ -110,8 +110,17 @@ describe("Recruitee candidate adapter", () => {
       { recruitee_question_91: false },
       request,
     );
-    expect(answeredNo.status).toBe("ready");
-    expect(answeredNo.plans[0]?.entries.at(-1)?.expected).toBe("false");
+    expect(answeredNo.status).toBe("unsupported");
+    const reviewedNo = await prepareRecruiteePacket(
+      target,
+      packet,
+      cvPdf,
+      { recruitee_question_91: false },
+      request,
+      async (_snapshot, plan) => plan,
+    );
+    expect(reviewedNo.status).toBe("ready");
+    expect(reviewedNo.plans[0]?.entries.at(-1)?.expected).toBe("false");
   });
 
   it("rechecks drift and sends one correlated multipart request after authorization", async () => {

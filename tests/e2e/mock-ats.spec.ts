@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
+import type { FormAnswerGuard } from "../../packages/browser/src/answer-guard.js";
 import {
-  commitPreparedMockPacket,
+  commitPreparedMockPacket as commitFixturePacket,
   DefinitiveMockRejection,
 } from "../../packages/browser/src/commit-mock.js";
 import { observeMockReceipt } from "../../packages/browser/src/observe-mock.js";
-import { prepareMockPacket } from "../../packages/browser/src/prepare.js";
+import { prepareMockPacket as prepareFixturePacket } from "../../packages/browser/src/prepare.js";
 import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
@@ -20,6 +21,26 @@ import { documentGenerationInput } from "../fixtures/document-packets.js";
 let packet: PacketSnapshot;
 let cvPdf: Buffer;
 let artifactDir: string;
+
+// These tests own the loopback ATS and explicitly approve synthetic answers.
+const fixtureAnswers: FormAnswerGuard = async (snapshot, plan) => {
+  if (new URL(snapshot.url).hostname !== "127.0.0.1" || snapshot.jobId !== packet.manifest.jobId)
+    throw new Error("Synthetic approval is restricted to the owned mock vacancy.");
+  return plan;
+};
+const prepareMockPacket: typeof prepareFixturePacket = (...args) =>
+  prepareFixturePacket(args[0], args[1], args[2], args[3], fixtureAnswers);
+const commitPreparedMockPacket: typeof commitFixturePacket = (...args) =>
+  commitFixturePacket(
+    args[0],
+    args[1],
+    args[2],
+    args[3],
+    args[4],
+    args[5],
+    args[6],
+    fixtureAnswers,
+  );
 
 test.beforeAll(async () => {
   artifactDir = await realpath(await mkdtemp(join(tmpdir(), "opencareers-mock-ats-")));

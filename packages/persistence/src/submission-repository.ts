@@ -188,6 +188,7 @@ export class SubmissionRepository extends Repository {
         authorizationRevision: policy.revision,
         profileId: manifest.profileId,
         fence: task.fence,
+        handoffId: typeof task.payload.handoffId === "string" ? task.payload.handoffId : null,
       };
       const intentId = randomUUID();
       const attemptId = randomUUID();
@@ -312,6 +313,7 @@ export class SubmissionRepository extends Repository {
         profileId: string;
         authorizationRevision: number;
         fence: number;
+        handoffId?: string | null;
       };
       if (
         digest(snapshot) !== row.sha256 ||
@@ -335,6 +337,47 @@ export class SubmissionRepository extends Repository {
         String(row.expires_at) <= this.now()
       )
         throw new DomainError("POLICY_REVOKED", "Standing authorization changed before dispatch.");
+      if (snapshot.handoffId) {
+        const continuation = (
+          await tx.query(
+            "SELECT h.id FROM handoff_sessions h JOIN handoff_continuations k ON k.owner_id=h.owner_id AND k.handoff_id=h.id WHERE h.owner_id=$1 AND h.id=$2 AND h.application_id=$3 AND h.state='completed' AND h.generation=k.generation AND h.expires_at>$4 AND k.expires_at=h.expires_at AND k.packet_id=$5",
+            [this.ownerId, snapshot.handoffId, handle.applicationId, this.now(), handle.packetId],
+          )
+        )[0];
+        if (!continuation)
+          throw new DomainError("FORM_CHANGED", "Browser continuation changed before dispatch.");
+      }
+      const preparedRow = (
+        await tx.query(
+          "SELECT b.result,p.manifest,c.content FROM browser_preparations b JOIN packets p ON p.owner_id=b.owner_id AND p.id=b.packet_id JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id WHERE b.owner_id=$1 AND b.id=$2 AND b.application_id=$3 AND p.id=$4",
+          [this.ownerId, handle.preparationId, handle.applicationId, handle.packetId],
+        )
+      )[0];
+      if (!preparedRow) throw new DomainError("FORM_CHANGED", "Prepared answers are missing.");
+      const prepared = dryRunResultSchema.parse(JSON.parse(String(preparedRow.result)));
+      const packet = {
+        manifest: packetManifestSchema.parse(JSON.parse(String(preparedRow.manifest))),
+        content: packetContentSchema.parse(JSON.parse(String(preparedRow.content))),
+        valid: true,
+        invalidReason: null,
+      };
+      const candidates = new CandidateRepository(this.db, this.ownerId, this.clock);
+      if (prepared.snapshots.length !== prepared.plans.length)
+        throw new DomainError("FORM_CHANGED", "Prepared answer steps changed.");
+      for (const [index, form] of prepared.snapshots.entries()) {
+        const plan = prepared.plans[index];
+        if (!plan) throw new DomainError("FORM_CHANGED", "Prepared answer plan is missing.");
+        const checked = await candidates.validateFormPlanIn(tx, packet, form, plan, handle);
+        const values = (entries: typeof plan.entries) =>
+          JSON.stringify(
+            entries.map(({ name, semanticKey, expected }) => ({ name, semanticKey, expected })),
+          );
+        if (checked.unresolved.length || values(checked.entries) !== values(plan.entries))
+          throw new DomainError(
+            "ANSWER_UNKNOWN",
+            "Prepared answers are no longer canonically approved.",
+          );
+      }
       const updated = await tx.query(
         "UPDATE attempts SET dispatch_started_at=$1 WHERE owner_id=$2 AND id=$3 AND dispatch_started_at IS NULL RETURNING id",
         [this.now(), this.ownerId, handle.attemptId],

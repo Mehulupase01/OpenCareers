@@ -25,8 +25,9 @@ export async function handoffRoutes(
   app: FastifyInstance,
   repository: Repository,
   broker: HandoffBrokerPort = new VisibleHandoffBroker(),
+  vaultKey?: string,
 ) {
-  const handoffs = new HandoffRepository(repository.db, repository.ownerId);
+  const handoffs = new HandoffRepository(repository.db, repository.ownerId, undefined, vaultKey);
   app.addHook("onClose", () => broker.closeAll());
   app.get("/v1/handoffs", () => handoffs.snapshot());
   app.post("/v1/handoffs", async (request) => {
@@ -51,9 +52,9 @@ export async function handoffRoutes(
   app.post("/v1/handoffs/:id/complete", async (request) => {
     const { id } = z.object({ id: idSchema }).parse(request.params);
     const { generation } = completeInput.parse(request.body);
-    const { leaseOwner } = await broker.verify(id, generation);
+    const { leaseOwner, browserSession } = await broker.verify(id, generation);
     try {
-      return await handoffs.completeHandoff(id, leaseOwner, generation);
+      return await handoffs.completeHandoff(id, leaseOwner, generation, browserSession);
     } finally {
       await broker.close(id);
     }

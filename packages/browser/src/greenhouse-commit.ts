@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { type BrowserContext, chromium } from "playwright";
 import type { BrowserPreparation } from "../../contracts/src/browser.js";
+import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { FormDriftError } from "../../contracts/src/index.js";
 import {
   type GreenhouseReceiptEvidence,
   greenhouseReceiptEvidenceSchema,
 } from "../../contracts/src/submission.js";
+import { assertGuardedPlan, type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 import {
   type GreenhouseTarget,
   greenhouseUrl,
@@ -24,6 +26,8 @@ export class GreenhouseDefinitiveRejection extends Error {
 export interface GreenhouseCommitOptions {
   configureContext?: (context: BrowserContext) => Promise<void>;
   clock?: () => Date;
+  validateAnswers?: FormAnswerGuard;
+  browserSession?: BrowserSessionState;
 }
 
 const emailHash = (email: string) => createHash("sha256").update(email).digest("hex");
@@ -59,6 +63,7 @@ export async function commitGreenhousePacket(
       viewport: { width: 1280, height: 900 },
     });
     context.setDefaultTimeout(10000);
+    if (options.browserSession) await context.addCookies(options.browserSession.cookies);
     context.setDefaultNavigationTimeout(20000);
     await options.configureContext?.(context);
     let dispatchAllowed = false;
@@ -83,6 +88,7 @@ export async function commitGreenhousePacket(
     const page = await context.newPage();
     await page.goto(expectedUrl, { waitUntil: "networkidle" });
     const current = await inspectGreenhouseForm(page, target);
+    current.jobId = packet.manifest.jobId;
     if (
       current.fingerprint !== preparedSnapshot.fingerprint ||
       current.fingerprint !== target.formFingerprint
@@ -91,7 +97,12 @@ export async function commitGreenhousePacket(
         "GREENHOUSE_FORM_CHANGED",
         "Greenhouse form changed after preparation.",
       );
-    const report = await fillGreenhouseForm(page, target, current, plan, packet, cvPdf);
+    const checked = await assertGuardedPlan(
+      options.validateAnswers ?? packetEvidenceGuard(packet),
+      current,
+      plan,
+    );
+    const report = await fillGreenhouseForm(page, target, current, checked, packet, cvPdf);
     if (
       report.status !== "ready" ||
       report.uploadStatus !== "selected" ||

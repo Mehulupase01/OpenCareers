@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,10 +7,13 @@ import { buildServer } from "../../apps/api/src/server.js";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { loadConfig } from "../../packages/config/src/index.js";
 import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
+import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
+import { buildPacket } from "../../packages/documents/src/factory.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { RestoreRepository } from "../../packages/persistence/src/restore-repository.js";
+import { documentGenerationInput } from "../fixtures/document-packets.js";
 import { identity } from "../helpers/candidate-fixtures.js";
 
 const cleanup: Array<() => Promise<void>> = [];
@@ -363,7 +366,24 @@ describe("API trust boundary", () => {
     const preparationId = randomUUID();
     const candidateId = randomUUID();
     const jobId = randomUUID();
-    const packetId = randomUUID();
+    const base = documentGenerationInput();
+    const input = {
+      ...base,
+      requestedAnswers: [],
+      job: { ...base.job, id: jobId },
+      profile: { ...base.profile, candidateId },
+      authorization: {
+        ...base.authorization,
+        candidateId,
+        effectiveAt: "2020-01-01T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+      assessment: { ...base.assessment, applicationId, jobId },
+    };
+    const artifacts = new ArtifactStore(dataDir);
+    await artifacts.initialize();
+    const built = await buildPacket(artifacts, input);
+    const packetId = built.manifest.id;
     const targetFingerprint = createHash("sha256")
       .update(JSON.stringify({ fixture: "challenge" }))
       .digest("hex");
@@ -402,6 +422,32 @@ describe("API trust boundary", () => {
       candidateId,
     ]);
     await db.query(
+      "INSERT INTO profile_versions(id,owner_id,candidate_id,revision,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        input.profile.id,
+        "synthetic-owner",
+        candidateId,
+        input.profile.revision,
+        JSON.stringify(input.profile),
+        input.profile.createdAt,
+      ],
+    );
+    await db.query(
+      "INSERT INTO authorizations(id,owner_id,revision,data,effective_at,expires_at) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        input.authorization.id,
+        "synthetic-owner",
+        input.authorization.revision,
+        JSON.stringify(input.authorization),
+        input.authorization.effectiveAt,
+        input.authorization.expiresAt,
+      ],
+    );
+    await db.query(
+      "UPDATE candidates SET active_profile_id=$1,active_authorization_id=$2 WHERE owner_id=$3",
+      [input.profile.id, input.authorization.id, "synthetic-owner"],
+    );
+    await db.query(
       "INSERT INTO jobs(owner_id,id,employer_id,requisition_id,data,created_at,last_seen_at) VALUES($1,$2,'synthetic-employer','req','{}',$3,$3)",
       ["synthetic-owner", jobId, "2026-09-28T20:00:00.000Z"],
     );
@@ -410,8 +456,15 @@ describe("API trust boundary", () => {
       ["synthetic-owner", applicationId, candidateId, jobId, "2026-09-28T20:00:00.000Z"],
     );
     await db.query(
-      "INSERT INTO packets(owner_id,id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,'{}',$4,$5)",
-      ["synthetic-owner", packetId, applicationId, "b".repeat(64), "2026-09-28T20:00:00.000Z"],
+      "INSERT INTO packets(owner_id,id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        "synthetic-owner",
+        packetId,
+        applicationId,
+        JSON.stringify(built.manifest),
+        createHash("sha256").update(JSON.stringify(built.manifest)).digest("hex"),
+        "2026-09-28T20:00:00.000Z",
+      ],
     );
     await db.query(
       "INSERT INTO browser_preparations(owner_id,id,application_id,packet_id,status,form_fingerprint,result,created_at,expires_at) VALUES($1,$2,$3,$4,'challenge',$5,$6,$7,$8)",
@@ -430,9 +483,13 @@ describe("API trust boundary", () => {
       visible: false,
       onOpened: async (page) => page.getByRole("button", { name: "Continue" }).click(),
     });
-    const app = await buildServer({ ...loadConfig({}), dataDir }, repository, {
-      handoffBroker: broker,
-    });
+    const app = await buildServer(
+      { ...loadConfig({}), dataDir, vaultKey: randomBytes(32).toString("base64") },
+      repository,
+      {
+        handoffBroker: broker,
+      },
+    );
     cleanup.push(() => app.close());
     const headers = { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4318" };
     const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
@@ -464,6 +521,12 @@ describe("API trust boundary", () => {
       payload: { generation: 1 },
     });
     expect(completed.json()).toMatchObject({ state: "rebuilding", generation: 2 });
+    expect(JSON.stringify(completed.json())).not.toContain("mock_owner_session");
+    expect(
+      await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='inspect'", [
+        "synthetic-owner",
+      ]),
+    ).toHaveLength(1);
     expect(
       await db.query("SELECT token_hash FROM handoff_sessions WHERE owner_id=$1 AND id=$2", [
         "synthetic-owner",

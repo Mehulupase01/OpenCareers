@@ -20,6 +20,7 @@ import { BrowserRepository } from "../../../packages/persistence/src/browser-rep
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import { DiscoveryRepository } from "../../../packages/persistence/src/discovery-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
+import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import { SubmissionRepository } from "../../../packages/persistence/src/submission-repository.js";
@@ -181,6 +182,15 @@ try {
               throw new DomainError("CONFIG_INVALID", "Submission adapter target is invalid.");
             }
             const cv = await documents.artifact(packetId, "cv_pdf", artifacts);
+            const browserSession =
+              typeof task.payload.handoffId === "string"
+                ? await new HandoffRepository(
+                    repository.db,
+                    repository.ownerId,
+                    undefined,
+                    config.vaultKey,
+                  ).continuation(task.payload.handoffId, String(task.applicationId), packetId)
+                : undefined;
             const app = (
               await repository.db.query(
                 "SELECT revision FROM applications WHERE owner_id=$1 AND id=$2",
@@ -199,10 +209,29 @@ try {
                 cvPdf: cv.buffer,
                 preparation,
                 target,
+                ...(browserSession ? { browserSession } : {}),
                 authorizeDispatch: () => submissions.authorizeDispatch(task, handle),
+                validateAnswers: (snapshot, plan) =>
+                  new CandidateRepository(repository.db, repository.ownerId).validateFormPlan(
+                    packet,
+                    snapshot,
+                    plan,
+                    { attemptId: handle.attemptId, fence: handle.fence },
+                  ),
               });
             } catch (error) {
-              if (!(error instanceof DomainError) || error.code !== "FORM_CHANGED") throw error;
+              if (
+                !(error instanceof DomainError) ||
+                ![
+                  "FORM_CHANGED",
+                  "ANSWER_UNKNOWN",
+                  "PROFILE_STALE",
+                  "POLICY_REVOKED",
+                  "SESSION_EXPIRED",
+                  "CLAIM_UNSUPPORTED",
+                ].includes(error.code)
+              )
+                throw error;
               await submissions.abortBeforeDispatch(
                 task,
                 handle,
@@ -211,7 +240,7 @@ try {
               outcome = null;
               logger.warn(
                 { taskId: task.id, applicationId: task.applicationId, adapterId: adapter.id },
-                "Submission stopped before dispatch after form drift",
+                "Submission stopped before dispatch after canonical revalidation",
               );
             }
             if (outcome?.status === "confirmed") {

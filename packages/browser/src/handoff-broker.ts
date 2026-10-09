@@ -1,9 +1,13 @@
 import type { Page } from "playwright";
 import type { DryRunResult } from "../../contracts/src/browser.js";
+import {
+  type BrowserSessionState,
+  browserSessionSchema,
+} from "../../contracts/src/browser-session.js";
 import type { HandoffSession } from "../../contracts/src/handoff.js";
 import { DomainError } from "../../contracts/src/index.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
-import { assertHandoffUrl, handoffCapability } from "./handoff-policy.js";
+import { allowedHandoffCookie, assertHandoffUrl, handoffCapability } from "./handoff-policy.js";
 import { launchDryRunBrowser, launchHandoffBrowser, type OwnedBrowser } from "./runtime.js";
 
 interface ActiveHandoff {
@@ -12,13 +16,19 @@ interface ActiveHandoff {
   leaseOwner: string;
   generation: number;
   challengeSelector: string;
+  completionSelector: string;
+  cookieNames: readonly string[];
+  pageUrl: string;
   expiryTimer: ReturnType<typeof setTimeout>;
   deadline: number;
 }
 
 export interface HandoffBrokerPort {
   open(session: HandoffSession, result: DryRunResult, leaseOwner: string): Promise<void>;
-  verify(id: string, generation: number): Promise<{ leaseOwner: string }>;
+  verify(
+    id: string,
+    generation: number,
+  ): Promise<{ leaseOwner: string; browserSession?: BrowserSessionState }>;
   close(id: string): Promise<void>;
   closeAll(): Promise<void>;
 }
@@ -84,6 +94,11 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
         leaseOwner,
         generation: session.generation,
         challengeSelector: capability.challengeSelector,
+        completionSelector: capability.completionSelector ?? "form:has(button[type='submit'])",
+        cookieNames: (capability.sessionCookieNames ?? []).filter((name) =>
+          allowedHandoffCookie(capability, name),
+        ),
+        pageUrl: url.toString(),
         deadline,
         expiryTimer: setTimeout(
           () => void this.close(session.id),
@@ -97,7 +112,10 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
     }
   }
 
-  async verify(id: string, generation: number): Promise<{ leaseOwner: string }> {
+  async verify(
+    id: string,
+    generation: number,
+  ): Promise<{ leaseOwner: string; browserSession: BrowserSessionState }> {
     const active = this.active.get(id);
     if (!active || active.generation !== generation)
       throw new DomainError("LEASE_STALE", "Handoff browser generation is stale.");
@@ -112,7 +130,43 @@ export class VisibleHandoffBroker implements HandoffBrokerPort {
       );
     if ((await active.browser.page.locator(active.challengeSelector).count()) > 0)
       throw new DomainError("STATE_INVALID", "Complete the verification step before continuing.");
-    return { leaseOwner: active.leaseOwner };
+    const actual = new URL(active.browser.page.url());
+    const expected = new URL(active.pageUrl);
+    if (
+      actual.origin !== expected.origin ||
+      actual.pathname !== expected.pathname ||
+      actual.search !== expected.search ||
+      (await active.browser.page.locator(active.completionSelector).count()) !== 1 ||
+      !(await active.browser.page.locator(active.completionSelector).isVisible())
+    )
+      throw new DomainError(
+        "FORM_CHANGED",
+        "The original application form must remain present after handoff.",
+      );
+    const cookies = (await active.browser.context.cookies(actual.toString())).filter((cookie) =>
+      active.cookieNames.includes(cookie.name),
+    );
+    const browserSession = browserSessionSchema.parse({
+      origin: actual.origin,
+      cookies: cookies.map(
+        ({ name, value, domain, path, expires, httpOnly, secure, sameSite }) => ({
+          name,
+          value,
+          domain,
+          path,
+          expires,
+          httpOnly,
+          secure,
+          sameSite,
+        }),
+      ),
+    });
+    if (active.deadline <= Date.now() || active.browser.blockedCommitCount > 0)
+      throw new DomainError(
+        "LEASE_STALE",
+        "Handoff changed while its continuation was being verified.",
+      );
+    return { leaseOwner: active.leaseOwner, browserSession };
   }
 
   async close(id: string): Promise<void> {

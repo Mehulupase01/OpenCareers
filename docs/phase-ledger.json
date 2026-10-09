@@ -1046,7 +1046,7 @@
     {
       "id": "P10",
       "title": "Accounts, secure handoffs, and exception resolution",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": ["P09"],
       "tickets": [
         {
@@ -1078,7 +1078,7 @@
         {
           "id": "P10-03",
           "text": "Challenge handoff. Preserve progress, create a scoped session handle, expose a visible local resume route, and expire stale handles, without implementing CAPTCHA bypass.",
-          "status": "in_progress",
+          "status": "code_complete_verification_pending",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1087,7 +1087,7 @@
             "tests/e2e/handoff-broker.spec.ts",
             "tests/e2e/handoff-external.spec.ts"
           ],
-          "nextAction": "Preserve solved session state and prove adapter-specific live challenge continuation. See docs/evidence/WORKFLOW-RECOVERY.md."
+          "nextAction": "Verify encrypted continuation and fresh-context recovery across CI lanes. Live portal certification remains separate coverage work."
         },
         {
           "id": "P10-04",
@@ -1104,7 +1104,7 @@
         {
           "id": "P10-05",
           "text": "Propagation and resumption. An approved answer resolves semantically equivalent pending questions within its scope, and the entire affected form is revalidated before commitment.",
-          "status": "in_progress",
+          "status": "code_complete_verification_pending",
           "acceptanceTests": ["T21", "T22", "T32"],
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
@@ -1112,7 +1112,7 @@
             "tests/integration/documents.test.ts",
             "tests/integration/handoff.test.ts"
           ],
-          "nextAction": "Affected applications now resume transactionally; finish exact answer/form-value validation across every supported adapter and UI scope review. See docs/evidence/INBOX-RESUMPTION.md."
+          "nextAction": "Verify canonical pre-fill and transactional dispatch validation across CI lanes."
         }
       ],
       "gates": [
@@ -1141,7 +1141,7 @@
         {
           "id": "P10-G3",
           "requirement": "CAPTCHA/MFA generates a usable handoff while unrelated queue work continues.",
-          "status": "in_progress",
+          "status": "code_complete_verification_pending",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/handoff.test.ts",
@@ -1175,7 +1175,7 @@
         {
           "id": "P10-G6",
           "requirement": "Resolving one answer does not incorrectly propagate to differently worded legal or sponsorship questions.",
-          "status": "in_progress",
+          "status": "code_complete_verification_pending",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/candidate.test.ts",
@@ -1185,7 +1185,7 @@
         {
           "id": "P10-G7",
           "requirement": "A resumed expired form is rebuilt safely, while an ambiguous prior commit is reconciled first.",
-          "status": "in_progress",
+          "status": "code_complete_verification_pending",
           "evidence": [
             "docs/evidence/P10-closeout-checkpoint.md",
             "tests/integration/rebuild.test.ts",
@@ -1213,8 +1213,9 @@
         }
       ],
       "acceptanceTests": ["T21", "T22", "T32"],
-      "nextAction": "Complete solved-session continuation, all-adapter exact answer gates and UI scope review; affected-application resumption is implemented. Verify remaining gates before reclosing P10.",
+      "nextAction": "Finish local and cross-platform verification before closing workflow-engine acceptance; no live portal support is claimed.",
       "evidence": [
+        "docs/evidence/P10-verified-recovery.md",
         "docs/evidence/INBOX-RESUMPTION.md",
         "docs/evidence/WORKFLOW-RECOVERY.md",
         "docs/evidence/P10-closeout-checkpoint.md",

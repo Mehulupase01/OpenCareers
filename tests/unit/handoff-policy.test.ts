@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  allowedHandoffCookie,
   assertHandoffUrl,
   classifyHandoffRequest,
   type HandoffPolicy,
@@ -26,6 +27,15 @@ const request = (
 });
 
 describe("handoff adapter capability", () => {
+  it("never preserves challenge clearance even if a capability mistakenly lists it", () => {
+    const capability = handoffCapability("mock-ats");
+    if (!capability) throw new Error("Expected synthetic capability.");
+    expect(allowedHandoffCookie(capability, "mock_owner_session")).toBe(true);
+    expect(allowedHandoffCookie(capability, "unreviewed_session")).toBe(false);
+    for (const name of ["cf_clearance", "g-recaptcha-response", "hcaptcha", "_abck", "bm_sz"]) {
+      expect(allowedHandoffCookie({ ...capability, sessionCookieNames: [name] }, name)).toBe(false);
+    }
+  });
   it("declares a supported adapter and refuses an unknown one", () => {
     expect(handoffCapability("mock-ats")?.navigation).toBe("fixture-server");
     expect(handoffCapability("greenhouse")?.navigation).toBe("prepared-url");

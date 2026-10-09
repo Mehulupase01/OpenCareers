@@ -76,7 +76,7 @@ test("broker accepts the scoped challenge action and verifies the fenced generat
   });
   try {
     await broker.open(session, result, "browser:test");
-    await expect(broker.verify(session.id, session.generation)).resolves.toEqual({
+    await expect(broker.verify(session.id, session.generation)).resolves.toMatchObject({
       leaseOwner: "browser:test",
     });
     await expect(broker.verify(session.id, session.generation + 1)).rejects.toMatchObject({

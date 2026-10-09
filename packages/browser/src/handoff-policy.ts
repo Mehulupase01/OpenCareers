@@ -26,6 +26,9 @@ export interface HandoffCapability {
   /** Paths whose non-GET request is the final application action. */
   readonly finalActionPaths: readonly string[];
   readonly challengeWritePaths?: readonly string[];
+  readonly completionSelector?: string;
+  /** Reviewed employer authentication cookies only, never challenge tokens. */
+  readonly sessionCookieNames?: readonly string[];
 }
 
 const MOCK_CHALLENGE: HandoffCapability = {
@@ -34,6 +37,8 @@ const MOCK_CHALLENGE: HandoffCapability = {
   challengeSelector: "[data-challenge]:not([hidden])",
   finalActionPaths: ["/applications"],
   challengeWritePaths: ["/challenge/verify"],
+  completionSelector: "form#application",
+  sessionCookieNames: ["mock_owner_session"],
 };
 
 const HOSTED_CHALLENGE: HandoffCapability = {
@@ -43,6 +48,7 @@ const HOSTED_CHALLENGE: HandoffCapability = {
     "[data-challenge]:not([hidden]), .g-recaptcha:not([hidden]), iframe[src*='recaptcha']",
   finalActionPaths: ["/jobs/submit", "/forms/submit", "/submit"],
   challengeWritePaths: ["/challenge/verify"],
+  completionSelector: "form:has(button[type='submit'])",
 };
 
 const API_CHALLENGE: HandoffCapability = {
@@ -52,6 +58,7 @@ const API_CHALLENGE: HandoffCapability = {
     "[data-challenge]:not([hidden]), .g-recaptcha:not([hidden]), iframe[src*='recaptcha']",
   finalActionPaths: ["/candidates", "/api/candidates"],
   challengeWritePaths: ["/challenge/verify"],
+  completionSelector: "form:has(button[type='submit'])",
 };
 
 const CAPABILITIES = new Map<string, HandoffCapability>(
@@ -60,6 +67,13 @@ const CAPABILITIES = new Map<string, HandoffCapability>(
 
 export function handoffCapability(adapterId: string): HandoffCapability | null {
   return CAPABILITIES.get(adapterId) ?? null;
+}
+
+export function allowedHandoffCookie(capability: HandoffCapability, name: string): boolean {
+  return (
+    (capability.sessionCookieNames?.includes(name) ?? false) &&
+    !/captcha|challenge|turnstile|cf_clearance|^_?abck$|^bm_/i.test(name)
+  );
 }
 
 export function registerHandoffCapability(capability: HandoffCapability): void {

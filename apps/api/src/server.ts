@@ -199,7 +199,7 @@ export async function buildServer(
   await matchingRoutes(app, config, repository);
   await documentRoutes(app, config, repository);
   await browserRoutes(app, config, repository);
-  await handoffRoutes(app, repository, dependencies.handoffBroker);
+  await handoffRoutes(app, repository, dependencies.handoffBroker, config.vaultKey);
   await accountRoutes(app, config, repository, dependencies.signupRequest);
   await exceptionRoutes(app, repository);
   await restoreRoutes(app, repository);

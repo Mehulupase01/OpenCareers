@@ -178,7 +178,7 @@ describe("external adapter challenge handoff", () => {
     );
     const reopenedTarget = await repository.target(reopened.session.id);
     await active.open(claimed, reopenedTarget.result, "browser:ext");
-    await expect(active.verify(reopened.session.id, claimed.generation)).resolves.toEqual({
+    await expect(active.verify(reopened.session.id, claimed.generation)).resolves.toMatchObject({
       leaseOwner: "browser:ext",
     });
     const completed = await repository.completeHandoff(
@@ -218,6 +218,27 @@ describe("external adapter challenge handoff", () => {
         }
       })
       .toContain("final application action");
+    expect(fixture.finalActionAttempts()).toBe(0);
+  });
+
+  it("does not mistake a vanished challenge and vanished form for completion", async () => {
+    await seed("greenhouse", `${fixture.url}/jobs/hosted`);
+    const created = await repository.create({
+      applicationId,
+      preparationId,
+      adapterId: "greenhouse",
+      targetFingerprint,
+    });
+    const session = await repository.claimHandoff(created.session.id, created.token, "browser:ext");
+    const target = await repository.target(created.session.id);
+    const active = broker(async (page) => {
+      await page.getByRole("button", { name: "I am not a robot" }).click();
+      await page.locator("form").evaluate((form) => form.remove());
+    });
+    await active.open(session, target.result, "browser:ext");
+    await expect(active.verify(session.id, session.generation)).rejects.toMatchObject({
+      code: "FORM_CHANGED",
+    });
     expect(fixture.finalActionAttempts()).toBe(0);
   });
 

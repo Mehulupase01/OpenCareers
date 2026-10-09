@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import type { BrowserPreparation, FormSnapshot } from "../../contracts/src/browser.js";
+import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { FormDriftError } from "../../contracts/src/index.js";
 import type { MockReceiptEvidence } from "../../contracts/src/submission.js";
 import type { startMockAts } from "../../mock-ats/src/server.js";
 import { fillStep, inspectForm, planFields } from "./adapter.js";
+import { assertGuardedPlan, type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 import { launchMockCommitBrowser } from "./runtime.js";
 
 type MockAts = Awaited<ReturnType<typeof startMockAts>>;
@@ -33,6 +35,8 @@ export async function commitPreparedMockPacket(
   preparation: BrowserPreparation,
   authorizeDispatch: () => Promise<{ expiresAt: string }>,
   fixture = "standard",
+  validateAnswers: FormAnswerGuard = packetEvidenceGuard(packet),
+  browserSession?: BrowserSessionState,
 ): Promise<MockReceiptEvidence> {
   if (
     preparation.status !== "ready" ||
@@ -46,6 +50,7 @@ export async function commitPreparedMockPacket(
     throw new Error("The CV no longer matches the packet manifest.");
   const owned = await launchMockCommitBrowser(mock.url);
   try {
+    if (browserSession) await owned.context.addCookies(browserSession.cookies);
     await owned.page.goto(
       `${mock.url}/jobs/${fixture}?jobId=${encodeURIComponent(packet.manifest.jobId)}`,
     );
@@ -57,7 +62,11 @@ export async function commitPreparedMockPacket(
           "MOCK_FORM_CHANGED",
           "Mock ATS form changed since the READY preparation.",
         );
-      const plan = planFields(snapshot, packet, approvedValues);
+      const plan = await assertGuardedPlan(
+        validateAnswers,
+        snapshot,
+        planFields(snapshot, packet, approvedValues),
+      );
       const filled = await fillStep(owned.page, plan, cvPdf);
       if (filled.snapshot.fingerprint !== snapshot.fingerprint)
         throw new FormDriftError(

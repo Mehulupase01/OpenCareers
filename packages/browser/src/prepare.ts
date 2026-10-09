@@ -6,9 +6,11 @@ import {
   type FillReport,
   type FormSnapshot,
 } from "../../contracts/src/browser.js";
+import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
 import { fillStep, inspectForm, planFields } from "./adapter.js";
+import { type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 import { launchDryRunBrowser } from "./runtime.js";
 
 export async function prepareMockPacket(
@@ -16,6 +18,8 @@ export async function prepareMockPacket(
   cvPdf: Buffer,
   approvedValues: Record<string, string | boolean>,
   fixture = "standard",
+  validateAnswers: FormAnswerGuard = packetEvidenceGuard(packet),
+  browserSession?: BrowserSessionState,
 ): Promise<DryRunResult> {
   if (!packet.valid || packet.manifest.validation.status === "blocked")
     throw new Error("The packet is not valid for browser preparation.");
@@ -26,11 +30,15 @@ export async function prepareMockPacket(
   try {
     const owned = await launchDryRunBrowser(mock.url);
     try {
+      if (browserSession) await owned.context.addCookies(browserSession.cookies);
       await owned.page.goto(
         `${mock.url}/jobs/${fixture}?jobId=${encodeURIComponent(packet.manifest.jobId)}`,
       );
       const firstSnapshot = await inspectForm(owned.page);
-      const firstPlan = planFields(firstSnapshot, packet, approvedValues);
+      const firstPlan = await validateAnswers(
+        firstSnapshot,
+        planFields(firstSnapshot, packet, approvedValues),
+      );
       const firstReport = await fillStep(owned.page, firstPlan, cvPdf);
       const snapshots: FormSnapshot[] = [firstSnapshot];
       const plans: FieldPlan[] = [firstPlan];
@@ -38,7 +46,10 @@ export async function prepareMockPacket(
       if (firstReport.status === "ready") {
         await owned.page.getByRole("button", { name: "Next" }).click();
         const secondSnapshot = await inspectForm(owned.page);
-        const secondPlan = planFields(secondSnapshot, packet, approvedValues);
+        const secondPlan = await validateAnswers(
+          secondSnapshot,
+          planFields(secondSnapshot, packet, approvedValues),
+        );
         const secondReport = await fillStep(owned.page, secondPlan, cvPdf);
         snapshots.push(secondSnapshot);
         plans.push(secondPlan);

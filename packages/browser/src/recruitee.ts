@@ -14,6 +14,7 @@ import {
   recruiteeReceiptEvidenceSchema,
 } from "../../contracts/src/submission.js";
 import { planFields } from "./adapter.js";
+import { assertGuardedPlan, type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 
 const tenantPattern = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const slugPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,119}$/;
@@ -257,11 +258,12 @@ export async function prepareRecruiteePacket(
   cvPdf: Buffer,
   approvedValues: Record<string, string | boolean>,
   request: RecruiteeRequest = fetch,
+  validateAnswers: FormAnswerGuard = packetEvidenceGuard(packet),
 ): Promise<DryRunResult> {
   assertPacket(packet, cvPdf);
   const loaded = await loadOffer(target, request);
   const snapshot = snapshotFor(target, packet, loaded);
-  const plan = planFields(snapshot, packet, approvedValues);
+  const plan = await validateAnswers(snapshot, planFields(snapshot, packet, approvedValues));
   const unsupported = snapshot.fields.filter(
     (field) => field.required && field.kind === "unsupported",
   );
@@ -320,6 +322,7 @@ export async function commitRecruiteePacket(
   authorizeDispatch: () => Promise<{ expiresAt: string }>,
   request: RecruiteeRequest = fetch,
   clock: () => Date = () => new Date(),
+  validateAnswers: FormAnswerGuard = packetEvidenceGuard(packet),
 ): Promise<RecruiteeReceiptEvidence> {
   assertPacket(packet, cvPdf);
   if (preparation.status !== "ready" || preparation.snapshots.length !== 1)
@@ -334,6 +337,7 @@ export async function commitRecruiteePacket(
   const plan = preparation.plans[0];
   if (!plan || plan.unresolved.length)
     throw new Error("Recruitee preparation has unresolved fields.");
+  await assertGuardedPlan(validateAnswers, current, plan);
   const values = new Map(plan.entries.map((entry) => [entry.name, entry.expected]));
   const form = new FormData();
   form.append("candidate[name]", String(values.get("name")));

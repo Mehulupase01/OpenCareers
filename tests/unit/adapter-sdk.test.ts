@@ -54,6 +54,7 @@ describe("submission adapter SDK", () => {
           cvPdf,
           target: { fixture: "standard" },
           approvedValues: { [key]: "unreviewed replacement" },
+          validateAnswers: async (_snapshot, plan) => plan,
         }),
       ).rejects.toThrow(`packet-backed field: ${key}`);
     }
@@ -72,6 +73,7 @@ describe("submission adapter SDK", () => {
       packet,
       cvPdf,
       target,
+      validateAnswers: async (_snapshot, plan) => plan,
       approvedValues: {
         country: "NL",
         sponsorship_required: "no",
@@ -91,6 +93,7 @@ describe("submission adapter SDK", () => {
         permits++;
         return { expiresAt: new Date(Date.now() + 10000).toISOString() };
       },
+      validateAnswers: async (_snapshot, plan) => plan,
     });
     expect(outcome.status).toBe("confirmed");
     expect(outcome.status === "confirmed" && outcome.evidence.kind).toBe("mock_ats");
@@ -134,7 +137,13 @@ describe("submission adapter SDK", () => {
       offerSlug: "software-engineer",
       packetId: "stripped",
     });
-    const result = await adapter.prepare({ packet, cvPdf, target, approvedValues: {} });
+    const result = await adapter.prepare({
+      packet,
+      cvPdf,
+      target,
+      approvedValues: {},
+      validateAnswers: async (_snapshot, plan) => plan,
+    });
     const prepared = preparation(result);
     await expect(
       adapter.commit({
@@ -142,6 +151,7 @@ describe("submission adapter SDK", () => {
         cvPdf,
         preparation: preparation({ ...result, adapter: null }),
         target,
+        validateAnswers: async (_snapshot, plan) => plan,
         authorizeDispatch: async () => {
           throw new Error("Legacy preparation must not receive a dispatch permit.");
         },
@@ -154,6 +164,7 @@ describe("submission adapter SDK", () => {
         cvPdf,
         preparation: prepared,
         target: { tenant: "synthetic", offerSlug: "different-offer" },
+        validateAnswers: async (_snapshot, plan) => plan,
         authorizeDispatch: async () => ({ expiresAt: "2099-01-01T00:00:00.000Z" }),
       }),
     ).rejects.toThrow("changed after preparation");
@@ -165,6 +176,7 @@ describe("submission adapter SDK", () => {
       cvPdf,
       preparation: prepared,
       target,
+      validateAnswers: async (_snapshot, plan) => plan,
       authorizeDispatch: async () => {
         permits++;
         return { expiresAt: "2099-01-01T00:00:00.000Z" };

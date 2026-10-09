@@ -1,6 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { chronology, conflictingFacts, usableFact } from "../../candidate/src/domain.js";
 import {
+  type FieldPlan,
+  type FormSnapshot,
+  fieldPlanSchema,
+  formSnapshotSchema,
+} from "../../contracts/src/browser.js";
+import {
   type AnswerInput,
   type ApprovedAnswer,
   type Authorization,
@@ -17,6 +23,7 @@ import {
   policyInputSchema,
   type SourceDocument,
 } from "../../contracts/src/candidate.js";
+import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
 import { localDay } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
@@ -620,6 +627,244 @@ export class CandidateRepository extends Repository {
       };
     }
     return null;
+  }
+
+  async validateFormPlan(
+    packet: PacketSnapshot,
+    rawSnapshot: FormSnapshot,
+    rawPlan: FieldPlan,
+    commit?: { attemptId: string; fence: number },
+  ): Promise<FieldPlan> {
+    return this.db.transaction((tx) =>
+      this.validateFormPlanIn(tx, packet, rawSnapshot, rawPlan, commit),
+    );
+  }
+
+  async validateFormPlanIn(
+    tx: SqlExecutor,
+    packet: PacketSnapshot,
+    rawSnapshot: FormSnapshot,
+    rawPlan: FieldPlan,
+    commit?: { attemptId: string; fence: number },
+  ): Promise<FieldPlan> {
+    await this.lockOwner(tx);
+    const snapshot = formSnapshotSchema.parse(rawSnapshot);
+    const plan = fieldPlanSchema.parse(rawPlan);
+    if (plan.fingerprint !== snapshot.fingerprint || snapshot.jobId !== packet.manifest.jobId)
+      throw new DomainError(
+        "FORM_CHANGED",
+        "The answer plan does not match the inspected vacancy.",
+      );
+    const row = (
+      await tx.query(
+        "SELECT a.state,a.job_id,a.commit_fence,j.data AS job_data,c.active_profile_id,c.active_authorization_id,u.revision,u.revoked_at,u.effective_at,u.expires_at,p.data AS profile_data,k.manifest AS packet_manifest FROM applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id JOIN candidates c ON c.owner_id=a.owner_id AND c.id=a.candidate_id JOIN authorizations u ON u.owner_id=c.owner_id AND u.id=c.active_authorization_id JOIN profile_versions p ON p.owner_id=c.owner_id AND p.id=c.active_profile_id JOIN packets k ON k.owner_id=a.owner_id AND k.application_id=a.id AND k.id=$3 LEFT JOIN packet_validity v ON v.owner_id=k.owner_id AND v.packet_id=k.id WHERE a.owner_id=$1 AND a.id=$2 AND v.packet_id IS NULL",
+        [this.ownerId, packet.manifest.applicationId, packet.manifest.id],
+      )
+    )[0];
+    if (
+      !row ||
+      !packet.valid ||
+      packet.manifest.validation.status === "blocked" ||
+      row.job_id !== packet.manifest.jobId ||
+      row.active_profile_id !== packet.manifest.profileId ||
+      row.active_authorization_id !== packet.manifest.authorizationId ||
+      Number(row.revision) !== packet.manifest.authorizationRevision ||
+      row.revoked_at ||
+      String(row.effective_at) > this.now() ||
+      String(row.expires_at) <= this.now()
+    )
+      throw new DomainError(
+        "PROFILE_STALE",
+        "Form answers require current profile and authorization bindings.",
+      );
+    if (
+      String(row.packet_manifest) !== JSON.stringify(packet.manifest) ||
+      createHash("sha256").update(JSON.stringify(packet.content)).digest("hex") !==
+        packet.manifest.contentSha256
+    )
+      throw new DomainError(
+        "CLAIM_UNSUPPORTED",
+        "Form preparation requires the immutable stored packet.",
+      );
+    if (commit) {
+      const attempt = (
+        await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND fence=$4 AND state='IN_FLIGHT' AND dispatch_started_at IS NULL",
+          [this.ownerId, commit.attemptId, packet.manifest.applicationId, commit.fence],
+        )
+      )[0];
+      if (!attempt || row.state !== "IN_FLIGHT" || Number(row.commit_fence) !== commit.fence)
+        throw new DomainError(
+          "LEASE_STALE",
+          "Answer read-back is not bound to the active attempt.",
+        );
+    }
+    if (
+      [
+        "SKIPPED",
+        "CLOSED",
+        "DUPLICATE",
+        "CONFIRMED",
+        "HISTORICAL_SUBMITTED",
+        "UNKNOWN",
+        "RECONCILING",
+        "NEEDS_REVIEW",
+      ].includes(String(row.state))
+    )
+      throw new DomainError("STATE_INVALID", "This application cannot be filled again.");
+    if (!commit && ["IN_FLIGHT", "INTENT_RECORDED"].includes(String(row.state)))
+      throw new DomainError(
+        "STATE_INVALID",
+        "An active final action prohibits another preparation.",
+      );
+    if (
+      !commit &&
+      (
+        await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+          [this.ownerId, packet.manifest.applicationId],
+        )
+      ).length
+    )
+      throw new DomainError(
+        "DUPLICATE_SUSPECTED",
+        "Reconcile the previous action before filling again.",
+      );
+    const control = await this.readControl(tx);
+    if (control.restoreBlocked || (commit && (control.stopped || control.submissionsPaused)))
+      throw new DomainError("POLICY_REVOKED", "Restore review prohibits browser preparation.");
+    const currentFacts = await this.facts(tx);
+    const profile = json<ProfileSnapshot>(row, "profile_data");
+    const today = this.now().slice(0, 10);
+    if (
+      profile.facts.some(
+        (fact) =>
+          !usableFact(fact, today) ||
+          !currentFacts.some(
+            (current) =>
+              current.id === fact.id &&
+              current.revision === fact.revision &&
+              usableFact(current, today),
+          ),
+      )
+    )
+      throw new DomainError(
+        "PROFILE_STALE",
+        "Profile facts have changed or expired before filling.",
+      );
+    const job = jobInputSchema.parse(json(row, "job_data"));
+    if (job.url !== packet.content.job.url)
+      throw new DomainError("FORM_CHANGED", "The packet vacancy URL changed.");
+    const identity = packet.content.cv.identity;
+    const cv = packet.manifest.artifacts.find((item) => item.kind === "cv_pdf");
+    const known: Record<string, string> = {
+      full_name: identity.fullName,
+      email: identity.email,
+      phone: identity.phone,
+      portfolio: identity.links[0] ?? "",
+      cv: cv?.filename ?? "",
+      motivation: `${packet.content.letter.opening} ${packet.content.letter.contributions.map((item) => item.text).join(" ")}`,
+    };
+    const labels: Record<string, readonly string[]> = {
+      full_name: ["Full name", "Name", "Full Name"],
+      email: ["Email", "E-mail", "Email address", "Email Address"],
+      phone: ["Phone", "Phone number", "Phone Number"],
+      portfolio: ["Portfolio", "Website", "Portfolio URL"],
+      cv: ["CV", "Resume", "Resume/CV", "CV or resume"],
+      motivation: ["Motivation", "Cover letter", "Cover Letter"],
+      first_name: ["First Name", "First name"],
+      last_name: ["Last Name", "Last name"],
+    };
+    const entries: FieldPlan["entries"] = [];
+    const unresolved = new Set(plan.unresolved);
+    const seenNames = new Set<string>();
+    const nameParts = identity.fullName.trim().split(/\s+/);
+    const given = plan.entries.find((item) => item.semanticKey === "first_name")?.expected;
+    const family = plan.entries.find((item) => item.semanticKey === "last_name")?.expected;
+    const exactNames =
+      typeof given === "string" &&
+      typeof family === "string" &&
+      `${given} ${family}`.trim().replace(/\s+/g, " ") ===
+        identity.fullName.trim().replace(/\s+/g, " ");
+    for (const entry of plan.entries) {
+      const field = snapshot.fields.find(
+        (item) => item.name === entry.name && item.semanticKey === entry.semanticKey,
+      );
+      if (!field || snapshot.fields.filter((item) => item.name === entry.name).length !== 1)
+        throw new DomainError("FORM_CHANGED", "An answer is not bound to one inspected field.");
+      if (seenNames.has(entry.name))
+        throw new DomainError("FORM_CHANGED", "An answer plan repeats an inspected field.");
+      seenNames.add(entry.name);
+      if (labels[entry.semanticKey] && !labels[entry.semanticKey]?.includes(field.label)) {
+        unresolved.add(entry.semanticKey);
+        continue;
+      }
+      if (Object.hasOwn(known, entry.semanticKey)) {
+        if (entry.expected !== known[entry.semanticKey])
+          throw new DomainError(
+            "CLAIM_UNSUPPORTED",
+            "A form value conflicts with the reviewed packet.",
+          );
+        entries.push(entry);
+        continue;
+      }
+      if (["first_name", "last_name"].includes(entry.semanticKey)) {
+        if (
+          nameParts.length === 2 &&
+          entry.expected === nameParts[entry.semanticKey === "first_name" ? 0 : 1]
+        ) {
+          entries.push(entry);
+          continue;
+        }
+        if (exactNames) {
+          const approved = await this.matchingAnswer(
+            tx,
+            entry.semanticKey,
+            field.label,
+            job.employerId,
+            job.countryCode ?? "",
+          );
+          if (approved && approved.answer === entry.expected) {
+            entries.push({ ...entry, evidence: approved.evidenceFactIds });
+            continue;
+          }
+        }
+        unresolved.add(entry.semanticKey);
+        continue;
+      }
+      const approved = await this.matchingAnswer(
+        tx,
+        entry.semanticKey,
+        field.label,
+        job.employerId,
+        job.countryCode ?? "",
+      );
+      let expected = approved
+        ? typeof approved.answer === "boolean"
+          ? approved.answer
+          : String(approved.answer)
+        : undefined;
+      if (expected !== undefined && ["select", "radio", "autocomplete"].includes(field.kind)) {
+        const options = field.options.filter(
+          (item) => item.value === String(expected) || item.label === String(expected),
+        );
+        expected = options.length === 1 ? options[0]?.value : undefined;
+      }
+      if (!approved || expected !== entry.expected) {
+        unresolved.add(entry.semanticKey);
+        continue;
+      }
+      entries.push({ ...entry, evidence: approved.evidenceFactIds });
+    }
+    for (const field of snapshot.fields) {
+      if (field.required && !entries.some((entry) => entry.name === field.name))
+        unresolved.add(field.semanticKey);
+    }
+    return fieldPlanSchema.parse({
+      fingerprint: plan.fingerprint,
+      entries,
+      unresolved: [...unresolved],
+    });
   }
   /**
    * Answers whose scope is satisfied for one specific job. Meaning is deliberately

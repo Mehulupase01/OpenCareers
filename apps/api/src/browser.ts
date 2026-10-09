@@ -5,6 +5,7 @@ import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
+import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
@@ -47,6 +48,7 @@ const recruiteeInput = z
 export async function browserRoutes(app: FastifyInstance, config: Config, repository: Repository) {
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
+  const candidates = new CandidateRepository(repository.db, repository.ownerId);
   const store = new ArtifactStore(
     config.dataDir,
     DocumentStorage.fromConfig(config, "document_artifact"),
@@ -58,7 +60,7 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     if (config.profile !== "demo")
       throw new DomainError("NOT_FOUND", "Mock ATS dry runs are available in demo mode only.");
     const input = dryRunInput.parse(request.body);
-    const packet = (await documents.snapshot()).find((item) => item.manifest.id === input.packetId);
+    const packet = await documents.get(input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const adapter = adapters.get("mock-ats");
@@ -68,6 +70,7 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
       cvPdf: cv.buffer,
       approvedValues: input.approvedValues,
       target,
+      validateAnswers: (snapshot, plan) => candidates.validateFormPlan(packet, snapshot, plan),
     });
     return browser.save(result, {
       queueSubmit: { adapterId: adapter.id, target: target as Record<string, unknown> },
@@ -77,7 +80,7 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
     if (!config.externalSubmissionEnabled || config.profile === "demo")
       throw new DomainError("UNAUTHORIZED", "External submission is not enabled.");
     const input = recruiteeInput.parse(request.body);
-    const packet = (await documents.snapshot()).find((item) => item.manifest.id === input.packetId);
+    const packet = await documents.get(input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const adapter = adapters.get("recruitee");
@@ -87,6 +90,7 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
       cvPdf: cv.buffer,
       approvedValues: input.approvedValues,
       target,
+      validateAnswers: (snapshot, plan) => candidates.validateFormPlan(packet, snapshot, plan),
     });
     return browser.save(result, {
       queueSubmit: { adapterId: adapter.id, target: target as Record<string, unknown> },

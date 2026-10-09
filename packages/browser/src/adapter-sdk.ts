@@ -2,10 +2,12 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
 import type { BrowserPreparation, DryRunResult } from "../../contracts/src/browser.js";
+import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { DomainError, FormDriftError } from "../../contracts/src/index.js";
 import type { ReceiptEvidence } from "../../contracts/src/submission.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
+import type { FormAnswerGuard } from "./answer-guard.js";
 import { commitPreparedMockPacket, DefinitiveMockRejection } from "./commit-mock.js";
 import {
   commitGreenhousePacket,
@@ -66,6 +68,8 @@ export interface AdapterPrepareInput {
   packet: PacketSnapshot;
   cvPdf: Buffer;
   approvedValues: Record<string, string | boolean>;
+  validateAnswers: FormAnswerGuard;
+  browserSession?: BrowserSessionState;
   target: unknown;
 }
 
@@ -75,6 +79,8 @@ export interface AdapterCommitInput {
   preparation: BrowserPreparation;
   target: unknown;
   authorizeDispatch: () => Promise<{ expiresAt: string }>;
+  validateAnswers: FormAnswerGuard;
+  browserSession?: BrowserSessionState;
 }
 
 export interface AdapterReconcileInput {
@@ -142,7 +148,14 @@ class MockSubmissionAdapter implements SubmissionAdapter {
 
   async prepare(input: AdapterPrepareInput) {
     const target = mockTargetSchema.parse(input.target);
-    return prepareMockPacket(input.packet, input.cvPdf, input.approvedValues, target.fixture);
+    return prepareMockPacket(
+      input.packet,
+      input.cvPdf,
+      input.approvedValues,
+      target.fixture,
+      input.validateAnswers,
+      input.browserSession,
+    );
   }
 
   async commit(input: AdapterCommitInput): Promise<AdapterCommitOutcome> {
@@ -159,6 +172,8 @@ class MockSubmissionAdapter implements SubmissionAdapter {
           input.preparation,
           input.authorizeDispatch,
           fixtureFrom(input.preparation),
+          input.validateAnswers,
+          input.browserSession,
         );
         return { status: "confirmed", evidence };
       } catch (error) {
@@ -197,6 +212,7 @@ class RecruiteeSubmissionAdapter implements SubmissionAdapter {
       input.cvPdf,
       input.approvedValues,
       this.request,
+      input.validateAnswers,
     );
   }
 
@@ -211,6 +227,8 @@ class RecruiteeSubmissionAdapter implements SubmissionAdapter {
         input.preparation.result,
         input.authorizeDispatch,
         this.request,
+        undefined,
+        input.validateAnswers,
       );
       return { status: "confirmed", evidence };
     } catch (error) {
@@ -241,6 +259,8 @@ class GreenhouseSubmissionAdapter implements SubmissionAdapter {
       input.cvPdf,
       input.approvedValues,
       this.commitOptions.configureContext,
+      input.validateAnswers,
+      input.browserSession,
     );
   }
 
@@ -254,7 +274,11 @@ class GreenhouseSubmissionAdapter implements SubmissionAdapter {
         input.cvPdf,
         input.preparation,
         input.authorizeDispatch,
-        this.commitOptions,
+        {
+          ...this.commitOptions,
+          validateAnswers: input.validateAnswers,
+          ...(input.browserSession ? { browserSession: input.browserSession } : {}),
+        },
       );
       return { status: "confirmed", evidence };
     } catch (error) {

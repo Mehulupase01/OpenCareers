@@ -1,12 +1,14 @@
 import type { AdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import type { BrowserPreparation } from "../../../packages/contracts/src/browser.js";
+import type { BrowserSessionState } from "../../../packages/contracts/src/browser-session.js";
 import { DomainError, jobInputSchema, type Task } from "../../../packages/contracts/src/index.js";
 import type { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
 import type { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import type { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import { ExceptionRepository } from "../../../packages/persistence/src/exception-repository.js";
+import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 
 export function inspectionTarget(applicationUrl: string, profile: Config["profile"]) {
@@ -28,7 +30,8 @@ export function inspectionTarget(applicationUrl: string, profile: Config["profil
 export async function runInspectionTask(
   task: Task,
   dependencies: {
-    config: Pick<Config, "profile" | "externalSubmissionEnabled">;
+    config: Pick<Config, "profile" | "externalSubmissionEnabled"> &
+      Partial<Pick<Config, "vaultKey">>;
     repository: Repository;
     documents: DocumentRepository;
     browser: BrowserRepository;
@@ -137,14 +140,52 @@ export async function runInspectionTask(
     return;
   }
   const adapter = adapters.get(route.adapterId);
-  const target = adapter.parseTarget(route.target) as Record<string, unknown>;
+  let target = adapter.parseTarget(route.target) as Record<string, unknown>;
+  let browserSession: BrowserSessionState | undefined;
+  const handoffId = typeof task.payload.handoffId === "string" ? task.payload.handoffId : undefined;
+  if (handoffId) {
+    const handoffs = new HandoffRepository(
+      repository.db,
+      repository.ownerId,
+      clock,
+      config.vaultKey,
+    );
+    const original = await handoffs.target(handoffId);
+    if (
+      original.session.applicationId !== task.applicationId ||
+      original.session.adapterId !== adapter.id
+    )
+      throw new DomainError("FORM_CHANGED", "Handoff does not match the inspection adapter.");
+    if (adapter.id === "mock-ats") {
+      const path = new URL(original.result.snapshots[0]?.url ?? "").pathname;
+      target = adapter.parseTarget({ fixture: path.split("/").at(-1) }) as Record<string, unknown>;
+    }
+    browserSession = await handoffs.continuation(handoffId, task.applicationId, packet.manifest.id);
+  }
   const cv = await documents.artifact(packet.manifest.id, "cv_pdf", artifacts);
-  const result = await adapter.prepare({ packet, cvPdf: cv.buffer, approvedValues: {}, target });
+  const result = await adapter.prepare({
+    packet,
+    cvPdf: cv.buffer,
+    approvedValues: {},
+    target,
+    validateAnswers: async (snapshot, plan) => {
+      if (handoffId)
+        await new HandoffRepository(
+          repository.db,
+          repository.ownerId,
+          clock,
+          config.vaultKey,
+        ).continuation(handoffId, String(task.applicationId), packet.manifest.id);
+      return candidates.validateFormPlan(packet, snapshot, plan);
+    },
+    ...(browserSession ? { browserSession } : {}),
+  });
   await repository.renew(task);
   let preparation: BrowserPreparation;
   try {
     preparation = await browser.save(result, {
       expectedRevision: Number(application.revision),
+      ...(handoffId ? { handoffId } : {}),
       ...(candidate.authorization.mode === "auto_submit"
         ? { queueSubmit: { adapterId: adapter.id, target } }
         : {}),
@@ -171,7 +212,10 @@ export async function runInspectionTask(
             (answer) =>
               answer.semanticKey === field.semanticKey &&
               answer.meaning === field.label &&
-              answer.status !== "deferred",
+              answer.status === "approved_reuse" &&
+              answer.approvedAnswerId === reusable.id &&
+              answer.approvedAnswerRevision === reusable.revision &&
+              answer.answer === reusable.answer,
           )
         )
           reusableCount++;
@@ -192,10 +236,21 @@ export async function runInspectionTask(
       priority: 20,
     });
   if (result.status === "challenge" || result.status === "unsupported") {
+    const login = result.snapshots.some((snapshot) => snapshot.blocker === "login");
     await new ExceptionRepository(repository.db, repository.ownerId, clock).record({
       applicationId: task.applicationId,
-      blocker: result.status === "challenge" ? "challenge_required" : "unsupported_form",
-      code: result.status === "challenge" ? "CHALLENGE_REQUIRED" : "ADAPTER_UNSUPPORTED",
+      blocker:
+        result.status === "challenge"
+          ? "challenge_required"
+          : login
+            ? "account_blocked"
+            : "unsupported_form",
+      code:
+        result.status === "challenge"
+          ? "CHALLENGE_REQUIRED"
+          : login
+            ? "SESSION_EXPIRED"
+            : "ADAPTER_UNSUPPORTED",
       reason: result.issues[0] ?? "The form needs owner review.",
     });
   }

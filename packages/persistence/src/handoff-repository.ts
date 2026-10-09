@@ -1,7 +1,14 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { allowedHandoffCookie, handoffCapability } from "../../browser/src/handoff-policy.js";
 import { dryRunResultSchema } from "../../contracts/src/browser.js";
+import {
+  type BrowserSessionState,
+  browserSessionSchema,
+} from "../../contracts/src/browser-session.js";
+import { packetManifestSchema } from "../../contracts/src/documents.js";
 import { type HandoffSession, handoffSessionSchema } from "../../contracts/src/handoff.js";
 import { DomainError } from "../../contracts/src/index.js";
+import { VaultCipher, vaultEnvelopeSchema } from "../../security/src/vault.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
 
@@ -31,7 +38,12 @@ function sessionFrom(row: Row): HandoffSession {
 }
 
 export class HandoffRepository extends Repository {
-  constructor(db: Database, ownerId: string, clock?: () => Date) {
+  constructor(
+    db: Database,
+    ownerId: string,
+    clock?: () => Date,
+    private readonly vaultKey?: string,
+  ) {
     super(db, ownerId, clock);
   }
 
@@ -159,6 +171,7 @@ export class HandoffRepository extends Repository {
     id: string,
     leaseOwner: string,
     generation: number,
+    browserSession?: BrowserSessionState,
   ): Promise<HandoffSession> {
     if (
       !/^[a-zA-Z0-9_.:-]{1,180}$/.test(leaseOwner) ||
@@ -184,6 +197,118 @@ export class HandoffRepository extends Repository {
       )
         throw new DomainError("LEASE_STALE", "Handoff lease is stale.");
       const nextGeneration = generation + 1;
+      if (browserSession) {
+        if (!this.vaultKey)
+          throw new DomainError(
+            "CONFIG_INVALID",
+            "Encrypted browser continuation requires a vault key.",
+          );
+        const state = browserSessionSchema.parse(browserSession);
+        const bound = (
+          await tx.query(
+            "SELECT b.result,p.manifest,c.active_profile_id,c.active_authorization_id,u.revision,u.revoked_at,u.expires_at,a.state FROM browser_preparations b JOIN packets p ON p.owner_id=b.owner_id AND p.id=b.packet_id JOIN applications a ON a.owner_id=b.owner_id AND a.id=b.application_id JOIN candidates c ON c.owner_id=a.owner_id AND c.id=a.candidate_id JOIN authorizations u ON u.owner_id=c.owner_id AND u.id=c.active_authorization_id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE b.owner_id=$1 AND b.id=$2 AND v.packet_id IS NULL",
+            [this.ownerId, row.preparation_id ?? null],
+          )
+        )[0];
+        if (
+          bound?.state !== "CHALLENGE_REQUIRED" ||
+          bound.revoked_at ||
+          String(bound.expires_at) <= this.now() ||
+          (await this.readControl(tx)).restoreBlocked
+        )
+          throw new DomainError("PROFILE_STALE", "Handoff inputs changed before continuation.");
+        const manifest = packetManifestSchema.parse(JSON.parse(String(bound.manifest)));
+        const prepared = dryRunResultSchema.parse(JSON.parse(String(bound.result)));
+        const origin = new URL(state.origin);
+        const original = new URL(prepared.snapshots[0]?.url ?? "");
+        const capability = handoffCapability(String(row.adapter_id));
+        if (
+          !capability ||
+          state.origin !== origin.origin ||
+          (capability.navigation === "fixture-server"
+            ? origin.protocol !== "http:" || origin.hostname !== "127.0.0.1"
+            : origin.origin !== original.origin) ||
+          state.cookies.some(
+            (cookie) =>
+              !allowedHandoffCookie(capability, cookie.name) ||
+              cookie.domain.replace(/^\./, "") !== origin.hostname ||
+              /[\r\n;]/.test(cookie.value),
+          )
+        )
+          throw new DomainError(
+            "ORIGIN_DENIED",
+            "Continuation contains unreviewed or off-origin session state.",
+          );
+        if (
+          manifest.profileId !== bound.active_profile_id ||
+          manifest.authorizationId !== bound.active_authorization_id ||
+          manifest.authorizationRevision !== Number(bound.revision)
+        )
+          throw new DomainError(
+            "PROFILE_STALE",
+            "Handoff continuation requires the active profile and authorization.",
+          );
+        const prior = await tx.query(
+          "SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2 AND (state<>'BLOCKED_BEFORE_DISPATCH' OR dispatch_started_at IS NOT NULL) LIMIT 1",
+          [this.ownerId, row.application_id ?? null],
+        );
+        if (prior.length)
+          throw new DomainError(
+            "DUPLICATE_SUSPECTED",
+            "Reconcile the previous action before resuming a browser.",
+          );
+        const secretId = randomUUID();
+        const payload = Buffer.from(
+          JSON.stringify({
+            session: state,
+            handoffId: id,
+            generation: nextGeneration,
+            applicationId: row.application_id,
+            adapterId: row.adapter_id,
+            targetFingerprint: row.target_fingerprint,
+            packetId: manifest.id,
+            profileId: manifest.profileId,
+            authorizationId: manifest.authorizationId,
+            authorizationRevision: manifest.authorizationRevision,
+            expiresAt: row.expires_at,
+          }),
+        );
+        try {
+          const envelope = new VaultCipher(this.vaultKey).seal(payload, {
+            ownerId: this.ownerId,
+            secretId,
+            purpose: "browser_storage",
+            keyVersion: 1,
+          });
+          await tx.query(
+            "INSERT INTO vault_secrets(owner_id,id,purpose,key_version,envelope,created_at) VALUES($1,$2,'browser_storage',1,$3,$4)",
+            [this.ownerId, secretId, JSON.stringify(envelope), this.now()],
+          );
+          await tx.query(
+            "INSERT INTO handoff_continuations(owner_id,handoff_id,secret_id,generation,packet_id,profile_id,authorization_id,authorization_revision,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            [
+              this.ownerId,
+              id,
+              secretId,
+              nextGeneration,
+              manifest.id,
+              manifest.profileId,
+              manifest.authorizationId,
+              manifest.authorizationRevision,
+              row.expires_at ?? null,
+            ],
+          );
+        } finally {
+          payload.fill(0);
+        }
+        await this.enqueueIn(tx, {
+          type: "inspect",
+          domain: "browser",
+          applicationId: String(row.application_id),
+          dedupeKey: `inspect:handoff:${id}:${nextGeneration}`,
+          payload: { schemaVersion: 1, packetId: manifest.id, handoffId: id },
+        });
+      }
       await tx.query(
         "UPDATE handoff_sessions SET state='rebuilding',generation=$1,lease_owner=NULL,lease_until=NULL,completed_at=$2 WHERE owner_id=$3 AND id=$4 AND state='claimed'",
         [nextGeneration, this.now(), this.ownerId, id],
@@ -213,6 +338,71 @@ export class HandoffRepository extends Repository {
       );
       if (!rows[0]) throw new DomainError("LEASE_STALE", "Handoff lease is stale.");
       await this.audit(tx, id, "handoff.cancelled", Number(rows[0].generation), {});
+    });
+  }
+
+  async continuation(
+    id: string,
+    applicationId: string,
+    packetId: string,
+  ): Promise<BrowserSessionState> {
+    if (!this.vaultKey)
+      throw new DomainError("CONFIG_INVALID", "Browser continuation requires a vault key.");
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = (
+        await tx.query(
+          "SELECT h.adapter_id,h.target_fingerprint,h.application_id,h.generation AS session_generation,h.expires_at AS session_expiry,h.state,k.*,s.envelope,s.key_version,c.active_profile_id,c.active_authorization_id,u.revision,u.revoked_at,u.expires_at AS authorization_expiry FROM handoff_sessions h JOIN handoff_continuations k ON k.owner_id=h.owner_id AND k.handoff_id=h.id JOIN vault_secrets s ON s.owner_id=k.owner_id AND s.id=k.secret_id JOIN applications a ON a.owner_id=h.owner_id AND a.id=h.application_id JOIN candidates c ON c.owner_id=a.owner_id AND c.id=a.candidate_id JOIN authorizations u ON u.owner_id=c.owner_id AND u.id=c.active_authorization_id LEFT JOIN packet_validity v ON v.owner_id=k.owner_id AND v.packet_id=k.packet_id WHERE h.owner_id=$1 AND h.id=$2 AND h.application_id=$3 AND k.packet_id=$4 AND v.packet_id IS NULL",
+          [this.ownerId, id, applicationId, packetId],
+        )
+      )[0];
+      if (
+        !row ||
+        row.generation !== row.session_generation ||
+        row.expires_at !== row.session_expiry ||
+        !["rebuilding", "completed"].includes(String(row.state)) ||
+        String(row.expires_at) <= this.now() ||
+        row.revoked_at ||
+        String(row.authorization_expiry) <= this.now() ||
+        row.profile_id !== row.active_profile_id ||
+        row.authorization_id !== row.active_authorization_id ||
+        Number(row.authorization_revision) !== Number(row.revision) ||
+        (await this.readControl(tx)).restoreBlocked
+      )
+        throw new DomainError("SESSION_EXPIRED", "Browser continuation is stale or revoked.");
+      const plaintext = new VaultCipher(this.vaultKey as string).open(
+        vaultEnvelopeSchema.parse(JSON.parse(String(row.envelope))),
+        {
+          ownerId: this.ownerId,
+          secretId: String(row.secret_id),
+          purpose: "browser_storage",
+          keyVersion: Number(row.key_version),
+        },
+      );
+      try {
+        const payload = JSON.parse(plaintext.toString("utf8"));
+        if (
+          payload.handoffId !== id ||
+          payload.generation !== Number(row.generation) ||
+          payload.applicationId !== applicationId ||
+          payload.adapterId !== row.adapter_id ||
+          payload.targetFingerprint !== row.target_fingerprint ||
+          payload.packetId !== packetId ||
+          payload.profileId !== row.profile_id ||
+          payload.authorizationId !== row.authorization_id ||
+          payload.authorizationRevision !== Number(row.authorization_revision) ||
+          payload.expiresAt !== row.expires_at
+        )
+          throw new DomainError("UNAUTHORIZED", "Browser continuation binding changed.");
+        return browserSessionSchema.parse(payload.session);
+      } catch {
+        throw new DomainError(
+          "UNAUTHORIZED",
+          "Browser continuation authentication or structure failed.",
+        );
+      } finally {
+        plaintext.fill(0);
+      }
     });
   }
 
