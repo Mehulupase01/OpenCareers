@@ -514,11 +514,18 @@ export class EmailRepository extends Repository {
       const mailboxHash = readData(connection).mailboxHash;
       const existing = (
         await tx.query(
-          "SELECT id FROM email_messages WHERE owner_id=$1 AND mailbox_hash=$2 AND provider_message_id=$3",
+          "SELECT id,evidence FROM email_messages WHERE owner_id=$1 AND mailbox_hash=$2 AND provider_message_id=$3",
           [this.ownerId, mailboxHash, message.id],
         )
       )[0];
-      if (existing) return String(existing.id);
+      if (existing) {
+        if (existing.evidence)
+          await this.queueReceipt(
+            tx,
+            emailReceiptEvidenceSchema.parse(JSON.parse(String(existing.evidence))),
+          );
+        return String(existing.id);
+      }
       const id = randomUUID(),
         context = match.context;
       const sha256 = mailHash(JSON.stringify(message));
@@ -560,19 +567,7 @@ export class EmailRepository extends Repository {
           "INSERT INTO email_outcome_events(owner_id,message_id,context_id,kind,occurred_at) VALUES($1,$2,$3,$4,$5)",
           [this.ownerId, id, context.id, match.kind, this.now()],
         );
-      if (evidence) {
-        const attempt = (
-          await tx.query("SELECT state FROM attempts WHERE owner_id=$1 AND id=$2", [
-            this.ownerId,
-            evidence.attemptId,
-          ])
-        )[0];
-        if (attempt?.state === "UNKNOWN")
-          await new ExceptionRepository(this.db, this.ownerId, this.clock).queueReconciliation(
-            tx,
-            evidence.applicationId,
-          );
-      }
+      if (evidence) await this.queueReceipt(tx, evidence);
       await this.audit(tx, id, "email.observed", 1, {
         correlation: match.status,
         classification: match.kind,
@@ -580,6 +575,24 @@ export class EmailRepository extends Repository {
       });
       return id;
     });
+  }
+
+  private async queueReceipt(tx: SqlExecutor, evidence: EmailReceiptEvidence) {
+    const latest = (
+      await tx.query(
+        "SELECT t.id,t.state,a.state AS application_state FROM attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id WHERE t.owner_id=$1 AND t.application_id=$2 ORDER BY t.started_at DESC,t.id DESC LIMIT 1",
+        [this.ownerId, evidence.applicationId],
+      )
+    )[0];
+    if (
+      latest?.id === evidence.attemptId &&
+      latest.state === "UNKNOWN" &&
+      ["UNKNOWN", "NEEDS_REVIEW"].includes(String(latest.application_state))
+    )
+      await new ExceptionRepository(this.db, this.ownerId, this.clock).queueReconciliation(
+        tx,
+        evidence.applicationId,
+      );
   }
 
   async receipt(applicationId: string): Promise<EmailReceiptEvidence | null> {

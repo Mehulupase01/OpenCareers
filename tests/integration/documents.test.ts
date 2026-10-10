@@ -1867,6 +1867,13 @@ for (const engine of ["sqlite", "postgres"] as const) {
             const first = await email.ingest(lease, message);
             expect(first).toBeTruthy();
             expect(await email.ingest(lease, message)).toBe(first);
+            const racing = await queue.claim("synthetic-racing-reconciler", ["reconcile"]);
+            if (!racing) throw new Error("Expected the first email reconciliation task.");
+            // The earlier worker read no mail before delivery, and completes after ingestion.
+            expect(await submissions.reconcileWithoutReceipt(racing)).toBe("needs_review");
+            expect(await email.ingest(lease, message)).toBe(first);
+            await queue.complete(racing);
+            expect(await email.ingest(lease, message)).toBe(first);
             expect(
               await db.query("SELECT message_id FROM email_outcome_events WHERE owner_id=$1", [
                 owner,

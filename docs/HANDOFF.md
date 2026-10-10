@@ -609,3 +609,8 @@ Local milestone checks: 330 tests passed (124 PostgreSQL tests skipped locally),
 46 desktop/mobile browser workflows passed, plus lint/typecheck/build/ledger,
 274-file public scan and production dependency audit. Existing helper-any lint
 and bundle-size warnings remain. CI evidence must be checked against this milestone.
+
+Receipt timing review also covers mail arriving during a stale read-only
+reconciliation. Duplicate ingestion now requeues only the same latest unknown
+attempt after the earlier task finishes, without duplicating the outcome event.
+The documents integration fixture explicitly exercises this interleaving.

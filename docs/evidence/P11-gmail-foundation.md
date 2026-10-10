@@ -29,6 +29,10 @@ real employer was changed. No live Gmail request or application was sent.
 - Only minimal message metadata, hashes and typed evidence are persisted, not
   subject/body/address plaintext. Duplicate provider IDs within a mailbox create
   one outcome event. Events do not trigger replies or accept interview slots.
+- A repeated observation also repairs the delivery-versus-queue-completion race:
+  if an older read-only task finished without seeing the receipt, the next sync
+  requeues reconciliation only for that same latest unknown attempt. No extra
+  outcome event or submit task is created, and settled/older attempts are not requeued.
 - Strong email receipts atomically queue only read-only reconciliation against
   the original immutable submission intent. SubmissionRepository validates stored
   message/event/packet/attempt evidence before confirming an unknown attempt.
