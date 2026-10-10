@@ -819,3 +819,29 @@ resumable large scans, shared forms, 20-source operational coverage and gated
 adapters remain. Next: shared low-risk form inspection/fill primitives, then
 P12/P13 alongside P18 breadth. Genuine P08 receipt and Gmail owner consent
 remain external verification prerequisites. Private installations untouched.
+
+## 2026-10-11: Shared Form Core Milestone
+
+Public discovery milestone pushed as `015017c9f2cd0e2c803b56ee8053591493ac1ddf`.
+CI 38094756123 Ubuntu and PostgreSQL passed; Windows first attempt failed with
+Chromium ERR_NO_BUFFER_SPACE in the unchanged adapter-sdk mock navigation, not
+a Breezy assertion. Only the failed lane was rerun; result pending at this entry.
+
+Shared hosted-form core recognizes only labelled, native, low-risk name/email/
+phone/portfolio controls. It pins vacancy identity and structure, revalidates
+packet-backed plans and canonical guards, blocks all network during generic
+fill, and performs final readback/native validation. Unknown controls stop the
+whole preparation; no generic clicks, uploads, graph authority or submissions.
+Greenhouse shares native fill/readback and read-only routing while preserving
+its own upload, packet, approval and dispatch safeguards.
+
+Verification: full frozen local check 497 passed/157 PostgreSQL skipped across
+59 files; all 58 desktop/mobile browser cases passed. Last generic-only native
+constraint hardening passed 26 targeted tests and typecheck. See
+`docs/evidence/P18-shared-form-core.md`; no full-local 499 claim. Public scan
+311 files and dependency audit passed before the new evidence document.
+P18-G2/P18-02 move to in_progress, not complete: owner-policy/API/persisted
+preparation/exception UI integration remains. No new submission adapter is
+enabled. Counts remain 11/19 phases, 80/128 gates. Source-session consumption,
+resumable large scans, 20-source operational coverage, five gated families and
+P12-P17 remain. No private profile, key, CV, OAuth grant or real application used.

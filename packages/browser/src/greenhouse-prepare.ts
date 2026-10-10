@@ -11,6 +11,7 @@ import {
 import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
+import { fillAndReadNativeControl, installReadOnlyFormRoutes } from "./form-controls.js";
 import {
   type GreenhouseTarget,
   greenhouseUrl,
@@ -38,11 +39,7 @@ export async function installGreenhouseReadOnlyRoutes(
   context: BrowserContext,
   onBlockedWrite: () => void,
 ) {
-  await context.route("**/*", async (route) => {
-    if (["GET", "HEAD"].includes(route.request().method())) return route.fallback();
-    onBlockedWrite();
-    return route.fulfill({ status: 409, body: "Read-only preparation blocked this request." });
-  });
+  await installReadOnlyFormRoutes(context, onBlockedWrite);
 }
 
 export function greenhousePreparationResult(
@@ -192,18 +189,8 @@ export async function fillGreenhouseForm(
         selected !== null &&
         createHash("sha256").update(Buffer.from(selected.bytes)).digest("hex") === cv.sha256;
       uploadStatus = matches ? "selected" : "failed";
-    } else if (field.kind === "checkbox") {
-      await control.setChecked(entry.expected as boolean);
-      actual = await control.isChecked();
-      matches = actual === entry.expected;
-    } else if (field.kind === "select") {
-      await control.selectOption(entry.expected as string);
-      actual = await control.inputValue();
-      matches = actual === entry.expected;
     } else {
-      await control.fill(entry.expected as string);
-      actual = await control.inputValue();
-      matches = actual === entry.expected;
+      ({ actual, matches } = await fillAndReadNativeControl(control, field.kind, entry.expected));
     }
     readBack.push({ name: entry.name, expected: entry.expected, actual, matches });
     if (!matches) issues.push(`Greenhouse read-back mismatch: ${entry.name}`);
