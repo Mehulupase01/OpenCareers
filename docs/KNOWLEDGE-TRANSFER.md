@@ -39,11 +39,10 @@ and `docs/masterplan-traceability.md`.
 
 ```
 Phases:  19 tracked (P00-P17 from the masterplan, plus P18 for owner-added scope)
-Gates:   72 of 128 complete
-Phases complete: 10 of 19  (P00-P07, P09, P10)
+Gates:   79 of 128 complete
+Phases complete: 11 of 19  (P00-P07, P09, P10, P11)
 Still open:
   P08  6/7   P08-G6 needs one genuine live receipt  (EXTERNAL, needs owner)
-  P11  0/7   email integration and receipt reconciliation
   P12  0/6   bounded multi-agent orchestration
   P13  0/7   unattended Windows autopilot and throughput
   P14  0/7   server and hybrid deployment

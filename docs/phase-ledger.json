@@ -1238,89 +1238,89 @@
     {
       "id": "P11",
       "title": "Email integration and receipt reconciliation",
-      "status": "code_complete_verification_pending",
+      "status": "complete",
       "dependsOn": ["P10"],
       "tickets": [
         {
           "id": "P11-01",
           "text": "OAuth lifecycle. Implement least-sufficient scopes, secure token storage, refresh, disconnect, revocation handling, and actionable reconnect states, documenting testing-mode versus deployed-app limitations.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T23", "T24"],
           "evidence": ["docs/evidence/P11-gmail-foundation.md", "tests/integration/email.test.ts"],
-          "nextAction": "P11-01"
+          "nextAction": null
         },
         {
           "id": "P11-02",
           "text": "Narrow message acquisition. Query only relevant time windows and application and account contexts, fetch minimal fields, and avoid retaining unrelated email.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T23", "T24"],
           "evidence": ["docs/evidence/P11-gmail-foundation.md", "tests/unit/email.test.ts"],
-          "nextAction": "P11-02"
+          "nextAction": null
         },
         {
           "id": "P11-03",
           "text": "Correlation. Match messages to pending applications using expected recipient, employer or sender domain, role or requisition ID, application ID, and timing, preserving uncertainty where several jobs could match.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T23", "T24"],
           "evidence": [
             "docs/evidence/P11-gmail-foundation.md",
             "tests/unit/email.test.ts",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "P11-03"
+          "nextAction": null
         },
         {
           "id": "P11-04",
           "text": "Verification links. Follow only links bound to a pending signup and a validated destination chain, rejecting unexpected redirects or instructions to disclose secrets.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T23", "T24"],
           "evidence": [
             "tests/unit/email-verification.test.ts",
             "tests/integration/email-verification.test.ts"
           ],
-          "nextAction": "P11-04"
+          "nextAction": null
         },
         {
           "id": "P11-05",
           "text": "Outcome updates. Classify receipt, interview, rejection, or ambiguous message with supporting evidence, without automatically replying to recruiters or accepting interview times.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T23", "T24"],
           "evidence": [
             "docs/evidence/P11-gmail-foundation.md",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "P11-05"
+          "nextAction": null
         }
       ],
       "gates": [
         {
           "id": "P11-G1",
           "requirement": "OAuth refresh and revocation produce correct state transitions without exposing tokens.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/integration/email.test.ts", "tests/unit/email.test.ts"]
         },
         {
           "id": "P11-G2",
           "requirement": "Synthetic unrelated messages never trigger actions or appear in application records.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/integration/email.test.ts"]
         },
         {
           "id": "P11-G3",
           "requirement": "Account-created and application-received messages are correctly distinguished.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/unit/email.test.ts"]
         },
         {
           "id": "P11-G4",
           "requirement": "Two roles at the same employer do not receive the same receipt unless identity evidence supports it.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/unit/email.test.ts", "tests/integration/documents.test.ts"]
         },
         {
           "id": "P11-G5",
           "requirement": "Unexpected verification-link domains are rejected.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "tests/unit/email-verification.test.ts",
             "tests/integration/email-verification.test.ts"
@@ -1329,13 +1329,13 @@
         {
           "id": "P11-G6",
           "requirement": "Duplicate email delivery creates one outcome event.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/integration/documents.test.ts"]
         },
         {
           "id": "P11-G7",
           "requirement": "The app remains useful with Gmail disconnected.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["tests/e2e/email.spec.ts", "tests/integration/api.test.ts"]
         }
       ],
@@ -1346,10 +1346,17 @@
         "status": "blocked_external",
         "note": "Code work continues against owned fixtures. Live Google consent, refresh and revocation require the owner's credentials path and consent; synthetic OAuth is not live verification."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "14412f2c394cb56d36a2d1b20d2c65a4c0d3abf0",
+      "remoteVerification": [
+        {
+          "runId": "38085606256",
+          "commit": "14412f2c394cb56d36a2d1b20d2c65a4c0d3abf0",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "P11 encrypted OAuth lifecycle, durable scan recovery, account/application correlation, reviewed verification redirects, receipt reconciliation and desktop/mobile disconnected operation against owned fixtures"
+        }
+      ],
       "acceptanceTests": ["T23", "T24"],
-      "nextAction": "Record full local and Windows/Ubuntu/PostgreSQL CI verification; close fixture-proven P11 while retaining the separate live Gmail prerequisite",
+      "nextAction": null,
       "evidence": [
         "docs/plans/P11-email-reconciliation.md",
         "docs/evidence/P11-gmail-foundation.md"

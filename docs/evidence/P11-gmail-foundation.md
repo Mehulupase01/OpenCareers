@@ -1,7 +1,7 @@
 # P11 Gmail Foundation
 
-2026-10-10. P11 implementation is awaiting final cross-platform verification,
-not closed or live-certified. Migrations 13 and 14
+2026-10-10. P11 engineering is complete against owned fixtures,
+not live-certified. Migrations 13 and 14
 are append-only. No private database, key, OAuth credentials, running service or
 real employer was changed. No live Gmail request or application was sent.
 
@@ -64,7 +64,7 @@ real employer was changed. No live Gmail request or application was sent.
 
 ## Evidence
 
-Local verification: `corepack pnpm check` passed 44 files, 330 tests with 124
+Foundation verification: `corepack pnpm check` passed 44 files, 330 tests with 124
 PostgreSQL cases skipped locally. All 46 desktop/mobile browser cases passed;
 screenshots were inspected. Public scan passed 274 files; production dependency
 audit reported no known vulnerabilities. Existing helper-any lint and bundle-size
@@ -84,7 +84,15 @@ warnings remain. PostgreSQL is verified separately in CI, not claimed locally.
 - `tests/e2e/email.spec.ts`: disconnected workspace at desktop/mobile widths,
   no page errors or horizontal overflow; synthetic screenshots only.
 
-## Current Verification And Boundaries
+## Closure Verification And Boundaries
+
+The frozen implementation at `14412f2c394cb56d36a2d1b20d2c65a4c0d3abf0`
+passes `corepack pnpm check`: 46 files, 374 passed and 136 PostgreSQL cases skipped
+locally. All 46 desktop/mobile workflows passed. Public scan: 280 files. Production
+audit: no known vulnerabilities. Existing helper-any and bundle-size warnings remain.
+GitHub [Verify run 38085606256](https://github.com/Mehulupase01/OpenCareers/actions/runs/38085606256)
+passed Windows, Ubuntu and PostgreSQL, including the real PostgreSQL contract lane.
+P11's seven gates close on that evidence, not on live Google or employer claims.
 
 - `tests/unit/email-verification.test.ts`: adversarial URL and literal-IP refusal,
   ambiguous link refusal, exact success text and issued-grant revocation after
@@ -105,8 +113,7 @@ warnings remain. PostgreSQL is verified separately in CI, not claimed locally.
   does not manufacture outcomes. This is not a trained multilingual classifier.
   Rich success pages without the exact reviewed full text remain unknown; adding
   vendor-specific structured success adapters requires separate evidence.
-- Cross-platform CI and the final full local suite must be recorded before closure.
-  Actual Google desktop credentials path and owner consent remain pending.
+- Actual Google desktop credentials path and owner consent remain pending.
   Do not search private folders for credentials or activate private services.
   P08's genuine live receipt and P15's crash/retention/soak certification remain open.
 

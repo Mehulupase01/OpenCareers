@@ -8,6 +8,18 @@ have working behavior; empty folders are not delivered features.
 
 ## ADR-001: Authoritative state
 
+### Mail Evidence Boundary
+
+P11's Gmail provider is read-only and stores minimal typed evidence, never mail
+bodies. Encrypted scan checkpoints are pure read progress, not submission permits.
+Stored strong receipts queue the existing read-only reconciler; only the submission
+authority may confirm the original unknown attempt. A separate deterministic account
+verification dispatcher may GET owner-reviewed signup routes with current policy
+checks, pinned public DNS and bounded validated redirects. Its intent is durable
+before HTTP, uncertain outcomes never replay, and exact reviewed success produces
+hashed account evidence rather than application confirmation. Network runs outside
+database transactions and mailbox polling does not block worker task claiming.
+
 Accepted. The database owns applications, tasks, authorizations, intents, attempts,
 receipts and audit/outbox records. Workers claim durable tasks transactionally with
 fencing tokens. Preparation can retry; a persisted in-flight submission requires

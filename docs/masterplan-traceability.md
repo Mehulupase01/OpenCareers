@@ -16,6 +16,14 @@ Historical exposure remains a separate remediation decision; removing a file in
 a new commit does not purge earlier Git history. The original scenario verdicts
 below remain a dated baseline, not current verification results.
 
+Correction, 2026-10-10: P11 closes T23/T24 against owned fixtures in
+`tests/unit/email.test.ts`, `tests/unit/email-verification.test.ts`,
+`tests/integration/email-verification.test.ts` and
+`tests/integration/documents.test.ts`. Account mail cannot confirm an application;
+reviewed verification redirects are independently authorized at every hop. See
+`docs/evidence/P11-gmail-foundation.md` and CI 38085606256. Live Gmail consent and
+P08's genuine employer receipt remain separate external verification gaps.
+
 ## Requirement Traceability
 
 | ID | Requirement | Phases | Gate evidence | Audit verdict |

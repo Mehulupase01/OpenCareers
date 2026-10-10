@@ -627,12 +627,19 @@ GET outcomes cannot replay or be bypassed with a second token for that account.
 The Mailbox surface exposes approvals and redacted status, never URL tokens.
 
 All 46 desktop/mobile E2E cases passed and the mobile mailbox screenshot was
-inspected. Public scan passed 280 files; dependency audit is clean. Final local
-suite and cross-platform CI are pending recording. P11 must not close until these
-are green. Live Gmail remains externally blocked by missing credentials path and
+inspected. Public scan passed 280 files; dependency audit is clean. The frozen local
+suite passed 374 tests (136 PostgreSQL skips), lint/typecheck/ledger and build.
+Commit `14412f2c394cb56d36a2d1b20d2c65a4c0d3abf0` passed Windows, Ubuntu and
+PostgreSQL CI 38085606256. P11's seven fixture-proven gates are complete:
+11/19 phases and 79/128 gates complete. Live Gmail remains externally blocked by missing credentials path and
 owner consent; no private services, real credentials or employers were touched.
 Next engineering work follows `docs/plans/PRODUCTION-COMPLETION.md`: P08 live
 receipt needs actual authority and access, and P18 LinkedIn/Indeed source breadth
 comes before P12 optimization. Do not wait on live prerequisites to develop owned
 fixtures. P12 remains a fixed bounded preparation graph, never submission authority.
 Follow the current privacy amendment, not the older plan's strict-only wording.
+
+Fresh synthetic preview: http://127.0.0.1:14324 (API 14323), hidden development
+manager PID 9980; logs `.cache/p11-preview.stdout.log` and `.cache/p11-preview.stderr.log`.
+It skips `.env`, uses a fresh demo run ID and cannot submit externally. Private
+4317/4318 services were not restarted. API/worker changes require a fresh preview.
