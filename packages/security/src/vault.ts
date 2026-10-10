@@ -8,7 +8,13 @@ export const vaultBindingSchema = z
   .object({
     ownerId: z.string().min(1).max(180),
     secretId: z.string().uuid(),
-    purpose: z.enum(["employer_password", "browser_storage", "oauth_token"]),
+    purpose: z.enum([
+      "employer_password",
+      "browser_storage",
+      "oauth_token",
+      "oauth_client",
+      "email_verification",
+    ]),
     keyVersion: z.number().int().positive(),
   })
   .strict();

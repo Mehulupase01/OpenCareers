@@ -7,6 +7,8 @@ import {
 } from "../../contracts/src/documents.js";
 import { DomainError, type FormDriftReason, type Task } from "../../contracts/src/index.js";
 import {
+  type EmailReceiptEvidence,
+  emailReceiptEvidenceSchema,
   type GreenhouseReceiptEvidence,
   greenhouseReceiptEvidenceSchema,
   type MockReceiptEvidence,
@@ -471,6 +473,11 @@ export class SubmissionRepository extends Repository {
     evidenceInput: ReceiptEvidence,
   ): Promise<string> {
     const evidence = receiptEvidenceSchema.parse(evidenceInput);
+    if (evidence.kind === "gmail")
+      throw new DomainError(
+        "STATE_INVALID",
+        "Email evidence is only consumed by read-only reconciliation.",
+      );
     return evidence.kind === "mock_ats"
       ? this.confirmMockReceipt(task, handle, evidence)
       : evidence.kind === "recruitee"
@@ -698,16 +705,25 @@ export class SubmissionRepository extends Repository {
     task: Task,
     evidenceInput: MockReceiptEvidence | null,
   ): Promise<"confirmed" | "needs_review"> {
+    return this.reconcileEvidence(
+      task,
+      evidenceInput ? mockReceiptEvidenceSchema.parse(evidenceInput) : null,
+    );
+  }
+
+  private async reconcileEvidence(
+    task: Task,
+    evidence: MockReceiptEvidence | EmailReceiptEvidence | null,
+  ): Promise<"confirmed" | "needs_review"> {
     const applicationId = task.applicationId;
     if (!applicationId)
       throw new DomainError("STATE_INVALID", "Reconciliation task has no application.");
-    const evidence = evidenceInput ? mockReceiptEvidenceSchema.parse(evidenceInput) : null;
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       await this.assertLease(tx, task, "reconcile");
       const row = (
         await tx.query(
-          "SELECT a.state,a.revision,t.id AS attempt_id,t.state AS attempt_state,i.snapshot,i.sha256,c.content FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE a.owner_id=$1 AND a.id=$2 ORDER BY t.started_at DESC,t.id DESC LIMIT 1",
+          "SELECT a.state,a.revision,t.id AS attempt_id,t.started_at,t.state AS attempt_state,i.packet_id,i.snapshot,i.sha256,c.content FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id WHERE a.owner_id=$1 AND a.id=$2 ORDER BY t.started_at DESC,t.id DESC LIMIT 1",
           [this.ownerId, applicationId],
         )
       )[0];
@@ -722,17 +738,49 @@ export class SubmissionRepository extends Repository {
       if (evidence) {
         const snapshot = JSON.parse(String(row.snapshot)) as { jobId: string };
         const content = packetContentSchema.parse(JSON.parse(String(row.content)));
-        const receiptUrl = new URL(evidence.receiptUrl);
         if (
           digest(snapshot) !== row.sha256 ||
           evidence.jobId !== snapshot.jobId ||
-          evidence.jobId !== content.job.id ||
-          evidence.emailHash !== digestEmail(content.cv.identity.email) ||
-          receiptUrl.protocol !== "http:" ||
-          receiptUrl.hostname !== "127.0.0.1" ||
-          receiptUrl.pathname !== `/receipts/${evidence.recordId}`
+          evidence.jobId !== content.job.id
         )
           throw new DomainError("RECEIPT_UNCORRELATED", "Recovered receipt differs from intent.");
+        if (evidence.kind === "mock_ats") {
+          const receiptUrl = new URL(evidence.receiptUrl);
+          if (
+            evidence.emailHash !== digestEmail(content.cv.identity.email) ||
+            receiptUrl.protocol !== "http:" ||
+            receiptUrl.hostname !== "127.0.0.1" ||
+            receiptUrl.pathname !== `/receipts/${evidence.recordId}`
+          )
+            throw new DomainError(
+              "RECEIPT_UNCORRELATED",
+              "Recovered mock receipt differs from intent.",
+            );
+        } else {
+          const stored = (
+            await tx.query(
+              "SELECT m.sha256,m.evidence,m.packet_id,m.received_at FROM email_messages m JOIN email_outcome_events e ON e.owner_id=m.owner_id AND e.message_id=m.id AND e.context_id=m.context_id AND e.kind=m.classification WHERE m.owner_id=$1 AND m.context_id=$2 AND m.attempt_id=$3 AND m.provider_message_id=$4 AND m.context_kind='application' AND m.correlation='correlated' AND m.classification='application_received'",
+              [this.ownerId, applicationId, row.attempt_id ?? null, evidence.providerMessageId],
+            )
+          )[0];
+          if (
+            !stored?.evidence ||
+            digest(emailReceiptEvidenceSchema.parse(JSON.parse(String(stored.evidence)))) !==
+              digest(evidence) ||
+            stored.sha256 !== evidence.messageSha256 ||
+            stored.packet_id !== row.packet_id ||
+            stored.received_at !== evidence.receivedAt ||
+            evidence.applicationId !== applicationId ||
+            evidence.attemptId !== row.attempt_id ||
+            evidence.emailHash !== digestEmail(content.cv.identity.email.trim().toLowerCase()) ||
+            Date.parse(evidence.receivedAt) < Date.parse(String(row.started_at)) ||
+            Date.parse(evidence.receivedAt) > this.clock().getTime()
+          )
+            throw new DomainError(
+              "RECEIPT_UNCORRELATED",
+              "Email receipt lacks stored evidence bound to this attempt.",
+            );
+        }
         await tx.query(
           "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7)",
           [
@@ -781,6 +829,7 @@ export class SubmissionRepository extends Repository {
     if (!evidenceInput) return this.reconcileWithoutReceipt(task);
     const evidence = receiptEvidenceSchema.parse(evidenceInput);
     if (evidence.kind === "mock_ats") return this.reconcileMockReceipt(task, evidence);
+    if (evidence.kind === "gmail") return this.reconcileEvidence(task, evidence);
     throw new DomainError(
       "ADAPTER_UNSUPPORTED",
       "Recruitee receipt reconciliation is introduced with email integration in P11.",

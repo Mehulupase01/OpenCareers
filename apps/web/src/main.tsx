@@ -11,6 +11,7 @@ import {
   Database,
   Files,
   LoaderCircle,
+  Mail,
   Pause,
   Play,
   RefreshCw,
@@ -30,6 +31,7 @@ import { request } from "./api.js";
 import { CandidateWorkspace } from "./candidate.js";
 import { DiscoveryWorkspace } from "./discovery.js";
 import { DocumentsWorkspace } from "./documents.js";
+import { EmailWorkspace } from "./email.js";
 import { ExceptionsPanel } from "./exceptions.js";
 import { MatchingWorkspace } from "./matching.js";
 import "./styles.css";
@@ -42,7 +44,8 @@ type View =
   | "candidate"
   | "discovery"
   | "matching"
-  | "documents";
+  | "documents"
+  | "email";
 
 const driftLabels = {
   ADAPTER_IDENTITY_CHANGED: "Adapter target or version changed",
@@ -151,6 +154,7 @@ function App() {
     discovery: "Discovery",
     matching: "Matching",
     documents: "Documents",
+    email: "Mailbox",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
@@ -158,6 +162,7 @@ function App() {
     { id: "discovery" as const, label: "Discovery", icon: Search },
     { id: "matching" as const, label: "Matching", icon: BrainCircuit },
     { id: "documents" as const, label: "Documents", icon: Files },
+    { id: "email" as const, label: "Mailbox", icon: Mail },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -350,6 +355,7 @@ function App() {
               )}
               {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
               {view === "matching" && <MatchingWorkspace jobs={summary.jobs} />}
+              {view === "email" && <EmailWorkspace demo={summary.profile === "demo"} />}
               {view === "documents" && (
                 <DocumentsWorkspace jobs={summary.jobs} demo={summary.profile === "demo"} />
               )}

@@ -9,6 +9,7 @@ import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.
 import type { DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { DomainError } from "../../packages/contracts/src/index.js";
+import type { ReceiptEvidence } from "../../packages/contracts/src/submission.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { generatePacketContent } from "../../packages/documents/src/domain.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
@@ -21,6 +22,7 @@ import {
   openSqlite,
 } from "../../packages/persistence/src/database.js";
 import { DocumentRepository } from "../../packages/persistence/src/document-repository.js";
+import { EmailRepository } from "../../packages/persistence/src/email-repository.js";
 import { ExceptionRepository } from "../../packages/persistence/src/exception-repository.js";
 import { HandoffRepository } from "../../packages/persistence/src/handoff-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
@@ -1734,120 +1736,192 @@ for (const engine of ["sqlite", "postgres"] as const) {
         ).toEqual([]);
       });
 
-      it("reconciles an accepted but ambiguous attempt without a second final action", async () => {
-        for (const fact of documentFacts) {
-          await db.query(
-            "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
-            [
+      it.each(["mock", "gmail"] as const)(
+        "reconciles an accepted but ambiguous attempt using %s without a second final action",
+        async (receiptKind) => {
+          for (const fact of documentFacts) {
+            await db.query(
+              "INSERT INTO fact_versions(owner_id,id,revision,candidate_id,data,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+              [
+                owner,
+                fact.id,
+                fact.revision,
+                documentProfile.candidateId,
+                JSON.stringify(fact),
+                fact.recordedAt,
+              ],
+            );
+            await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
               owner,
               fact.id,
               fact.revision,
-              documentProfile.candidateId,
-              JSON.stringify(fact),
-              fact.recordedAt,
-            ],
+            ]);
+          }
+          const clock = () => new Date("2026-09-17T09:00:00.000Z");
+          const queue = new Repository(db, owner, clock);
+          await queue.setControl({ submissionsPaused: false });
+          const built = await buildPacket(artifacts, {
+            ...documentGenerationInput(),
+            requestedAnswers: [],
+          });
+          const packet = await documents.savePacket(built);
+          const preparation = await new BrowserRepository(db, owner, clock).save(
+            readyBrowserResult(packet),
           );
-          await db.query("INSERT INTO fact_heads(owner_id,id,revision) VALUES($1,$2,$3)", [
-            owner,
-            fact.id,
-            fact.revision,
-          ]);
-        }
-        const clock = () => new Date("2026-09-17T09:00:00.000Z");
-        const queue = new Repository(db, owner, clock);
-        await queue.setControl({ submissionsPaused: false });
-        const built = await buildPacket(artifacts, {
-          ...documentGenerationInput(),
-          requestedAnswers: [],
-        });
-        const packet = await documents.savePacket(built);
-        const preparation = await new BrowserRepository(db, owner, clock).save(
-          readyBrowserResult(packet),
-        );
-        await queue.enqueue({
-          type: "submit",
-          dedupeKey: `submit:${packet.manifest.applicationId}`,
-          applicationId: packet.manifest.applicationId,
-          domain: "mock-ats",
-          payload: {
-            schemaVersion: 1,
+          await queue.enqueue({
+            type: "submit",
+            dedupeKey: `submit:${packet.manifest.applicationId}`,
+            applicationId: packet.manifest.applicationId,
+            domain: "mock-ats",
+            payload: {
+              schemaVersion: 1,
+              packetId: packet.manifest.id,
+              preparationId: preparation.id,
+              expectedRevision: Number(
+                (
+                  await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+                    owner,
+                    packet.manifest.applicationId,
+                  ])
+                )[0]?.revision,
+              ),
+            },
+          });
+          const task = await queue.claim("synthetic-worker", ["submit"]);
+          if (!task) throw new Error("Expected a leased submit task.");
+          const app = (
+            await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ])
+          )[0];
+          await approveMockScreening(clock);
+          const submissions = new SubmissionRepository(db, owner, clock);
+          const handle = await submissions.begin(task, {
             packetId: packet.manifest.id,
             preparationId: preparation.id,
-            expectedRevision: Number(
-              (
-                await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
-                  owner,
-                  packet.manifest.applicationId,
-                ])
-              )[0]?.revision,
-            ),
-          },
-        });
-        const task = await queue.claim("synthetic-worker", ["submit"]);
-        if (!task) throw new Error("Expected a leased submit task.");
-        const app = (
-          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
-            owner,
-            packet.manifest.applicationId,
-          ])
-        )[0];
-        await approveMockScreening(clock);
-        const submissions = new SubmissionRepository(db, owner, clock);
-        const handle = await submissions.begin(task, {
-          packetId: packet.manifest.id,
-          preparationId: preparation.id,
-          expectedRevision: Number(app?.revision),
-        });
-        await submissions.authorizeDispatch(task, handle);
-        await queue.fail(task, new DomainError("COMMIT_UNKNOWN", "Response was lost."));
-        const reconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
-        if (!reconcile) throw new Error("Expected a reconciliation task.");
-        const recordId = randomUUID();
-        const evidence = {
-          kind: "mock_ats" as const,
-          recordId,
-          jobId: packet.manifest.jobId,
-          receiptUrl: `http://127.0.0.1:4320/receipts/${recordId}`,
-          receivedAt: clock().toISOString(),
-          emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
-        };
-        expect(await submissions.reconcileMockReceipt(reconcile, null)).toBe("needs_review");
-        await queue.complete(reconcile);
-        const exceptions = new ExceptionRepository(db, owner, clock);
-        const exceptionId = await exceptions.record({
-          applicationId: packet.manifest.applicationId,
-          blocker: "needs_review",
-          code: "COMMIT_UNKNOWN",
-          reason: "Synthetic lost response needs reconciliation.",
-        });
-        const requested = await exceptions.resolve(exceptionId, { action: "reconcile" });
-        expect(requested.exception.state).toBe("open");
-        expect(requested.requeued).toBe(1);
-        expect((await exceptions.resolve(exceptionId, { action: "reconcile" })).requeued).toBe(0);
-        const retryReconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
-        if (!retryReconcile) throw new Error("Expected an owner-requested reconciliation task.");
-        expect(await submissions.reconcileMockReceipt(retryReconcile, evidence)).toBe("confirmed");
-        await queue.complete(retryReconcile);
-        expect((await exceptions.get(exceptionId)).state).toBe("resolved");
-        expect(
-          await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
-            owner,
-            packet.manifest.applicationId,
-          ]),
-        ).toEqual([{ state: "CONFIRMED" }]);
-        expect(
-          await db.query("SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2", [
-            owner,
-            packet.manifest.applicationId,
-          ]),
-        ).toHaveLength(1);
-        expect(
-          await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
-            owner,
-            packet.manifest.applicationId,
-          ]),
-        ).toHaveLength(1);
-      });
+            expectedRevision: Number(app?.revision),
+          });
+          await submissions.authorizeDispatch(task, handle);
+          await queue.fail(task, new DomainError("COMMIT_UNKNOWN", "Response was lost."));
+          const reconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
+          if (!reconcile) throw new Error("Expected a reconciliation task.");
+          const recordId = randomUUID();
+          let evidence: ReceiptEvidence = {
+            kind: "mock_ats" as const,
+            recordId,
+            jobId: packet.manifest.jobId,
+            receiptUrl: `http://127.0.0.1:4320/receipts/${recordId}`,
+            receivedAt: clock().toISOString(),
+            emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+          };
+          expect(await submissions.reconcileMockReceipt(reconcile, null)).toBe("needs_review");
+          await queue.complete(reconcile);
+          const exceptions = new ExceptionRepository(db, owner, clock);
+          const exceptionId = await exceptions.record({
+            applicationId: packet.manifest.applicationId,
+            blocker: "needs_review",
+            code: "COMMIT_UNKNOWN",
+            reason: "Synthetic lost response needs reconciliation.",
+          });
+          if (receiptKind === "gmail") {
+            const email = new EmailRepository(
+              db,
+              owner,
+              Buffer.alloc(32, 23).toString("base64"),
+              clock,
+            );
+            const mailbox = packet.content.cv.identity.email;
+            await email.configure(
+              { clientId: "synthetic-client-id", clientSecret: "synthetic-client-secret" },
+              mailbox,
+              false,
+            );
+            await email.connected(await email.lease("connecting"), {
+              accessToken: "synthetic-access-token",
+              refreshToken: "synthetic-refresh-token",
+              mailbox,
+              expiresAt: "2026-09-17T10:00:00.000Z",
+              refreshExpiresAt: null,
+            });
+            // The loopback employer is a test fixture; public sender approval remains HTTPS-only.
+            await db.query(
+              "INSERT INTO email_sender_rules(owner_id,employer_origin,sender_domain,approved_at) VALUES($1,$2,$3,$4)",
+              [
+                owner,
+                new URL(packet.content.job.url).origin,
+                "mail.synthetic.example",
+                clock().toISOString(),
+              ],
+            );
+            const lease = await email.lease("connected");
+            const message = {
+              id: "synthetic-receipt-message",
+              receivedAt: clock().toISOString(),
+              sender: "jobs@mail.synthetic.example",
+              recipients: [mailbox],
+              authenticatedDomain: "mail.synthetic.example",
+              subject: `Application received ${documentJob.requisitionId}`,
+              text: `Thank you for applying. ${documentJob.requisitionId}`,
+            };
+            const first = await email.ingest(lease, message);
+            expect(first).toBeTruthy();
+            expect(await email.ingest(lease, message)).toBe(first);
+            expect(
+              await db.query("SELECT message_id FROM email_outcome_events WHERE owner_id=$1", [
+                owner,
+              ]),
+            ).toHaveLength(1);
+            const receipt = await email.receipt(packet.manifest.applicationId);
+            if (!receipt) throw new Error("Expected a correlated synthetic email receipt.");
+            evidence = receipt;
+            expect(
+              JSON.stringify(
+                await db.query("SELECT * FROM email_messages WHERE owner_id=$1", [owner]),
+              ),
+            ).not.toContain("Thank you for applying");
+            await email.finishSync(lease);
+          }
+          const requested = await exceptions.resolve(exceptionId, { action: "reconcile" });
+          expect(requested.exception.state).toBe("open");
+          expect(requested.requeued).toBe(receiptKind === "gmail" ? 0 : 1);
+          expect((await exceptions.resolve(exceptionId, { action: "reconcile" })).requeued).toBe(0);
+          const retryReconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
+          if (!retryReconcile) throw new Error("Expected an owner-requested reconciliation task.");
+          if (evidence.kind === "gmail") {
+            await expect(
+              submissions.reconcileReceipt(retryReconcile, {
+                ...evidence,
+                messageSha256: "0".repeat(64),
+              }),
+            ).rejects.toMatchObject({ code: "RECEIPT_UNCORRELATED" });
+            await expect(
+              submissions.confirmReceipt(retryReconcile, handle, evidence),
+            ).rejects.toMatchObject({ code: "STATE_INVALID" });
+          }
+          expect(await submissions.reconcileReceipt(retryReconcile, evidence)).toBe("confirmed");
+          await queue.complete(retryReconcile);
+          expect((await exceptions.get(exceptionId)).state).toBe("resolved");
+          expect(
+            await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ]),
+          ).toEqual([{ state: "CONFIRMED" }]);
+          expect(
+            await db.query("SELECT id FROM attempts WHERE owner_id=$1 AND application_id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ]),
+          ).toHaveLength(1);
+          expect(
+            await db.query("SELECT id FROM receipts WHERE owner_id=$1 AND application_id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ]),
+          ).toHaveLength(1);
+        },
+      );
 
       it("records a definitive mock validation rejection without a receipt", async () => {
         for (const fact of documentFacts) {

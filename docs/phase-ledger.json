@@ -1238,31 +1238,35 @@
     {
       "id": "P11",
       "title": "Email integration and receipt reconciliation",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P10"],
       "tickets": [
         {
           "id": "P11-01",
           "text": "OAuth lifecycle. Implement least-sufficient scopes, secure token storage, refresh, disconnect, revocation handling, and actionable reconnect states, documenting testing-mode versus deployed-app limitations.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T23", "T24"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P11-gmail-foundation.md", "tests/integration/email.test.ts"],
           "nextAction": "P11-01"
         },
         {
           "id": "P11-02",
           "text": "Narrow message acquisition. Query only relevant time windows and application and account contexts, fetch minimal fields, and avoid retaining unrelated email.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T23", "T24"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P11-gmail-foundation.md", "tests/unit/email.test.ts"],
           "nextAction": "P11-02"
         },
         {
           "id": "P11-03",
           "text": "Correlation. Match messages to pending applications using expected recipient, employer or sender domain, role or requisition ID, application ID, and timing, preserving uncertainty where several jobs could match.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T23", "T24"],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P11-gmail-foundation.md",
+            "tests/unit/email.test.ts",
+            "tests/integration/documents.test.ts"
+          ],
           "nextAction": "P11-03"
         },
         {
@@ -1276,9 +1280,12 @@
         {
           "id": "P11-05",
           "text": "Outcome updates. Classify receipt, interview, rejection, or ambiguous message with supporting evidence, without automatically replying to recruiters or accepting interview times.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T23", "T24"],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P11-gmail-foundation.md",
+            "tests/integration/documents.test.ts"
+          ],
           "nextAction": "P11-05"
         }
       ],
@@ -1286,26 +1293,26 @@
         {
           "id": "P11-G1",
           "requirement": "OAuth refresh and revocation produce correct state transitions without exposing tokens.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/integration/email.test.ts", "tests/unit/email.test.ts"]
         },
         {
           "id": "P11-G2",
           "requirement": "Synthetic unrelated messages never trigger actions or appear in application records.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/integration/email.test.ts"]
         },
         {
           "id": "P11-G3",
           "requirement": "Account-created and application-received messages are correctly distinguished.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/unit/email.test.ts"]
         },
         {
           "id": "P11-G4",
           "requirement": "Two roles at the same employer do not receive the same receipt unless identity evidence supports it.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/unit/email.test.ts", "tests/integration/documents.test.ts"]
         },
         {
           "id": "P11-G5",
@@ -1316,26 +1323,31 @@
         {
           "id": "P11-G6",
           "requirement": "Duplicate email delivery creates one outcome event.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/integration/documents.test.ts"]
         },
         {
           "id": "P11-G7",
           "requirement": "The app remains useful with Gmail disconnected.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["tests/e2e/email.spec.ts", "tests/integration/api.test.ts"]
         }
       ],
-      "externalPrerequisites": [],
+      "externalPrerequisites": [
+        "Owner-provided Google OAuth desktop credentials path and interactive Gmail consent; neither has been used by this implementation."
+      ],
       "externalVerification": {
-        "status": "not_required",
-        "note": "No external prerequisite is recorded for this phase."
+        "status": "blocked_external",
+        "note": "Code work continues against owned fixtures. Live Google consent, refresh and revocation require the owner's credentials path and consent; synthetic OAuth is not live verification."
       },
       "lastVerifiedCommit": null,
       "remoteVerification": [],
       "acceptanceTests": ["T23", "T24"],
-      "nextAction": "P11-01",
-      "evidence": ["docs/plans/P11-email-reconciliation.md"]
+      "nextAction": "P11-02: durable scan progress and P11-04: validated verification links; finish OAuth failure matrix and live owner consent",
+      "evidence": [
+        "docs/plans/P11-email-reconciliation.md",
+        "docs/evidence/P11-gmail-foundation.md"
+      ]
     },
     {
       "id": "P12",

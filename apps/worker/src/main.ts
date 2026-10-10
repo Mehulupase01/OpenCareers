@@ -13,6 +13,7 @@ import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js
 import { generatePacketContent } from "../../../packages/documents/src/domain.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
+import { GmailService } from "../../../packages/email/src/service.js";
 import { MatchingRunner } from "../../../packages/inference/src/gateway.js";
 import { OpenRouterTransport } from "../../../packages/inference/src/transport.js";
 import { createLogger } from "../../../packages/observability/src/index.js";
@@ -20,6 +21,7 @@ import { BrowserRepository } from "../../../packages/persistence/src/browser-rep
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import { DiscoveryRepository } from "../../../packages/persistence/src/discovery-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
+import { EmailRepository } from "../../../packages/persistence/src/email-repository.js";
 import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
@@ -49,6 +51,9 @@ const artifacts = new ArtifactStore(
 );
 await artifacts.initialize();
 const adapters = createAdapterRegistry(config.dataDir);
+const email = new EmailRepository(repository.db, repository.ownerId, config.vaultKey);
+const gmail = new GmailService(email);
+let nextMailSync = 0;
 const matchingRepository = new MatchingRepository(repository.db, repository.ownerId);
 const matching = new MatchingRunner(matchingRepository, config);
 const letterDraftRunner = config.inference.apiKey
@@ -64,6 +69,14 @@ try {
   while (!controller.signal.aborted) {
     try {
       await repository.heartbeat(workerId, "scheduler");
+      if (config.profile !== "demo" && config.vaultKey && Date.now() >= nextMailSync) {
+        nextMailSync = Date.now() + 300000;
+        try {
+          await gmail.sync();
+        } catch {
+          logger.warn("Read-only mailbox sync deferred.");
+        }
+      }
       await matching.run();
       const canPrepare =
         config.profile === "demo" ||
@@ -282,7 +295,9 @@ try {
             } catch {
               throw new DomainError("CONFIG_INVALID", "Reconcile adapter target is invalid.");
             }
-            const evidence = await adapter.reconcile({ packet, target });
+            const evidence =
+              (await email.receipt(task.applicationId)) ??
+              (await adapter.reconcile({ packet, target }));
             const outcome = await submissions.reconcileReceipt(task, evidence);
             logger.info(
               { taskId: task.id, adapterId: adapter.id, outcome },
@@ -312,5 +327,6 @@ try {
     }
   }
 } finally {
+  await gmail.close();
   await repository.db.close();
 }

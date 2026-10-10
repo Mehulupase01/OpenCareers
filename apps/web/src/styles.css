@@ -915,6 +915,55 @@ td:last-child {
 .candidate-section h2 {
   margin: 0 0 10px;
 }
+.email-workspace h3 {
+  margin-top: 24px;
+}
+.email-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.email-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #dce1e6;
+}
+.email-status dt {
+  color: #5b6470;
+  font-size: 12px;
+}
+.email-status dd {
+  margin: 6px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.email-senders {
+  list-style: none;
+  padding: 0;
+}
+.email-senders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #dce1e6;
+  padding: 12px 0;
+}
+.email-sender {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.email-senders strong {
+  display: block;
+  margin-top: 4px;
+}
+.email-workspace .button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .candidate-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

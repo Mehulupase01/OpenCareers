@@ -586,3 +586,26 @@ privacy remains the default. This implements the approved amendment, not another
 phase closure; model quality and a live activation/application remain unverified.
 Next: P11 Gmail integration with minimal read-only correlation and encrypted OAuth;
 desktop credentials exist but their path is still pending in chat.
+
+## 2026-10-10: P11 Gmail Implementation In Progress
+
+Reviewed-inference commit 5675ea9f605e12cf632c3cc1ef5bd0c86b8dd54b passed
+Windows, Ubuntu and PostgreSQL CI 37866247964 (44 browser cases on each OS).
+
+Gmail now has encrypted owner/client/mailbox-bound desktop OAuth, read-only
+bounded acquisition, conservative correlation, duplicate-safe outcome events,
+an authenticated Mailbox workspace and private worker polling. Strong stored
+email receipts queue only the original read-only reconciliation; the existing
+submission authority confirms unknown attempts without a second final action.
+Read `docs/evidence/P11-gmail-foundation.md` for implementation and limitations.
+
+P11 remains in progress; no gate or phase was prematurely closed. Next: durable
+pagination/context cursors, validated verification-link flows, the complete
+OAuth failure matrix and nonblocking worker polling. The credentials path and
+real owner consent are still pending. No private file, service, key, database or
+real application was touched. Migration 13 ran only against synthetic test stores.
+
+Local milestone checks: 330 tests passed (124 PostgreSQL tests skipped locally),
+46 desktop/mobile browser workflows passed, plus lint/typecheck/build/ledger,
+274-file public scan and production dependency audit. Existing helper-any lint
+and bundle-size warnings remain. CI evidence must be checked against this milestone.

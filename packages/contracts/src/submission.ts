@@ -40,9 +40,25 @@ export const greenhouseReceiptEvidenceSchema = z
   .strict();
 export type GreenhouseReceiptEvidence = z.infer<typeof greenhouseReceiptEvidenceSchema>;
 
+export const emailReceiptEvidenceSchema = z
+  .object({
+    kind: z.literal("gmail"),
+    providerMessageId: z.string().regex(/^[a-zA-Z0-9_-]{1,180}$/),
+    messageSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    applicationId: z.string().min(1).max(180),
+    attemptId: z.string().min(1).max(180),
+    jobId: z.string().min(1).max(180),
+    receivedAt: z.iso.datetime(),
+    emailHash: z.string().regex(/^[a-f0-9]{64}$/),
+    senderDomain: z.string().min(1).max(253),
+  })
+  .strict();
+export type EmailReceiptEvidence = z.infer<typeof emailReceiptEvidenceSchema>;
+
 export const receiptEvidenceSchema = z.discriminatedUnion("kind", [
   mockReceiptEvidenceSchema,
   recruiteeReceiptEvidenceSchema,
   greenhouseReceiptEvidenceSchema,
+  emailReceiptEvidenceSchema,
 ]);
 export type ReceiptEvidence = z.infer<typeof receiptEvidenceSchema>;

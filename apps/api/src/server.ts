@@ -14,6 +14,7 @@ import { browserRoutes } from "./browser.js";
 import { candidateRoutes } from "./candidate.js";
 import { discoveryRoutes } from "./discovery.js";
 import { documentRoutes } from "./documents.js";
+import { emailRoutes } from "./email.js";
 import { exceptionRoutes } from "./exception.js";
 import { handoffRoutes } from "./handoff.js";
 import { matchingRoutes } from "./matching.js";
@@ -25,6 +26,7 @@ export async function buildServer(
   dependencies: {
     handoffBroker?: HandoffBrokerPort;
     signupRequest?: (input: string, init: RequestInit) => Promise<Response>;
+    gmailProvider?: import("../../../packages/email/src/gmail.js").GmailProvider;
   } = {},
 ) {
   const app = Fastify({
@@ -201,6 +203,7 @@ export async function buildServer(
   await browserRoutes(app, config, repository);
   await handoffRoutes(app, repository, dependencies.handoffBroker, config.vaultKey);
   await accountRoutes(app, config, repository, dependencies.signupRequest);
+  await emailRoutes(app, config, repository, dependencies.gmailProvider);
   await exceptionRoutes(app, repository);
   await restoreRoutes(app, repository);
 

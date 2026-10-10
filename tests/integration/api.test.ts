@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
-import { loadConfig } from "../../packages/config/src/index.js";
+import { type Config, loadConfig } from "../../packages/config/src/index.js";
 import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
@@ -21,7 +21,7 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
 
-async function setup(profile: "demo" | "local" = "demo") {
+async function setup(profile: "demo" | "local" = "demo", configOverrides: Partial<Config> = {}) {
   const dataDir = await realpath(await mkdtemp(join(tmpdir(), "opencareers-api-")));
   cleanup.push(() => rm(dataDir, { recursive: true, force: true }));
   const db = await openSqlite(":memory:");
@@ -35,6 +35,7 @@ async function setup(profile: "demo" | "local" = "demo") {
       profile,
       dataDir,
       ownerToken: profile === "local" ? "a".repeat(32) : undefined,
+      ...configOverrides,
     },
     repository,
   );
@@ -44,6 +45,34 @@ async function setup(profile: "demo" | "local" = "demo") {
 }
 
 describe("API trust boundary", () => {
+  it("protects mailbox metadata and refuses Gmail network access in demo or without a vault", async () => {
+    const { app, headers } = await setup();
+    expect((await app.inject({ url: "/v1/email", headers })).statusCode).toBe(401);
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    expect(
+      (await app.inject({ url: "/v1/email", headers: authenticated })).json().connection.state,
+    ).toBe("unconfigured");
+    for (const action of ["connect", "sync"]) {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/email/${action}`,
+        headers: authenticated,
+        payload: {},
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().code).toBe("CONFIG_INVALID");
+    }
+    const privateApp = await setup("local", { vaultKey: undefined });
+    const response = await privateApp.app.inject({
+      method: "POST",
+      url: "/v1/email/connect",
+      headers: { ...privateApp.headers, authorization: `Bearer ${"a".repeat(32)}` },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().message).toContain("vault key");
+  });
   it("requires an owner session and exact request bodies for restore review and release", async () => {
     const { app, headers, db, repository } = await setup();
     const runId = await new RestoreRepository(db, repository.ownerId).block("a".repeat(64));

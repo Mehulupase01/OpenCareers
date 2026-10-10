@@ -234,7 +234,7 @@ export class ExceptionRepository extends Repository {
     });
   }
 
-  private async queueReconciliation(tx: SqlExecutor, applicationId: string): Promise<number> {
+  async queueReconciliation(tx: SqlExecutor, applicationId: string): Promise<number> {
     const source = await this.reconciliationSource(tx, applicationId);
     if (!source)
       throw new DomainError(

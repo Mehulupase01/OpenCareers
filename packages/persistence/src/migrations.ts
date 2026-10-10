@@ -115,6 +115,13 @@ export const migrations = [
   [
     "CREATE TABLE handoff_continuations (owner_id TEXT NOT NULL, handoff_id TEXT NOT NULL, secret_id TEXT NOT NULL, generation INTEGER NOT NULL, packet_id TEXT NOT NULL, profile_id TEXT NOT NULL, authorization_id TEXT NOT NULL, authorization_revision INTEGER NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,handoff_id), FOREIGN KEY(owner_id,handoff_id) REFERENCES handoff_sessions(owner_id,id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
   ],
+  [
+    "CREATE TABLE email_connections (owner_id TEXT PRIMARY KEY REFERENCES owners(id), generation INTEGER NOT NULL, state TEXT NOT NULL, client_secret_id TEXT, token_secret_id TEXT, data TEXT NOT NULL, expires_at TEXT, refresh_expires_at TEXT, lease_until TEXT, last_sync_at TEXT, FOREIGN KEY(owner_id,client_secret_id) REFERENCES vault_secrets(owner_id,id), FOREIGN KEY(owner_id,token_secret_id) REFERENCES vault_secrets(owner_id,id))",
+    "CREATE TABLE email_sender_rules (owner_id TEXT NOT NULL REFERENCES owners(id), employer_origin TEXT NOT NULL, sender_domain TEXT NOT NULL, approved_at TEXT NOT NULL, PRIMARY KEY(owner_id,employer_origin,sender_domain))",
+    "CREATE TABLE email_messages (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, mailbox_hash TEXT NOT NULL, provider_message_id TEXT NOT NULL, sha256 TEXT NOT NULL, classification TEXT NOT NULL, correlation TEXT NOT NULL, context_id TEXT, context_kind TEXT, attempt_id TEXT, packet_id TEXT, evidence TEXT, received_at TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,mailbox_hash,provider_message_id))",
+    "CREATE TABLE email_outcome_events (owner_id TEXT NOT NULL, message_id TEXT NOT NULL, context_id TEXT NOT NULL, kind TEXT NOT NULL, occurred_at TEXT NOT NULL, PRIMARY KEY(owner_id,message_id), FOREIGN KEY(owner_id,message_id) REFERENCES email_messages(owner_id,id))",
+    "CREATE TABLE email_verification_links (owner_id TEXT NOT NULL, id TEXT NOT NULL, message_id TEXT NOT NULL, account_id TEXT NOT NULL, secret_id TEXT NOT NULL, state TEXT NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,message_id), FOREIGN KEY(owner_id,message_id) REFERENCES email_messages(owner_id,id), FOREIGN KEY(owner_id,account_id) REFERENCES employer_accounts(owner_id,id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {
