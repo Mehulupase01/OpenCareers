@@ -89,6 +89,8 @@ export function hostedUrl(
     return `https://job-boards.greenhouse.io/${source.board}/jobs/${encodeURIComponent(posting)}`;
   if (source.connector === "ashby")
     return `https://jobs.ashbyhq.com/${source.board}/${encodeURIComponent(posting)}`;
+  if (source.connector === "teamtailor")
+    return `https://${source.board}.teamtailor.com/jobs/${encodeURIComponent(posting)}`;
   if (source.connector === "workable")
     return `https://apply.workable.com/${source.board}/j/${encodeURIComponent(posting)}`;
   if (source.connector === "smartrecruiters")
@@ -124,6 +126,14 @@ export function recognizeUrl(input: string): {
   ) {
     connector = "greenhouse";
     postingId = parts[2] as string;
+  } else if (
+    /^[a-z0-9][a-z0-9-]{0,62}\.teamtailor\.com$/.test(url.hostname) &&
+    parts.length === 2 &&
+    parts[0] === "jobs" &&
+    /^[1-9][0-9]{0,17}(?:-[a-zA-Z0-9_-]{1,180})?$/.test(parts[1] ?? "")
+  ) {
+    connector = "teamtailor";
+    postingId = (parts[1] as string).split("-")[0] as string;
   } else if (
     url.hostname === "apply.workable.com" &&
     (parts.length === 3 || (parts.length === 4 && parts[3] === "apply")) &&
@@ -178,11 +188,13 @@ export function recognizeUrl(input: string): {
       "This URL is not a supported public ATS vacancy. Redirectors are not followed.",
     );
   const board =
-    connector === "personio"
+    connector === "teamtailor"
       ? (url.hostname.split(".")[0] ?? "")
-      : connector === "recruitee"
-        ? url.hostname.slice(0, -".recruitee.com".length)
-        : (parts[0] ?? "");
+      : connector === "personio"
+        ? (url.hostname.split(".")[0] ?? "")
+        : connector === "recruitee"
+          ? url.hostname.slice(0, -".recruitee.com".length)
+          : (parts[0] ?? "");
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(board))
     throw new DomainError("CONFIG_INVALID", "Invalid board token.");
   const result = { connector, board, region, postingId };

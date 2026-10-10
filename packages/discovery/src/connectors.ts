@@ -18,6 +18,7 @@ import {
 } from "./normalize.js";
 import { normalizePersonio } from "./personio.js";
 import { normalizeSmartPage, pollSmartSource } from "./smartrecruiters.js";
+import { normalizeTeamtailor } from "./teamtailor.js";
 import {
   DiscoveryFailure,
   pageEvidence,
@@ -96,6 +97,7 @@ export function normalizePage(
   page: number,
 ): { jobs: NormalizedJob[]; size: number } {
   const jobs: NormalizedJob[] = [];
+  if (source.connector === "teamtailor") return normalizeTeamtailor(raw, source, page);
   if (source.connector === "workable") return normalizeWorkable(raw, source, page);
   if (source.connector === "smartrecruiters") return normalizeSmartPage(raw, source, page);
   if (source.connector === "personio") return normalizePersonio(raw, source, page);
@@ -299,17 +301,19 @@ export async function pollSource(
       if (signal.aborted)
         throw new DiscoveryFailure("unavailable", "Source scan time limit exceeded.");
       const url =
-        source.connector === "workable"
-          ? `https://www.workable.com/api/accounts/${source.board}?details=true`
-          : source.connector === "personio"
-            ? `https://${source.board}.jobs.personio.${source.region === "eu" ? "de" : "com"}/xml?language=en`
-            : source.connector === "greenhouse"
-              ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
-              : source.connector === "ashby"
-                ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
-                : source.connector === "recruitee"
-                  ? `https://${source.board}.recruitee.com/api/offers/`
-                  : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
+        source.connector === "teamtailor"
+          ? `https://${source.board}.teamtailor.com/jobs.rss?offset=${page * 100}&per_page=100`
+          : source.connector === "workable"
+            ? `https://www.workable.com/api/accounts/${source.board}?details=true`
+            : source.connector === "personio"
+              ? `https://${source.board}.jobs.personio.${source.region === "eu" ? "de" : "com"}/xml?language=en`
+              : source.connector === "greenhouse"
+                ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
+                : source.connector === "ashby"
+                  ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
+                  : source.connector === "recruitee"
+                    ? `https://${source.board}.recruitee.com/api/offers/`
+                    : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
       let response = await read(
         url,
         source.connector === "greenhouse" ? source.etag : null,
@@ -350,7 +354,9 @@ export async function pollSource(
       let normalized: ReturnType<typeof normalizePage>;
       try {
         normalized = normalizePage(
-          source.connector === "personio" ? response.body : JSON.parse(response.body),
+          ["personio", "teamtailor"].includes(source.connector)
+            ? response.body
+            : JSON.parse(response.body),
           source,
           result.pages.length - 1,
         );
@@ -371,7 +377,7 @@ export async function pollSource(
           result.warnings.push(`Empty or very short description: ${job.postingId}`);
         result.jobs.push(job);
       }
-      if (source.connector !== "lever" || normalized.size < 100) {
+      if (!["lever", "teamtailor"].includes(source.connector) || normalized.size < 100) {
         result.etag = source.connector === "greenhouse" ? response.etag : null;
         return result;
       }

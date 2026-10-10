@@ -130,7 +130,9 @@ function SourceEditor({
             value={connector}
             onChange={(event) => {
               setConnector(event.target.value as SourceInput["connector"]);
-              if (["ashby", "smartrecruiters", "workable"].includes(event.target.value))
+              if (
+                ["ashby", "smartrecruiters", "workable", "teamtailor"].includes(event.target.value)
+              )
                 setRegion("global");
             }}
           >
@@ -141,6 +143,7 @@ function SourceEditor({
             <option value="personio">Personio</option>
             <option value="smartrecruiters">SmartRecruiters</option>
             <option value="workable">Workable</option>
+            <option value="teamtailor">Teamtailor</option>
           </select>
         </label>
         <label>
@@ -158,7 +161,10 @@ function SourceEditor({
           <select
             value={region}
             disabled={
-              connector === "ashby" || connector === "smartrecruiters" || connector === "workable"
+              connector === "ashby" ||
+              connector === "smartrecruiters" ||
+              connector === "workable" ||
+              connector === "teamtailor"
             }
             onChange={(event) => setRegion(event.target.value as SourceInput["region"])}
           >

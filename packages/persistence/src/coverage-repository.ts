@@ -18,6 +18,22 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  teamtailor: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    adapterVersion: null,
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    limitations: [
+      "Public tenant RSS only; custom-domain feeds and application operations unsupported.",
+      "Primary location only; complete scan requires a short terminal page.",
+    ],
+  },
   workable: {
     accountNeed: "unknown",
     challengeNeed: "unknown",
@@ -142,6 +158,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "teamtailor-public-rss-v1",
+    family: "teamtailor",
+    variant: "Paginated public tenant RSS",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.teamtailor.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Teamtailor career RSS read: 13 postings; retained hashed response plus synthetic paginated discovery",
+    limitations: support.teamtailor.limitations,
+  },
   {
     id: "workable-public-account-v1",
     family: "workable",

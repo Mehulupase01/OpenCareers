@@ -13,6 +13,7 @@ export const sourceInputSchema = z
       "personio",
       "smartrecruiters",
       "workable",
+      "teamtailor",
     ]),
     board: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
     region: z.enum(["global", "eu"]),
@@ -24,6 +25,15 @@ export const sourceInputSchema = z
   })
   .strict()
   .superRefine((source, context) => {
+    if (
+      source.connector === "teamtailor" &&
+      (source.region !== "global" || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(source.board))
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["board"],
+        message: "Teamtailor requires a lowercase global career-site token.",
+      });
     if (
       source.connector === "workable" &&
       (source.region !== "global" || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(source.board))

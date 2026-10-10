@@ -768,3 +768,32 @@ page, detect duplicates/drift, and never assume the default first 100 is complet
 Custom-domain feeds, universal forms, reviewed owner ingestion, 20-source
 operational coverage, five gated families, P12-P17, real Gmail path/consent and
 the P08 private live receipt remain outstanding.
+
+## 2026-10-10: P18 Teamtailor Discovery
+
+Workable commit `a4389c694dea22deab76efc278a47c46ed68492f` is in CI 38088890531;
+Ubuntu and PostgreSQL passed, Windows browser checks were still running at this
+checkpoint. Teamtailor tenant RSS discovery is implemented with offset/per_page
+pagination through a short terminal page. Typed XML, exact channel/job tenant
+checks and duplicate detection fail closed. A public Teamtailor `career` feed
+normalized 13 jobs, retaining raw response/hash/date in an isolated probe DB;
+see `docs/evidence/P18-teamtailor-discovery.md`. Custom domains and secondary
+locations are not supported; application operations remain planned.
+
+Focused regressions: 44 passed, 11 PostgreSQL skipped, six files. Typecheck, lint,
+ledger and production build passed; public scan 305 files. All twelve desktop/
+mobile Discovery cases passed with the five new source families and existing
+history/identity workflow together; mobile screenshot inspected. Complete CI
+follows the push. The earlier Workable full local run was 452 passed, 155 skipped
+across 55 files; do not attribute it to this newer increment.
+
+Five of six P18 public-feed families are now implemented with normalized dated
+reads. Breezy remains: its public Codebase portal and referenced official CDN
+index.js were inspected credential-free and DNS-pinned, but no documented complete
+description-inclusive public feed has yet been established. Do not use its
+authenticated employer API or label HTML inspection as a connector. The published
+portal-widget documentation is `https://help.breezy.hr/en/articles/5307157-customizing-your-career-portal`.
+P18 stays open, 11/19 phases and 79/128 gates complete. Universal hosted forms,
+reviewed owner ingestion, 20-source operational coverage and five gated adapter
+families are still required. No private account, service, candidate data,
+credential or real employer submission was touched.

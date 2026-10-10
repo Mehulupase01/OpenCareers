@@ -37,6 +37,7 @@ const hosts = new Set([
   "apply.workable.com",
 ]);
 const approvedHost = (hostname: string) =>
+  /^[a-z0-9][a-z0-9-]{0,62}\.teamtailor\.com$/.test(hostname) ||
   hosts.has(hostname) ||
   /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(hostname) ||
   /^[a-z0-9][a-z0-9-]{0,62}\.jobs\.personio\.(de|com)$/.test(hostname);
@@ -60,6 +61,8 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
     !approvedHost(url.hostname) ||
+    (url.hostname.endsWith(".teamtailor.com") &&
+      (url.pathname !== "/jobs.rss" || !/^\?offset=\d{1,5}&per_page=100$/.test(url.search))) ||
     (url.hostname === "apply.workable.com" &&
       (!/^\/api\/v1\/widget\/accounts\/[a-z0-9][a-z0-9-]{0,62}$/.test(url.pathname) ||
         url.search !== "?details=true")) ||
@@ -94,7 +97,11 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
           ? AbortSignal.any([signal, AbortSignal.timeout(10000)])
           : AbortSignal.timeout(10000),
         headers: {
-          Accept: url.hostname.includes(".jobs.personio.") ? "application/xml" : "application/json",
+          Accept: url.hostname.endsWith(".teamtailor.com")
+            ? "application/rss+xml"
+            : url.hostname.includes(".jobs.personio.")
+              ? "application/xml"
+              : "application/json",
           "Accept-Encoding": "identity",
           "User-Agent": "OpenCareers/0.1 public-job-reader",
           ...(etag ? { "If-None-Match": etag } : {}),

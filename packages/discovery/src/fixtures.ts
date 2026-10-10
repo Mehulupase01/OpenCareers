@@ -4,6 +4,13 @@ export const readFixture: ReadPublic = async (input, etag) => {
   const url = new URL(input);
   if (etag === '"synthetic-v1"') return { status: 304, body: "", etag, retryAfter: null };
   const ids = [1, 2, 3];
+  if (url.hostname.endsWith(".teamtailor.com"))
+    return {
+      status: 200,
+      etag: null,
+      retryAfter: null,
+      body: `<rss xmlns:tt="https://www.teamtailor.com"><channel><title>Synthetic Teamtailor Employer</title><link>https://${url.hostname}</link>${Number(url.searchParams.get("offset")) === 0 ? ids.map((id) => `<item><title>Teamtailor Software Engineer ${id}</title><description><![CDATA[<p>Build reliable synthetic TypeScript services. Fixture vacancy only.</p>]]></description><link>https://${url.hostname}/jobs/${500 + id}-synthetic-role</link><guid>synthetic-global-${id}</guid><pubDate>Sat, 10 Oct 2026 12:00:00 GMT</pubDate><remoteStatus>hybrid</remoteStatus><tt:locations><tt:location><tt:city>Amsterdam</tt:city><tt:country>Netherlands</tt:country></tt:location></tt:locations></item>`).join("") : ""}</channel></rss>`,
+    };
   if (url.hostname === "www.workable.com")
     return {
       status: 302,
