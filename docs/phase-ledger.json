@@ -1988,7 +1988,8 @@
       "evidence": [
         "docs/plans/P18-owner-sources-hosted-forms.md",
         "docs/evidence/P18-source-session-foundation.md",
-        "docs/evidence/P18-ashby-discovery.md"
+        "docs/evidence/P18-ashby-discovery.md",
+        "docs/evidence/P18-personio-discovery.md"
       ],
       "acceptanceTests": ["T03", "T31", "T32"],
       "remoteVerification": [],
@@ -2022,7 +2023,10 @@
           "evidence": [
             "docs/evidence/P18-ashby-discovery.md",
             "tests/unit/ashby.test.ts",
-            "tests/integration/ashby.test.ts"
+            "tests/integration/ashby.test.ts",
+            "docs/evidence/P18-personio-discovery.md",
+            "tests/unit/personio.test.ts",
+            "tests/integration/personio.test.ts"
           ]
         },
         {
@@ -2080,7 +2084,10 @@
           "evidence": [
             "docs/evidence/P18-ashby-discovery.md",
             "tests/unit/ashby.test.ts",
-            "tests/integration/ashby.test.ts"
+            "tests/integration/ashby.test.ts",
+            "docs/evidence/P18-personio-discovery.md",
+            "tests/unit/personio.test.ts",
+            "tests/integration/personio.test.ts"
           ],
           "nextAction": "P18-04"
         },

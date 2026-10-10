@@ -18,6 +18,22 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  personio: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    adapterVersion: null,
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    limitations: [
+      "Enabled public XML feed only; no Personio application adapter or private receipt.",
+      "Office text only; no inferred publication date or secondary-office coverage.",
+    ],
+  },
   ashby: {
     accountNeed: "unknown",
     challengeNeed: "unknown",
@@ -94,6 +110,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "personio-public-xml-v1",
+    family: "personio",
+    variant: "Enabled public XML job feed",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.personio.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Personio public XML read: 1 posting; retained hashed response, plus synthetic XML discovery lifecycle",
+    limitations: support.personio.limitations,
+  },
   {
     id: "ashby-public-posting-v1",
     family: "ashby",

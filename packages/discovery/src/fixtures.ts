@@ -4,6 +4,18 @@ export const readFixture: ReadPublic = async (input, etag) => {
   const url = new URL(input);
   if (etag === '"synthetic-v1"') return { status: 304, body: "", etag, retryAfter: null };
   const ids = [1, 2, 3];
+  if (url.hostname.includes(".jobs.personio."))
+    return {
+      status: 200,
+      etag: null,
+      retryAfter: null,
+      body: `<?xml version="1.0" encoding="UTF-8"?><workzag-jobs>${ids
+        .map(
+          (id) =>
+            `<position><id>${300 + id}</id><name>Personio Software Engineer ${id}</name><office>Amsterdam, Netherlands</office><jobDescriptions><jobDescription><name>Responsibilities</name><value><![CDATA[<p>Build reliable synthetic services in TypeScript. Fixture vacancy only.</p>]]></value></jobDescription></jobDescriptions><createdAt>2026-10-10T12:00:00Z</createdAt></position>`,
+        )
+        .join("")}</workzag-jobs>`,
+    };
   const body =
     url.hostname === "boards-api.greenhouse.io"
       ? {

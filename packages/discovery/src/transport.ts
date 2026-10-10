@@ -33,7 +33,9 @@ const hosts = new Set([
   "api.ashbyhq.com",
 ]);
 const approvedHost = (hostname: string) =>
-  hosts.has(hostname) || /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(hostname);
+  hosts.has(hostname) ||
+  /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(hostname) ||
+  /^[a-z0-9][a-z0-9-]{0,62}\.jobs\.personio\.(de|com)$/.test(hostname);
 export function publicAddress(address: string): boolean {
   try {
     return ipaddr.process(address).range() === "unicast";
@@ -54,6 +56,8 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
     !approvedHost(url.hostname) ||
+    (url.hostname.includes(".jobs.personio.") &&
+      (url.pathname !== "/xml" || url.search !== "?language=en")) ||
     (url.hostname === "api.ashbyhq.com" &&
       !/^\/posting-api\/job-board\/[a-zA-Z0-9_-]{1,100}$/.test(url.pathname)) ||
     url.protocol !== "https:" ||
@@ -73,7 +77,7 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
           ? AbortSignal.any([signal, AbortSignal.timeout(10000)])
           : AbortSignal.timeout(10000),
         headers: {
-          Accept: "application/json",
+          Accept: url.hostname.includes(".jobs.personio.") ? "application/xml" : "application/json",
           "Accept-Encoding": "identity",
           "User-Agent": "OpenCareers/0.1 public-job-reader",
           ...(etag ? { "If-None-Match": etag } : {}),

@@ -16,6 +16,7 @@ import {
   roleFamily,
   sourceKey,
 } from "./normalize.js";
+import { normalizePersonio } from "./personio.js";
 import {
   DiscoveryFailure,
   pageEvidence,
@@ -93,6 +94,7 @@ export function normalizePage(
   page: number,
 ): { jobs: NormalizedJob[]; size: number } {
   const jobs: NormalizedJob[] = [];
+  if (source.connector === "personio") return normalizePersonio(raw, source, page);
   if (source.connector === "ashby") {
     const data = z
       .object({ apiVersion: z.literal("1"), jobs: z.array(ashbyJob).max(10000) })
@@ -292,13 +294,15 @@ export async function pollSource(
       if (signal.aborted)
         throw new DiscoveryFailure("unavailable", "Source scan time limit exceeded.");
       const url =
-        source.connector === "greenhouse"
-          ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
-          : source.connector === "ashby"
-            ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
-            : source.connector === "recruitee"
-              ? `https://${source.board}.recruitee.com/api/offers/`
-              : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
+        source.connector === "personio"
+          ? `https://${source.board}.jobs.personio.${source.region === "eu" ? "de" : "com"}/xml?language=en`
+          : source.connector === "greenhouse"
+            ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
+            : source.connector === "ashby"
+              ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
+              : source.connector === "recruitee"
+                ? `https://${source.board}.recruitee.com/api/offers/`
+                : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
       const response = await read(
         url,
         source.connector === "greenhouse" ? source.etag : null,
@@ -325,7 +329,11 @@ export async function pollSource(
         throw new DiscoveryFailure("unavailable", `Source returned HTTP ${response.status}.`);
       let normalized: ReturnType<typeof normalizePage>;
       try {
-        normalized = normalizePage(JSON.parse(response.body), source, page);
+        normalized = normalizePage(
+          source.connector === "personio" ? response.body : JSON.parse(response.body),
+          source,
+          page,
+        );
       } catch {
         throw new DiscoveryFailure(
           "parser_failed",

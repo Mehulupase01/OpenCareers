@@ -682,3 +682,31 @@ Ashby tests passed (9 passed, 1 PostgreSQL skipped). Public scan: 288 files. All
 inspected; final typecheck passed after the source-default adjustment. The vacancy identity test now selects
 explicit employers/postings, not positions that depend on the number of sources.
 No private service, credential, candidate data or employer application was touched.
+
+## 2026-10-10: P18 Personio Discovery
+
+Ashby commit `69d429151dffc2e366ab073962be9846956663ef` passed Windows, Ubuntu
+and PostgreSQL CI 38087448146. Personio enabled XML discovery now uses the same
+leases, complete snapshots, dated evidence and identity pipeline. Public Personio
+read yielded 1 posting; raw response and normalized listings are retained in an
+isolated ignored probe database, with hash/date in
+`docs/evidence/P18-personio-discovery.md`. XML has strict root/schema/nesting and
+DTD/entity-declaration guards. Disabled feeds and rate limits fail closed.
+Global/EU select com/de explicitly. Publication dates and secondary-office coverage
+are not inferred. Application operations remain planned, no submission adapter.
+
+Full local check: 417 passed, 152 PostgreSQL skipped, 51 files; lint/typecheck/
+ledger/build passed. All 50 desktop/mobile browser cases passed; Personio mobile
+screenshot inspected. Public scan: 293 files. Cross-platform CI is pending for
+this increment. Synthetic preview refreshed after owned process-tree/listener
+checks: manager PID 5912, API 14323, UI http://127.0.0.1:14324. No private service,
+credential, candidate data or real employer application was touched.
+
+P18 remains open; 11/19 phases, 79/128 gates complete. Next public families:
+SmartRecruiters, Teamtailor, Workable, Breezy. SmartRecruiters official Posting API
+lists public summaries with offset/limit and requires separate posting GETs for
+descriptions; explicit PUBLIC-only destination and fixed company/detail origins
+must be enforced. Do not treat summary-only discovery or a partial timed-out
+scan as a complete board. Universal hosted forms, reviewed owner ingestion,
+20-source operational coverage and five gated families are still required.
+Real Gmail credential path/consent and P08 genuine private receipt remain external.

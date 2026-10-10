@@ -1,5 +1,35 @@
 import { expect, test } from "@playwright/test";
 
+test("Personio XML source retains discovery-only support in the owned workflow", async ({
+  page,
+}, info) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Discovery", exact: true }).click();
+  await page.getByRole("tab", { name: "Sources", exact: true }).click();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add discovery source" });
+  await editor.getByRole("combobox", { name: "Connector", exact: true }).selectOption("personio");
+  await editor.getByRole("combobox", { name: "Region", exact: true }).selectOption("eu");
+  await editor.getByLabel("Board token", { exact: true }).fill("synthetic-personio-e2e");
+  await editor.getByLabel("Company", { exact: true }).fill("Synthetic Personio Employer");
+  await editor.getByLabel("Employer ID", { exact: true }).fill("synthetic-personio-employer");
+  await expect(editor.getByLabel("Poll interval (minutes)", { exact: true })).toHaveValue("20");
+  await editor.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const source = page
+    .locator(".source-health-list article")
+    .filter({ hasText: "synthetic-personio-e2e" });
+  await expect(source).toContainText("healthy", { timeout: 25000 });
+  await expect(source).toContainText("3 postings");
+  await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  const variant = page
+    .locator(".coverage-table tbody tr")
+    .filter({ hasText: "Enabled public XML job feed" });
+  await expect(variant).toContainText("planned / planned");
+  await page.screenshot({ path: `test-results/personio-${info.project.name}.png`, fullPage: true });
+});
+
 test("Ashby source runs through the owned discovery workflow without claiming application support", async ({
   page,
 }, info) => {
