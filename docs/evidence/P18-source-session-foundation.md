@@ -33,7 +33,9 @@ skipped across this file, API trust-boundary tests and vault tests. Both desktop
 and mobile Discovery browser tests passed; the mobile Sources screenshot was
 inspected. The frozen full local check passed 388 tests in 47 files, with 149
 PostgreSQL cases skipped locally; lint/typecheck/ledger/build passed. Public scan
-passed 285 files. Remote CI remains pending for this increment, not assumed green.
+passed 285 files. Commit `904a77238f46deea753d9cdb16fce2c5a254c58f` passed
+Windows, Ubuntu and PostgreSQL [CI 38086701394](https://github.com/Mehulupase01/OpenCareers/actions/runs/38086701394).
+P18 remains in progress; this does not activate any owner-account source.
 
 ## Remaining
 

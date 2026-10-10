@@ -12,6 +12,7 @@ import {
   locationFields,
   normalizedDate,
   plainText,
+  recognizeUrl,
   roleFamily,
   sourceKey,
 } from "./normalize.js";
@@ -24,6 +25,26 @@ import {
 } from "./transport.js";
 
 const text = z.string().max(200000);
+const ashbyJob = z.object({
+  title: z.string().min(1).max(240),
+  location: z.string().max(240),
+  jobUrl: z.url().max(2000),
+  isListed: z.boolean(),
+  isRemote: z.boolean().optional(),
+  workplaceType: z.enum(["OnSite", "Remote", "Hybrid"]).optional(),
+  descriptionPlain: text.optional(),
+  descriptionHtml: text.optional(),
+  publishedAt: z.string().max(80).optional(),
+  address: z
+    .object({
+      postalAddress: z
+        .object({ addressCountry: z.string().max(80).optional() })
+        .passthrough()
+        .optional(),
+    })
+    .passthrough()
+    .optional(),
+});
 const ghJob = z.object({
   id: z.number().int().positive(),
   internal_job_id: z.number().int().positive().nullable(),
@@ -72,6 +93,72 @@ export function normalizePage(
   page: number,
 ): { jobs: NormalizedJob[]; size: number } {
   const jobs: NormalizedJob[] = [];
+  if (source.connector === "ashby") {
+    const data = z
+      .object({ apiVersion: z.literal("1"), jobs: z.array(ashbyJob).max(10000) })
+      .parse(raw);
+    const countries: Record<string, string> = {
+      NLD: "NL",
+      USA: "US",
+      CAN: "CA",
+      DEU: "DE",
+      GBR: "GB",
+      BEL: "BE",
+      FRA: "FR",
+      AUS: "AU",
+      NZL: "NZ",
+      IND: "IN",
+    };
+    for (const [index, job] of data.jobs.entries()) {
+      if (!job.isListed) continue;
+      const target = recognizeUrl(job.jobUrl);
+      if (target.connector !== "ashby" || target.board !== source.board)
+        throw new Error("Ashby posting left the configured board.");
+      const requisitionId = `${sourceKey(source)}:${target.postingId}`;
+      const fields = locationFields(
+        job.location,
+        undefined,
+        job.workplaceType === "Remote"
+          ? "remote"
+          : job.workplaceType === "Hybrid"
+            ? "hybrid"
+            : job.workplaceType === "OnSite"
+              ? "on-site"
+              : job.isRemote
+                ? "remote"
+                : undefined,
+      );
+      const country = job.address?.postalAddress?.addressCountry?.toUpperCase();
+      const countryCode = country
+        ? (countries[country] ?? (/^[A-Z]{2}$/.test(country) ? country : undefined))
+        : fields.countryCode;
+      jobs.push(
+        normalizedJobSchema.parse({
+          id: digest(`${source.employerId}:${requisitionId}`),
+          employerId: source.employerId,
+          requisitionId,
+          title: job.title,
+          company: source.company,
+          location: job.location || "Unknown",
+          ...fields,
+          countryCode,
+          city: countryCode === "NL" ? fields.city : null,
+          url: target.canonicalUrl,
+          canonicalUrl: target.canonicalUrl,
+          postingId: target.postingId,
+          providerRequisition: null,
+          description: job.descriptionPlain ?? plainText(job.descriptionHtml ?? ""),
+          source: "ashby",
+          synthetic: source.mode === "fixture",
+          postedAt: normalizedDate(job.publishedAt),
+          updatedAt: null,
+          roleFamily: roleFamily(job.title),
+          evidence: { page, locator: `jobs[${index}]` },
+        }),
+      );
+    }
+    return { jobs, size: data.jobs.length };
+  }
   if (source.connector === "greenhouse") {
     const data = z
       .object({
@@ -207,9 +294,11 @@ export async function pollSource(
       const url =
         source.connector === "greenhouse"
           ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
-          : source.connector === "recruitee"
-            ? `https://${source.board}.recruitee.com/api/offers/`
-            : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
+          : source.connector === "ashby"
+            ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
+            : source.connector === "recruitee"
+              ? `https://${source.board}.recruitee.com/api/offers/`
+              : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
       const response = await read(
         url,
         source.connector === "greenhouse" ? source.etag : null,

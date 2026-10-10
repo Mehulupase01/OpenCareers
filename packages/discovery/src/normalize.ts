@@ -87,6 +87,8 @@ export function hostedUrl(
 ): string {
   if (source.connector === "greenhouse")
     return `https://job-boards.greenhouse.io/${source.board}/jobs/${encodeURIComponent(posting)}`;
+  if (source.connector === "ashby")
+    return `https://jobs.ashbyhq.com/${source.board}/${encodeURIComponent(posting)}`;
   if (source.connector === "recruitee")
     return `https://${source.board}.recruitee.com/o/${encodeURIComponent(posting)}`;
   return `https://jobs.${source.region === "eu" ? "eu." : ""}lever.co/${source.board}/${encodeURIComponent(posting)}`;
@@ -116,6 +118,13 @@ export function recognizeUrl(input: string): {
   ) {
     connector = "greenhouse";
     postingId = parts[2] as string;
+  } else if (
+    url.hostname === "jobs.ashbyhq.com" &&
+    (parts.length === 2 || (parts.length === 3 && parts[2] === "application")) &&
+    /^[a-zA-Z0-9-]{1,180}$/.test(parts[1] ?? "")
+  ) {
+    connector = "ashby";
+    postingId = parts[1] as string;
   } else if (
     ["jobs.lever.co", "jobs.eu.lever.co"].includes(url.hostname) &&
     (parts.length === 2 || (parts.length === 3 && parts[2] === "apply")) &&

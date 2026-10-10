@@ -26,7 +26,12 @@ export type ReadPublic = (
   etag?: string | null,
   signal?: AbortSignal,
 ) => Promise<ReadResponse>;
-const hosts = new Set(["boards-api.greenhouse.io", "api.lever.co", "api.eu.lever.co"]);
+const hosts = new Set([
+  "boards-api.greenhouse.io",
+  "api.lever.co",
+  "api.eu.lever.co",
+  "api.ashbyhq.com",
+]);
 const approvedHost = (hostname: string) =>
   hosts.has(hostname) || /^[a-z0-9][a-z0-9-]{0,62}\.recruitee\.com$/.test(hostname);
 export function publicAddress(address: string): boolean {
@@ -49,6 +54,8 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
     !approvedHost(url.hostname) ||
+    (url.hostname === "api.ashbyhq.com" &&
+      !/^\/posting-api\/job-board\/[a-zA-Z0-9_-]{1,100}$/.test(url.pathname)) ||
     url.protocol !== "https:" ||
     url.port ||
     url.username ||

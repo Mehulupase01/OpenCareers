@@ -18,7 +18,7 @@ that portal family.
 | Lever hosted Protolabs variant | Public form inspected read-only | Unsupported: substantive answers and challenge | None | None | Public read-only 2026-09-27 |
 | Greenhouse public Job Board GET / hosted external form | Live-read P04 | Fingerprint-pinned hosted form fixture-tested P09; unknown controls and challenges blocked | One guarded POST and correlated receipt fixture-tested P09 | Unknown outcomes stop without replay; read-only recovery pending P11 | DEPT/Adyen public reads only; no live POST or private receipt |
 | Lever public postings GET | Fixture-tested P04 | Planned | Planned | Planned | No live read |
-| Ashby | Planned P04 | Planned | Planned | Planned | None |
+| Ashby public posting API v1 | Fixture-tested and public read P18 | Planned | Planned | Planned | Ashby board, 68 listed postings, 2026-10-10; no employer write |
 
 Select the first real adapter from relevant permitted vacancies at P08. Support
 levels: planned, fixture-tested, dry-run-tested, live-verified. Each variant records

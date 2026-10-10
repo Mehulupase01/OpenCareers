@@ -18,33 +18,48 @@ export const readFixture: ReadPublic = async (input, etag) => {
           })),
           meta: { total: 3 },
         }
-      : url.hostname.endsWith(".recruitee.com")
+      : url.hostname === "api.ashbyhq.com"
         ? {
-            offers: ids.map((id) => ({
-              id: 200 + id,
-              slug: `synthetic-engineer-${id}`,
-              title: `Platform Engineer ${id}`,
-              status: "published",
-              location: "Rotterdam, Netherlands",
-              country_code: "NL",
-              description:
-                "Build and test reliable synthetic platform services. Fixture vacancy only.",
-              requirements: "Use TypeScript and careful operational practices.",
-              published_at: "2026-09-16T10:00:00Z",
-              updated_at: "2026-09-16T11:00:00Z",
-              hybrid: true,
+            apiVersion: "1",
+            jobs: ids.map((id) => ({
+              title: `Ashby Software Engineer ${id}`,
+              location: "Amsterdam, Netherlands",
+              jobUrl: `https://jobs.ashbyhq.com/${url.pathname.split("/").at(-1)}/synthetic-${id}`,
+              isListed: true,
+              workplaceType: "Hybrid",
+              descriptionPlain:
+                "Build and test reliable synthetic services with TypeScript. Fixture vacancy only.",
+              publishedAt: "2026-10-10T12:00:00Z",
+              address: { postalAddress: { addressCountry: "NLD" } },
             })),
           }
-        : Number(url.searchParams.get("skip")) === 0
-          ? ids.map((id) => ({
-              id: `synthetic-${id}`,
-              text: `Data Engineer ${id}`,
-              categories: { location: "Amsterdam" },
-              country: "NL",
-              descriptionPlain:
-                "Build and test reliable synthetic data services. Fixture vacancy only.",
-              workplaceType: "hybrid",
-            }))
-          : [];
+        : url.hostname.endsWith(".recruitee.com")
+          ? {
+              offers: ids.map((id) => ({
+                id: 200 + id,
+                slug: `synthetic-engineer-${id}`,
+                title: `Platform Engineer ${id}`,
+                status: "published",
+                location: "Rotterdam, Netherlands",
+                country_code: "NL",
+                description:
+                  "Build and test reliable synthetic platform services. Fixture vacancy only.",
+                requirements: "Use TypeScript and careful operational practices.",
+                published_at: "2026-09-16T10:00:00Z",
+                updated_at: "2026-09-16T11:00:00Z",
+                hybrid: true,
+              })),
+            }
+          : Number(url.searchParams.get("skip")) === 0
+            ? ids.map((id) => ({
+                id: `synthetic-${id}`,
+                text: `Data Engineer ${id}`,
+                categories: { location: "Amsterdam" },
+                country: "NL",
+                descriptionPlain:
+                  "Build and test reliable synthetic data services. Fixture vacancy only.",
+                workplaceType: "hybrid",
+              }))
+            : [];
   return { status: 200, body: JSON.stringify(body), etag: '"synthetic-v1"', retryAfter: null };
 };

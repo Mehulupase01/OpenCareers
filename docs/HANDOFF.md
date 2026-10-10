@@ -663,3 +663,22 @@ pending for this increment. The fresh demo manager is now PID 21064 on the same
 Only that owned synthetic preview was replaced; private 4317/4318 were untouched.
 The LinkedIn/Indeed permission review is documented, not replaced by an assumption
 that a logged-in account grants automated access. No real accounts were touched.
+
+## 2026-10-10: P18 Ashby Discovery
+
+Owner-source commit `904a77238f46deea753d9cdb16fce2c5a254c58f` passed Windows,
+Ubuntu and PostgreSQL CI 38086701394. Ashby public discovery now shares the source
+leases, complete-snapshot validation, dated raw evidence and identity pipeline.
+Public read normalized 68 postings; its retained response hash and isolated probe
+database are recorded in `docs/evidence/P18-ashby-discovery.md`. This is discovery
+only: application operations remain planned and no Ashby submission adapter exists.
+Sources now default to the requested 20-minute interval; saved private sources were
+not changed. P18-G4 remains in progress because the other five families are pending.
+
+Full local check: 397 passed, 150 PostgreSQL skipped, 49 files; build/lint/typecheck/
+ledger passed. The final synthetic fixture label changed afterward and its focused
+Ashby tests passed (9 passed, 1 PostgreSQL skipped). Public scan: 288 files. All
+48 desktop/mobile browser cases passed and the Ashby mobile screenshot was
+inspected; final typecheck passed after the source-default adjustment. The vacancy identity test now selects
+explicit employers/postings, not positions that depend on the number of sources.
+No private service, credential, candidate data or employer application was touched.

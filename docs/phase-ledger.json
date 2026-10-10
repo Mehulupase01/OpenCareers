@@ -1985,7 +1985,11 @@
       },
       "lastVerifiedCommit": null,
       "nextAction": "P18-01",
-      "evidence": ["docs/plans/P18-owner-sources-hosted-forms.md"],
+      "evidence": [
+        "docs/plans/P18-owner-sources-hosted-forms.md",
+        "docs/evidence/P18-source-session-foundation.md",
+        "docs/evidence/P18-ashby-discovery.md"
+      ],
       "acceptanceTests": ["T03", "T31", "T32"],
       "remoteVerification": [],
       "gates": [
@@ -2014,8 +2018,12 @@
         {
           "id": "P18-G4",
           "requirement": "Every added public-API family passes the connector contract and yields a normalized job with a dated read-only sample and retained raw evidence.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P18-ashby-discovery.md",
+            "tests/unit/ashby.test.ts",
+            "tests/integration/ashby.test.ts"
+          ]
         },
         {
           "id": "P18-G5",
@@ -2067,9 +2075,13 @@
         {
           "id": "P18-04",
           "text": "Public-API family expansion. Add Ashby, Teamtailor, SmartRecruiters, Workable, Personio, and Breezy discovery connectors with normalization, identity resolution, and coverage rows.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T03", "T31", "T32"],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P18-ashby-discovery.md",
+            "tests/unit/ashby.test.ts",
+            "tests/integration/ashby.test.ts"
+          ],
           "nextAction": "P18-04"
         },
         {

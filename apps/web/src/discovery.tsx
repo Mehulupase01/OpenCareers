@@ -128,11 +128,15 @@ function SourceEditor({
           Connector
           <select
             value={connector}
-            onChange={(event) => setConnector(event.target.value as SourceInput["connector"])}
+            onChange={(event) => {
+              setConnector(event.target.value as SourceInput["connector"]);
+              if (event.target.value === "ashby") setRegion("global");
+            }}
           >
             <option value="greenhouse">Greenhouse</option>
             <option value="lever">Lever</option>
             <option value="recruitee">Recruitee</option>
+            <option value="ashby">Ashby</option>
           </select>
         </label>
         <label>
@@ -149,6 +153,7 @@ function SourceEditor({
           Region
           <select
             value={region}
+            disabled={connector === "ashby"}
             onChange={(event) => setRegion(event.target.value as SourceInput["region"])}
           >
             <option value="global">Global</option>
@@ -176,7 +181,7 @@ function SourceEditor({
         </label>
         <label>
           Poll interval (minutes)
-          <input name="minutes" type="number" min={5} max={1440} defaultValue={60} required />
+          <input name="minutes" type="number" min={5} max={1440} defaultValue={20} required />
         </label>
         <div className="form-actions wide">
           <button type="submit" className="button-primary" disabled={busy}>

@@ -18,6 +18,21 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  ashby: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    adapterVersion: null,
+    limitations: [
+      "Public posting discovery only; no Ashby application adapter or private receipt.",
+    ],
+  },
   recruitee: {
     accountNeed: "not_required",
     challengeNeed: "not_present",
@@ -79,6 +94,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "ashby-public-posting-v1",
+    family: "ashby",
+    variant: "Published listed job-board snapshot",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.ashby.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Ashby public board read: 68 postings; retained hashed response, plus synthetic discovery lifecycle",
+    limitations: support.ashby.limitations,
+  },
   {
     id: "mock-ats-standard",
     family: "mock_ats",

@@ -1,5 +1,35 @@
 import { expect, test } from "@playwright/test";
 
+test("Ashby source runs through the owned discovery workflow without claiming application support", async ({
+  page,
+}, info) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Discovery", exact: true }).click();
+  await page.getByRole("tab", { name: "Sources", exact: true }).click();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add discovery source" });
+  await editor.getByRole("combobox", { name: "Connector", exact: true }).selectOption("ashby");
+  await expect(editor.getByRole("combobox", { name: "Region", exact: true })).toBeDisabled();
+  await editor.getByLabel("Board token", { exact: true }).fill("synthetic-ashby-e2e");
+  await editor.getByLabel("Company", { exact: true }).fill("Synthetic Ashby Employer");
+  await editor.getByLabel("Employer ID", { exact: true }).fill("synthetic-ashby-employer");
+  await editor.getByLabel("Poll interval (minutes)", { exact: true }).fill("20");
+  await editor.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const source = page
+    .locator(".source-health-list article")
+    .filter({ hasText: "synthetic-ashby-e2e" });
+  await expect(source).toContainText("healthy", { timeout: 25000 });
+  await expect(source).toContainText("3 postings");
+  await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  const variant = page
+    .locator(".coverage-table tbody tr")
+    .filter({ hasText: "Published listed job-board snapshot" });
+  await expect(variant).toContainText("planned / planned");
+  await page.screenshot({ path: `test-results/ashby-${info.project.name}.png`, fullPage: true });
+});
+
 test("discovery source, evidence, historical import and reversible identity", async ({
   page,
 }, info) => {
@@ -47,7 +77,11 @@ test("discovery source, evidence, historical import and reversible identity", as
     fullPage: true,
   });
   await page.getByRole("tab", { name: "Vacancies", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect Software Engineer 1", exact: true }).click();
+  await page
+    .locator(".vacancy-table tbody tr")
+    .filter({ hasText: "greenhouse" })
+    .getByRole("button", { name: "Inspect Software Engineer 1", exact: true })
+    .click();
   const detail = page.getByRole("dialog", { name: "Vacancy evidence" });
   await expect(detail).toContainText("Fixture vacancy only.");
   await detail.getByRole("button", { name: "Source evidence", exact: true }).click();
@@ -95,11 +129,19 @@ test("discovery source, evidence, historical import and reversible identity", as
     await expect(split).toBeDisabled();
   }
   const sourceVacancy = page.getByRole("combobox", { name: "Source vacancy", exact: true });
-  await expect(sourceVacancy.locator("option")).toHaveCount(4);
-  await sourceVacancy.selectOption({ index: 3 });
+  const fromOption = sourceVacancy.getByRole("option", {
+    name: "Synthetic Employer: Software Engineer 3 (3)",
+    exact: true,
+  });
+  await expect(fromOption).toHaveCount(1);
+  await sourceVacancy.selectOption((await fromOption.getAttribute("value")) as string);
   const canonicalVacancy = page.getByRole("combobox", { name: "Canonical vacancy", exact: true });
-  await expect(canonicalVacancy.locator("option")).toHaveCount(4);
-  await canonicalVacancy.selectOption({ index: 2 });
+  const toOption = canonicalVacancy.getByRole("option", {
+    name: "Synthetic Employer: Software Engineer 2 (2)",
+    exact: true,
+  });
+  await expect(toOption).toHaveCount(1);
+  await canonicalVacancy.selectOption((await toOption.getAttribute("value")) as string);
   const identityEvidence = `Synthetic ${info.project.name} reversible identity check ${Date.now()}.`;
   await page.getByLabel("Identity evidence", { exact: true }).fill(identityEvidence);
   await page.getByRole("button", { name: "Confirm same requisition", exact: true }).click();
