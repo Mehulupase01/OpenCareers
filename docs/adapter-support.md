@@ -21,6 +21,7 @@ that portal family.
 | Ashby public posting API v1 | Fixture-tested and public read P18 | Planned | Planned | Planned | Ashby board, 68 listed postings, 2026-10-10; no employer write |
 | Personio enabled XML feed | Fixture-tested and public read P18 | Planned | Planned | Planned | Personio board, 1 posting, 2026-10-10; office text only, no employer write |
 | SmartRecruiters public Posting API | Fixture-tested and public read P18 | Planned | Planned | Planned | Sana Commerce, 6 postings plus descriptions, 2026-10-10; bounded complete scans only, no employer write |
+| Workable published public account feed | Fixture-tested and public read P18 | Planned | Planned | Planned | Workable careers, 2 postings plus descriptions, 2026-10-10; exact widget redirect, primary visible location only, no employer write |
 
 Select the first real adapter from relevant permitted vacancies at P08. Support
 levels: planned, fixture-tested, dry-run-tested, live-verified. Each variant records

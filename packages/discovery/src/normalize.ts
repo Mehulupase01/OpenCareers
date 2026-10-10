@@ -89,6 +89,8 @@ export function hostedUrl(
     return `https://job-boards.greenhouse.io/${source.board}/jobs/${encodeURIComponent(posting)}`;
   if (source.connector === "ashby")
     return `https://jobs.ashbyhq.com/${source.board}/${encodeURIComponent(posting)}`;
+  if (source.connector === "workable")
+    return `https://apply.workable.com/${source.board}/j/${encodeURIComponent(posting)}`;
   if (source.connector === "smartrecruiters")
     return `https://jobs.smartrecruiters.com/${source.board}/${encodeURIComponent(posting)}`;
   if (source.connector === "personio")
@@ -121,6 +123,15 @@ export function recognizeUrl(input: string): {
     /^\d+$/.test(parts[2] ?? "")
   ) {
     connector = "greenhouse";
+    postingId = parts[2] as string;
+  } else if (
+    url.hostname === "apply.workable.com" &&
+    (parts.length === 3 || (parts.length === 4 && parts[3] === "apply")) &&
+    parts[1] === "j" &&
+    /^[a-z0-9][a-z0-9-]{0,62}$/.test(parts[0] ?? "") &&
+    /^[A-Z0-9]{1,30}$/.test(parts[2] ?? "")
+  ) {
+    connector = "workable";
     postingId = parts[2] as string;
   } else if (
     url.hostname === "jobs.smartrecruiters.com" &&

@@ -1990,7 +1990,8 @@
         "docs/evidence/P18-source-session-foundation.md",
         "docs/evidence/P18-ashby-discovery.md",
         "docs/evidence/P18-personio-discovery.md",
-        "docs/evidence/P18-smartrecruiters-discovery.md"
+        "docs/evidence/P18-smartrecruiters-discovery.md",
+        "docs/evidence/P18-workable-discovery.md"
       ],
       "acceptanceTests": ["T03", "T31", "T32"],
       "remoteVerification": [],
@@ -2030,7 +2031,10 @@
             "tests/integration/personio.test.ts",
             "docs/evidence/P18-smartrecruiters-discovery.md",
             "tests/unit/smartrecruiters.test.ts",
-            "tests/integration/smartrecruiters.test.ts"
+            "tests/integration/smartrecruiters.test.ts",
+            "docs/evidence/P18-workable-discovery.md",
+            "tests/unit/workable.test.ts",
+            "tests/integration/workable.test.ts"
           ]
         },
         {
@@ -2094,7 +2098,10 @@
             "tests/integration/personio.test.ts",
             "docs/evidence/P18-smartrecruiters-discovery.md",
             "tests/unit/smartrecruiters.test.ts",
-            "tests/integration/smartrecruiters.test.ts"
+            "tests/integration/smartrecruiters.test.ts",
+            "docs/evidence/P18-workable-discovery.md",
+            "tests/unit/workable.test.ts",
+            "tests/integration/workable.test.ts"
           ],
           "nextAction": "P18-04"
         },

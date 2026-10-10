@@ -1,5 +1,35 @@
 import { expect, test } from "@playwright/test";
 
+test("Workable public source retains redirect evidence and discovery-only support", async ({
+  page,
+}, info) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Discovery", exact: true }).click();
+  await page.getByRole("tab", { name: "Sources", exact: true }).click();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add discovery source" });
+  await editor.getByRole("combobox", { name: "Connector", exact: true }).selectOption("workable");
+  await expect(editor.getByRole("combobox", { name: "Region", exact: true })).toBeDisabled();
+  await editor.getByLabel("Board token", { exact: true }).fill("synthetic-workable-e2e");
+  await editor.getByLabel("Company", { exact: true }).fill("Synthetic Workable Employer");
+  await editor.getByLabel("Employer ID", { exact: true }).fill("synthetic-workable-employer");
+  await editor.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const source = page
+    .locator(".source-health-list article")
+    .filter({ hasText: "synthetic-workable-e2e" });
+  await expect(source).toContainText("healthy", { timeout: 25000 });
+  await expect(source).toContainText("3 postings");
+  await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  await expect(
+    page
+      .locator(".coverage-table tbody tr")
+      .filter({ hasText: "Published account feed with descriptions" }),
+  ).toContainText("planned / planned");
+  await page.screenshot({ path: `test-results/workable-${info.project.name}.png`, fullPage: true });
+});
+
 test("SmartRecruiters source combines public summaries and descriptions without application support", async ({
   page,
 }, info) => {

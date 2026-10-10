@@ -16,6 +16,7 @@ export class DiscoveryFailure extends Error {
   }
 }
 export interface ReadResponse {
+  location?: string | null;
   status: number;
   body: string;
   etag: string | null;
@@ -32,6 +33,8 @@ const hosts = new Set([
   "api.eu.lever.co",
   "api.ashbyhq.com",
   "api.smartrecruiters.com",
+  "www.workable.com",
+  "apply.workable.com",
 ]);
 const approvedHost = (hostname: string) =>
   hosts.has(hostname) ||
@@ -57,6 +60,12 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
     !approvedHost(url.hostname) ||
+    (url.hostname === "apply.workable.com" &&
+      (!/^\/api\/v1\/widget\/accounts\/[a-z0-9][a-z0-9-]{0,62}$/.test(url.pathname) ||
+        url.search !== "?details=true")) ||
+    (url.hostname === "www.workable.com" &&
+      (!/^\/api\/accounts\/[a-z0-9][a-z0-9-]{0,62}$/.test(url.pathname) ||
+        url.search !== "?details=true")) ||
     (url.hostname === "api.smartrecruiters.com" &&
       !(
         (/^\/v1\/companies\/[a-zA-Z0-9_-]{1,100}\/postings$/.test(url.pathname) &&
@@ -104,6 +113,7 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
         );
         response.on("end", () =>
           resolve({
+            location: response.headers.location?.slice(0, 2000) ?? null,
             status: response.statusCode ?? 0,
             body: Buffer.concat(chunks).toString("utf8"),
             etag: response.headers.etag?.slice(0, 1000) ?? null,

@@ -18,6 +18,22 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  workable: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    adapterVersion: null,
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    limitations: [
+      "Published account feed with descriptions only; no Workable application adapter.",
+      "Primary visible location only; boardless short links cannot identify an account for source setup.",
+    ],
+  },
   smartrecruiters: {
     accountNeed: "unknown",
     challengeNeed: "unknown",
@@ -126,6 +142,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "workable-public-account-v1",
+    family: "workable",
+    variant: "Published account feed with descriptions",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.workable.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Workable careers public read: 2 postings with descriptions; retained redirect/feed evidence plus synthetic discovery",
+    limitations: support.workable.limitations,
+  },
   {
     id: "smartrecruiters-public-posting-v1",
     family: "smartrecruiters",

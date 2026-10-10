@@ -4,6 +4,37 @@ export const readFixture: ReadPublic = async (input, etag) => {
   const url = new URL(input);
   if (etag === '"synthetic-v1"') return { status: 304, body: "", etag, retryAfter: null };
   const ids = [1, 2, 3];
+  if (url.hostname === "www.workable.com")
+    return {
+      status: 302,
+      body: "",
+      etag: null,
+      retryAfter: null,
+      location: `https://apply.workable.com/api/v1/widget/accounts/${url.pathname.split("/").at(-1)}?details=true`,
+    };
+  if (url.hostname === "apply.workable.com")
+    return {
+      status: 200,
+      etag: null,
+      retryAfter: null,
+      body: JSON.stringify({
+        name: "Synthetic Workable Employer",
+        jobs: ids.map((id) => ({
+          title: `Workable Software Engineer ${id}`,
+          shortcode: `SYNTHETIC${id}`,
+          url: `https://apply.workable.com/j/SYNTHETIC${id}`,
+          description:
+            "<p>Build reliable synthetic software with TypeScript. Fixture vacancy only.</p>",
+          published_on: "2026-10-10",
+          telecommuting: false,
+          city: "Amsterdam",
+          country: "Netherlands",
+          locations: [
+            { city: "Amsterdam", country: "Netherlands", countryCode: "NL", hidden: false },
+          ],
+        })),
+      }),
+    };
   if (url.hostname === "api.smartrecruiters.com") {
     const board = url.pathname.split("/")[3];
     const posting = url.pathname.split("/")[5];

@@ -25,6 +25,7 @@ import {
   readPublic,
   retryAfter,
 } from "./transport.js";
+import { normalizeWorkable } from "./workable.js";
 
 const text = z.string().max(200000);
 const ashbyJob = z.object({
@@ -95,6 +96,7 @@ export function normalizePage(
   page: number,
 ): { jobs: NormalizedJob[]; size: number } {
   const jobs: NormalizedJob[] = [];
+  if (source.connector === "workable") return normalizeWorkable(raw, source, page);
   if (source.connector === "smartrecruiters") return normalizeSmartPage(raw, source, page);
   if (source.connector === "personio") return normalizePersonio(raw, source, page);
   if (source.connector === "ashby") {
@@ -297,16 +299,18 @@ export async function pollSource(
       if (signal.aborted)
         throw new DiscoveryFailure("unavailable", "Source scan time limit exceeded.");
       const url =
-        source.connector === "personio"
-          ? `https://${source.board}.jobs.personio.${source.region === "eu" ? "de" : "com"}/xml?language=en`
-          : source.connector === "greenhouse"
-            ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
-            : source.connector === "ashby"
-              ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
-              : source.connector === "recruitee"
-                ? `https://${source.board}.recruitee.com/api/offers/`
-                : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
-      const response = await read(
+        source.connector === "workable"
+          ? `https://www.workable.com/api/accounts/${source.board}?details=true`
+          : source.connector === "personio"
+            ? `https://${source.board}.jobs.personio.${source.region === "eu" ? "de" : "com"}/xml?language=en`
+            : source.connector === "greenhouse"
+              ? `https://boards-api.greenhouse.io/v1/boards/${source.board}/jobs?content=true`
+              : source.connector === "ashby"
+                ? `https://api.ashbyhq.com/posting-api/job-board/${source.board}`
+                : source.connector === "recruitee"
+                  ? `https://${source.board}.recruitee.com/api/offers/`
+                  : `https://api.${source.region === "eu" ? "eu." : ""}lever.co/v0/postings/${source.board}?mode=json&skip=${page * 100}&limit=100`;
+      let response = await read(
         url,
         source.connector === "greenhouse" ? source.etag : null,
         signal,
@@ -315,6 +319,19 @@ export async function pollSource(
       if (totalBytes > 32 * 1024 * 1024)
         throw new DiscoveryFailure("parser_failed", "Source scan exceeds storage bounds.");
       result.pages.push(pageEvidence(url, response, new Date()));
+      if (source.connector === "workable" && response.status === 302) {
+        const widget = `https://apply.workable.com/api/v1/widget/accounts/${source.board}?details=true`;
+        if (response.location !== widget)
+          throw new DiscoveryFailure(
+            "unavailable",
+            "Public account redirect left its approved tenant route.",
+          );
+        response = await read(widget, null, signal);
+        totalBytes += Buffer.byteLength(response.body);
+        result.pages.push(pageEvidence(widget, response, new Date()));
+        if (totalBytes > 32 * 1024 * 1024)
+          throw new DiscoveryFailure("parser_failed", "Source scan exceeds storage bounds.");
+      }
       if (response.status === 403)
         throw new DiscoveryFailure("forbidden", "Source denied public access.");
       if (response.status === 429)
@@ -335,7 +352,7 @@ export async function pollSource(
         normalized = normalizePage(
           source.connector === "personio" ? response.body : JSON.parse(response.body),
           source,
-          page,
+          result.pages.length - 1,
         );
       } catch {
         throw new DiscoveryFailure(

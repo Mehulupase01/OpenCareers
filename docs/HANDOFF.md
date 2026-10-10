@@ -735,3 +735,36 @@ snapshot. Next documented public routes: Workable's published
 returned 404; no successful sample claimed), and Teamtailor `jobs.rss` with
 offset/per_page pagination. Teamtailor RSS defaults to only 100 jobs, so one page
 is not complete. Breezy access route still needs primary-source review.
+
+## 2026-10-10: P18 Workable Discovery
+
+SmartRecruiters commit `926d0e7fe11807f469deccba446a5ff3816c5942` passed Windows,
+Ubuntu and PostgreSQL CI 38088398806. Workable published account discovery is now
+implemented. The documented www account route redirects to the exact same-tenant
+public widget route; only that single redirect is admitted and both responses
+retain dated evidence. A public Workable `careers` read yielded two jobs with full
+descriptions. Raw responses/hash/date/probe DB are recorded in
+`docs/evidence/P18-workable-discovery.md`. Hidden locations remain unknown and only
+the primary visible location is normalized. Application operations remain planned.
+
+Full local check: 452 passed, 155 PostgreSQL skipped, 55 files; lint/typecheck/
+ledger/build passed. All ten desktop/mobile Discovery cases passed, including all
+four added families and the existing history/identity workflow together. Mobile
+screenshot inspected; public scan 301 files. Cross-platform CI is pending for the
+Workable checkpoint. Earlier complete browser runs: Personio 50, SmartRecruiters
+52 in CI; do not attribute those older full runs to Workable.
+
+The owned synthetic preview was refreshed after process-tree/listener checks,
+manager PID 3768, API 14323, UI http://127.0.0.1:14324; ready endpoint reports demo.
+No private service, credential, candidate data or employer application was touched.
+11/19 phases and 79/128 gates remain complete, P18-G4 in progress with four of six
+new public-feed families. Next: Teamtailor RSS, then Breezy after primary access
+review. A credential-free public-DNS-pinned read of
+`https://career.teamtailor.com/jobs.rss?offset=0&per_page=100` yielded 13 items, with
+title/description/pubDate/link/remoteStatus/guid and `tt:locations.tt:location`
+metadata. This inspection was not retained as a normalized connector sample;
+the actual connector must parse/retain it and traverse offset/per_page to a short
+page, detect duplicates/drift, and never assume the default first 100 is complete.
+Custom-domain feeds, universal forms, reviewed owner ingestion, 20-source
+operational coverage, five gated families, P12-P17, real Gmail path/consent and
+the P08 private live receipt remain outstanding.
