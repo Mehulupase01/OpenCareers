@@ -9,6 +9,8 @@ import {
   mailMessageSchema,
 } from "../../contracts/src/email.js";
 import { DomainError } from "../../contracts/src/index.js";
+import { mailHash } from "./correlation.js";
+import { type MailScan, mailContextKey, mailScanSchema, newMailScan } from "./scan.js";
 
 export const oauthClientSchema = z
   .object({ clientId: z.string().min(10).max(1000), clientSecret: z.string().min(5).max(1000) })
@@ -110,39 +112,56 @@ export class GmailProvider {
         client_secret: client.clientSecret,
       }),
     });
-    const parsed = tokenSchema.safeParse(await boundedJson(response));
-    if (!parsed.success || parsed.data.scope.trim() !== GMAIL_READ_SCOPE)
+    const raw = await boundedJson(response);
+    try {
+      const parsed = tokenSchema.safeParse(raw);
+      if (!parsed.success || parsed.data.scope.trim() !== GMAIL_READ_SCOPE)
+        throw new DomainError(
+          "SESSION_EXPIRED",
+          "Gmail granted scopes differ from the reviewed read-only scope.",
+        );
+      const token = parsed.data;
+      const refreshToken = token.refresh_token ?? existing?.refreshToken;
+      if (!refreshToken)
+        throw new DomainError("SESSION_EXPIRED", "Gmail did not grant offline access; reconnect.");
+      const expiryCandidates = [
+        token.refresh_token_expires_in
+          ? now.getTime() + token.refresh_token_expires_in * 1000
+          : null,
+        existing?.refreshExpiresAt ? Date.parse(existing.refreshExpiresAt) : null,
+        testing ? now.getTime() + 7 * 86400000 : null,
+      ].filter((value): value is number => value !== null);
+      const refreshExpiresAt = expiryCandidates.length
+        ? new Date(Math.min(...expiryCandidates)).toISOString()
+        : null;
+      const tokens = {
+        accessToken: token.access_token,
+        refreshToken,
+        expiresAt: new Date(now.getTime() + token.expires_in * 1000).toISOString(),
+        refreshExpiresAt,
+        mailbox: existing?.mailbox ?? "",
+      };
+      if (!existing) {
+        const profile = z
+          .object({ emailAddress: z.email() })
+          .passthrough()
+          .parse(await this.get("/profile?fields=emailAddress", tokens.accessToken));
+        tokens.mailbox = profile.emailAddress.trim().toLowerCase();
+      }
+      return tokens;
+    } catch {
+      // A grant can exist even when validation or the mailbox lookup failed.
+      if (raw && typeof raw === "object") {
+        const grant = raw as Record<string, unknown>;
+        const token = grant.refresh_token ?? grant.access_token;
+        if (typeof token === "string" && token.length >= 10 && token.length <= 8192)
+          await this.revoke(token).catch(() => undefined);
+      }
       throw new DomainError(
         "SESSION_EXPIRED",
-        "Gmail granted scopes differ from the reviewed read-only scope.",
+        "Gmail grant validation failed; reconnect from the mailbox workspace.",
       );
-    const token = parsed.data;
-    const refreshToken = token.refresh_token ?? existing?.refreshToken;
-    if (!refreshToken)
-      throw new DomainError("SESSION_EXPIRED", "Gmail did not grant offline access; reconnect.");
-    const expiryCandidates = [
-      token.refresh_token_expires_in ? now.getTime() + token.refresh_token_expires_in * 1000 : null,
-      existing?.refreshExpiresAt ? Date.parse(existing.refreshExpiresAt) : null,
-      testing ? now.getTime() + 7 * 86400000 : null,
-    ].filter((value): value is number => value !== null);
-    const refreshExpiresAt = expiryCandidates.length
-      ? new Date(Math.min(...expiryCandidates)).toISOString()
-      : null;
-    const tokens = {
-      accessToken: token.access_token,
-      refreshToken,
-      expiresAt: new Date(now.getTime() + token.expires_in * 1000).toISOString(),
-      refreshExpiresAt,
-      mailbox: existing?.mailbox ?? "",
-    };
-    if (!existing) {
-      const profile = z
-        .object({ emailAddress: z.email() })
-        .passthrough()
-        .parse(await this.get("/profile?fields=emailAddress", tokens.accessToken));
-      tokens.mailbox = profile.emailAddress.trim().toLowerCase();
     }
-    return tokens;
   }
 
   async revoke(token: string) {
@@ -172,24 +191,46 @@ export class GmailProvider {
     contexts: MailContext[],
     observe: (message: MailMessage) => Promise<void>,
     checkpoint: () => Promise<void> = async () => {},
+    progress?: { scan: MailScan; save: (scan: MailScan) => Promise<void>; signal?: AbortSignal },
   ): Promise<{ complete: boolean; inspected: number }> {
-    const signal = AbortSignal.timeout(90000);
+    const signal = progress?.signal
+      ? AbortSignal.any([progress.signal, AbortSignal.timeout(90000)])
+      : AbortSignal.timeout(90000);
     if (contexts.length > 50)
       throw new DomainError("CONFIG_INVALID", "Too many Gmail acquisition contexts.");
+    const scan = mailScanSchema.parse(progress?.scan ?? newMailScan(contexts));
+    const byKey = new Map(contexts.map((context) => [mailContextKey(context), context]));
+    const save = async () => {
+      mailScanSchema.parse(scan);
+      await progress?.save(scan);
+    };
     const ids = new Set<string>();
     let pages = 0;
-    for (const context of contexts) {
-      let pageToken: string | undefined;
-      const visited = new Set<string>();
-      do {
+    await save();
+    while (scan.entries.some((entry) => !entry.done)) {
+      const entry = scan.pending
+        ? scan.entries.find((item) => item.key === scan.pending?.key)
+        : scan.entries[scan.nextIndex];
+      if (!entry) throw new DomainError("CONFIG_INVALID", "Mailbox checkpoint context is missing.");
+      const context = byKey.get(entry.key);
+      if (!context)
+        throw new DomainError(
+          "CONFIG_INVALID",
+          "Mailbox checkpoint no longer matches its contexts.",
+        );
+      if (entry.done) {
+        scan.nextIndex = (scan.nextIndex + 1) % scan.entries.length;
+        continue;
+      }
+      if (!scan.pending) {
         if (++pages > 50 || ids.size >= 100) return { complete: false, inspected: ids.size };
         await checkpoint();
         const query = new URLSearchParams({
-          q: gmailQuery(context),
+          q: gmailQuery({ ...context, before: entry.before }),
           maxResults: "25",
           includeSpamTrash: "false",
           fields: "messages/id,nextPageToken",
-          ...(pageToken ? { pageToken } : {}),
+          ...(entry.pageToken ? { pageToken: entry.pageToken } : {}),
         });
         const list = z
           .object({
@@ -201,9 +242,24 @@ export class GmailProvider {
           })
           .passthrough()
           .parse(await this.get(`/messages?${query}`, token, signal));
-        for (const { id } of list.messages ?? []) {
-          if (ids.has(id)) continue;
-          if (ids.size >= 100) return { complete: false, inspected: ids.size };
+        if (
+          list.nextPageToken &&
+          (list.nextPageToken === entry.pageToken ||
+            entry.seen.includes(mailHash(list.nextPageToken)))
+        )
+          throw new DomainError("CONFIG_INVALID", "Gmail pagination did not advance.");
+        scan.pending = {
+          key: entry.key,
+          ids: [...new Set((list.messages ?? []).map((message) => message.id))],
+          nextPageToken: list.nextPageToken ?? null,
+        };
+        await save();
+      }
+      while (scan.pending.ids.length) {
+        const id = scan.pending.ids[0];
+        if (!id) break;
+        if (ids.size >= 100) return { complete: false, inspected: ids.size };
+        if (!ids.has(id)) {
           await checkpoint();
           const fields = new URLSearchParams({
             format: "full",
@@ -220,13 +276,15 @@ export class GmailProvider {
           await observe(message);
           ids.add(id);
         }
-        pageToken = list.nextPageToken;
-        if (pageToken) {
-          if (visited.has(pageToken))
-            throw new DomainError("CONFIG_INVALID", "Gmail pagination did not advance.");
-          visited.add(pageToken);
-        }
-      } while (pageToken);
+        scan.pending.ids.shift();
+        await save();
+      }
+      entry.pageToken = scan.pending.nextPageToken;
+      entry.done = entry.pageToken === null;
+      if (entry.pageToken) entry.seen = [...entry.seen, mailHash(entry.pageToken)].slice(-8);
+      scan.pending = null;
+      scan.nextIndex = (scan.entries.indexOf(entry) + 1) % scan.entries.length;
+      await save();
     }
     return { complete: true, inspected: ids.size };
   }
@@ -269,9 +327,20 @@ export function parseGmailMessage(raw: unknown): MailMessage | null {
   const plain: string[] = [],
     html: string[] = [];
   let count = 0;
+  let incomplete = false;
   function visit(part: unknown, depth: number) {
-    if (depth > 6 || ++count > 40 || !part || typeof part !== "object") return;
+    if (depth > 6 || ++count > 40) {
+      incomplete = true;
+      return;
+    }
+    if (!part || typeof part !== "object") return;
     const value = part as { mimeType?: string; body?: { data?: string }; parts?: unknown[] };
+    if (
+      typeof value.body?.data === "string" &&
+      value.body.data.length > 48000 &&
+      ["text/plain", "text/html"].includes(value.mimeType ?? "")
+    )
+      incomplete = true;
     if (
       typeof value.body?.data === "string" &&
       value.body.data.length <= 48000 &&
@@ -281,13 +350,14 @@ export function parseGmailMessage(raw: unknown): MailMessage | null {
       if (value.mimeType === "text/plain") plain.push(text);
       else html.push(text);
     }
-    if (Array.isArray(value.parts))
+    if (Array.isArray(value.parts)) {
+      if (value.parts.length > 40) incomplete = true;
       for (const child of value.parts.slice(0, 40)) visit(child, depth + 1);
+    }
   }
   visit(payload, 0);
-  const text = (
-    plain.length ? plain.join("\n") : convert(html.join("\n"), { wordwrap: false })
-  ).slice(0, 32000);
+  const text = plain.length ? plain.join("\n") : convert(html.join("\n"), { wordwrap: false });
+  if (incomplete || text.length > 32000) return null;
   const receivedAt = new Date(Number(internalDate));
   if (!Number.isFinite(receivedAt.getTime())) return null;
   const parsed = mailMessageSchema.safeParse({

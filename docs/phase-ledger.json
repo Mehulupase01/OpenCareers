@@ -1238,7 +1238,7 @@
     {
       "id": "P11",
       "title": "Email integration and receipt reconciliation",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": ["P10"],
       "tickets": [
         {
@@ -1272,9 +1272,12 @@
         {
           "id": "P11-04",
           "text": "Verification links. Follow only links bound to a pending signup and a validated destination chain, rejecting unexpected redirects or instructions to disclose secrets.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T23", "T24"],
-          "evidence": [],
+          "evidence": [
+            "tests/unit/email-verification.test.ts",
+            "tests/integration/email-verification.test.ts"
+          ],
           "nextAction": "P11-04"
         },
         {
@@ -1317,8 +1320,11 @@
         {
           "id": "P11-G5",
           "requirement": "Unexpected verification-link domains are rejected.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "tests/unit/email-verification.test.ts",
+            "tests/integration/email-verification.test.ts"
+          ]
         },
         {
           "id": "P11-G6",
@@ -1343,7 +1349,7 @@
       "lastVerifiedCommit": null,
       "remoteVerification": [],
       "acceptanceTests": ["T23", "T24"],
-      "nextAction": "P11-02: durable scan progress and P11-04: validated verification links; finish OAuth failure matrix and live owner consent",
+      "nextAction": "Record full local and Windows/Ubuntu/PostgreSQL CI verification; close fixture-proven P11 while retaining the separate live Gmail prerequisite",
       "evidence": [
         "docs/plans/P11-email-reconciliation.md",
         "docs/evidence/P11-gmail-foundation.md"

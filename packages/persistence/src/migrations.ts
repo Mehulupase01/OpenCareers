@@ -122,6 +122,10 @@ export const migrations = [
     "CREATE TABLE email_outcome_events (owner_id TEXT NOT NULL, message_id TEXT NOT NULL, context_id TEXT NOT NULL, kind TEXT NOT NULL, occurred_at TEXT NOT NULL, PRIMARY KEY(owner_id,message_id), FOREIGN KEY(owner_id,message_id) REFERENCES email_messages(owner_id,id))",
     "CREATE TABLE email_verification_links (owner_id TEXT NOT NULL, id TEXT NOT NULL, message_id TEXT NOT NULL, account_id TEXT NOT NULL, secret_id TEXT NOT NULL, state TEXT NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,message_id), FOREIGN KEY(owner_id,message_id) REFERENCES email_messages(owner_id,id), FOREIGN KEY(owner_id,account_id) REFERENCES employer_accounts(owner_id,id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id))",
   ],
+  [
+    "CREATE TABLE email_verification_rules (owner_id TEXT NOT NULL REFERENCES owners(id), employer_origin TEXT NOT NULL, pathname TEXT NOT NULL, data TEXT NOT NULL, approved_at TEXT NOT NULL, PRIMARY KEY(owner_id,employer_origin,pathname))",
+    "CREATE TABLE email_verification_evidence (owner_id TEXT NOT NULL, link_id TEXT NOT NULL, response_sha256 TEXT NOT NULL, rule_sha256 TEXT NOT NULL, observed_at TEXT NOT NULL, PRIMARY KEY(owner_id,link_id), FOREIGN KEY(owner_id,link_id) REFERENCES email_verification_links(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

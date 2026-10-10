@@ -58,6 +58,7 @@ export interface MailConnectionSummary {
   refreshExpiresAt: string | null;
   lastSyncAt: string | null;
   reason: string;
+  scanPaused: boolean;
 }
 export interface MailSnapshot {
   connection: MailConnectionSummary;

@@ -14,6 +14,14 @@ test("mailbox stays disconnected and private credentials are unavailable in demo
   await expect(page.getByRole("button", { name: "Sync", exact: true })).toBeDisabled();
   await expect(page.getByLabel("Credentials JSON path", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Save credentials", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("heading", { name: "Reviewed verification routes", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Verification employer origin", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Approve route", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("heading", { name: "Account verification", exact: true }),
+  ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

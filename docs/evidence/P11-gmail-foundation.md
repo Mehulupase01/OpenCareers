@@ -1,7 +1,8 @@
 # P11 Gmail Foundation
 
-2026-10-10. P11 is **in progress**, not closed or live-certified. Migration 13
-is append-only. No private database, key, OAuth credentials, running service or
+2026-10-10. P11 implementation is awaiting final cross-platform verification,
+not closed or live-certified. Migrations 13 and 14
+are append-only. No private database, key, OAuth credentials, running service or
 real employer was changed. No live Gmail request or application was sent.
 
 ## Implemented
@@ -14,12 +15,31 @@ real employer was changed. No live Gmail request or application was sent.
   ciphertext cannot prevent local disconnect. Superseded secrets are deleted.
 - Expired uncertain refresh requires fresh consent; no automatic refresh replay.
   Testing authorization has a conservative seven-day bound that refresh cannot extend.
-- Narrow recipient/sender/time queries for up to 50 existing contexts over at most
+- Narrow recipient/sender/time queries for up to 50 existing contexts per batch over at most
   14 days, provider field allowlists, fixed endpoints, redirects refused, body
   limits and timeouts. No mailbox-wide crawl, attachments, outbound mail or LLM.
 - Pagination, deduplication, incremental ingestion and stop/disconnect checks
   before each request. Limits: 50 pages, 100 messages, 90 seconds per sync.
   Partial scans explicitly report partial acquisition; they are not exhaustive.
+- Encrypted, purpose-bound pagination checkpoints save page IDs before message
+  acquisition and advance only after ingestion. Restart resumes incomplete pages;
+  fair round-robin page selection and persisted context watermarks prevent capped
+  batches from permanently omitting later contexts. Correlation includes the full
+  relevant set, capped at 1,000 contexts with explicit review rather than truncation.
+  Checkpoints are capped at 60 KB. Invalid scans pause without losing OAuth; an
+  authenticated owner reset clears progress and fences old readers.
+- Verification links are extracted only from uniquely correlated account mail.
+  The pending signup, identity, original message hash and current policy are bound
+  to an encrypted URL. Exact HTTPS origins, paths, token query keys and complete
+  success text require owner approval; no route is approved by default. Only GET
+  is allowed, with no cookies, referrer, credentials or email body in the request.
+  Public-only DNS addresses are pinned to the connection; literal private IPs are
+  rejected separately. Each redirect is reauthorized, with three redirects maximum,
+  64 KB response and 30-second dispatch limits. HTTP 200 or a phrase buried in other
+  text is insufficient. Successful accounts have hashed response/rule evidence.
+  Intent precedes the request. Lost responses and stopped/revoked requests become
+  unknown and cannot replay, including another token for the same account. A crash
+  leaves in-flight evidence visible and non-replayable, not implicitly successful.
 - Conservative English classifications and exact recipient, reviewed sender,
   Gmail-provided DKIM authentication result, bounded time and unique reference
   correlation. Parent/vendor sender domains require explicit owner approval.
@@ -37,7 +57,9 @@ real employer was changed. No live Gmail request or application was sent.
   the original immutable submission intent. SubmissionRepository validates stored
   message/event/packet/attempt evidence before confirming an unknown attempt.
   Caller-fabricated receipts and final-action email evidence are rejected.
-- Private worker polling every five minutes, independent of discovery cadence.
+- Private worker polling every five minutes runs as one bounded background promise,
+  independent of discovery cadence and task claiming. Shutdown aborts acquisition.
+  Reviewed verification follows only when external account actions are enabled.
   A disconnected mailbox requires no network and leaves application workflows usable.
 
 ## Evidence
@@ -62,23 +84,31 @@ warnings remain. PostgreSQL is verified separately in CI, not claimed locally.
 - `tests/e2e/email.spec.ts`: disconnected workspace at desktop/mobile widths,
   no page errors or horizontal overflow; synthetic screenshots only.
 
-## Remaining Before P11 Closure
+## Current Verification And Boundaries
 
-1. Durable encrypted pagination/context cursors and fair rotation for capped scans.
-   The current bounded sync restarts its window; persistent high-volume first
-   pages can starve older pages. Do not claim complete mailbox acquisition.
-2. Bound account-verification link extraction, encrypted URL storage, reviewed
-   exact GET paths, SSRF-safe pinned DNS, redirect-chain validation and account
-   state evidence. `email_verification_links` is reserved, not a working feature.
-   No email link is currently followed, including arbitrary recruiter links.
-3. Complete provider refresh/revocation/transient failure/stop/restore matrix and
-   private-configure API fixture tests. Synthetic consent is not Google consent.
-4. Improve conservative language/receipt coverage and stale/multiple-attempt
-   correlation, with a frozen evaluation. Classification is not a trained model.
-5. Bound polling without delaying unrelated worker work; a sync can currently
-   occupy the scheduler for up to 90 seconds before task acquisition.
-6. Actual Google desktop credentials path and owner consent remain pending.
-   Do not search private folders for credentials or activate private services.
+- `tests/unit/email-verification.test.ts`: adversarial URL and literal-IP refusal,
+  ambiguous link refusal, exact success text and issued-grant revocation after
+  scope/profile validation failure.
+- `tests/integration/email-verification.test.ts`: correlated acquisition through
+  encrypted capture and verified account state, duplicate delivery, 52-context
+  rotation, pre-request intent, reviewed redirects, unexpected origin rejection,
+  lost-response replay prevention, route removal and policy revocation mid-request.
+  Owned synthetic transports only; no employer endpoint is contacted.
+- `tests/integration/email.test.ts`: interrupted-page resume, ciphertext lifecycle,
+  explicit scan review/reset, stop/restore fencing and local disconnect.
+- `tests/integration/api.test.ts`: reviewed-route access controls, external-action
+  refusal, bounded synthetic desktop credentials import and no plaintext exposure.
+- All 46 desktop/mobile browser workflows passed. The Mailbox workspace includes
+  reviewed-route controls, redacted link status and explicit paused-scan reset.
+  The private verification dispatcher is integration-tested, not live-certified.
+- Classifier coverage remains conservative English; unsupported/ambiguous mail
+  does not manufacture outcomes. This is not a trained multilingual classifier.
+  Rich success pages without the exact reviewed full text remain unknown; adding
+  vendor-specific structured success adapters requires separate evidence.
+- Cross-platform CI and the final full local suite must be recorded before closure.
+  Actual Google desktop credentials path and owner consent remain pending.
+  Do not search private folders for credentials or activate private services.
+  P08's genuine live receipt and P15's crash/retention/soak certification remain open.
 
 ## Protocol References
 

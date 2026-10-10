@@ -130,9 +130,10 @@ export class GmailService {
     if (tokens) await this.provider.revoke(tokens.refreshToken);
   }
 
-  async sync() {
+  async sync(signal?: AbortSignal) {
     let snapshot = await this.repository.snapshot();
     if (snapshot.connection.state !== "connected") return { status: "disconnected", observed: 0 };
+    if (snapshot.connection.scanPaused) return { status: "needs_review", observed: 0 };
     if (
       !snapshot.connection.expiresAt ||
       Date.parse(snapshot.connection.expiresAt) <= Date.now() + 60000
@@ -160,37 +161,57 @@ export class GmailService {
       }
       snapshot = await this.repository.snapshot();
     }
-    const contexts = await this.repository.contexts();
-    if (!contexts.length) return { status: "idle", observed: 0 };
     const lease = await this.repository.lease("connected");
     let observed = 0;
     try {
       const { tokens } = await this.repository.credentials(lease);
       if (!tokens) throw new DomainError("SESSION_EXPIRED", "Gmail token is unavailable.");
+      const plan = await this.repository.scanPlan(lease);
+      if (!plan.contexts.length) {
+        await this.repository.saveScan(lease, plan.scan);
+        await this.repository.finishSync(lease);
+        return { status: "idle", observed: 0 };
+      }
       const scan = await this.provider.messages(
         tokens.accessToken,
-        contexts,
+        plan.contexts,
         async (message) => {
           if (await this.repository.ingest(lease, message)) observed++;
         },
         async () => {
           await this.repository.credentials(lease);
         },
+        {
+          scan: plan.scan,
+          save: (scan) => this.repository.saveScan(lease, scan),
+          ...(signal ? { signal } : {}),
+        },
       );
       await this.repository.finishSync(lease, scan.complete);
-      return { status: scan.complete ? "synced" : "partial", observed };
+      return {
+        status: scan.complete
+          ? plan.totalContexts > plan.contexts.length
+            ? "batch_complete"
+            : "synced"
+          : "partial",
+        observed,
+      };
     } catch (error) {
       await this.repository.invalidate(
         lease,
-        error instanceof DomainError && error.code === "RATE_LIMITED"
-          ? "temporarily_unavailable"
-          : "authorization_expired",
+        error instanceof DomainError && error.code === "SESSION_EXPIRED"
+          ? "authorization_expired"
+          : error instanceof DomainError && error.code !== "RATE_LIMITED"
+            ? "scan_needs_review"
+            : "temporarily_unavailable",
       );
       return {
         status:
-          error instanceof DomainError && error.code === "RATE_LIMITED"
-            ? "retry_later"
-            : "reconnect_required",
+          error instanceof DomainError && error.code === "SESSION_EXPIRED"
+            ? "reconnect_required"
+            : error instanceof DomainError && error.code !== "RATE_LIMITED"
+              ? "needs_review"
+              : "retry_later",
         observed,
       };
     }

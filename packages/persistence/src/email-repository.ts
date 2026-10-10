@@ -19,12 +19,31 @@ import {
 } from "../../contracts/src/submission.js";
 import { correlateMail, mailHash, recipientHash } from "../../email/src/correlation.js";
 import { type GmailTokens, type OAuthClient, oauthClientSchema } from "../../email/src/gmail.js";
+import {
+  type MailScan,
+  mailContextKey,
+  mailScanSchema,
+  newMailScan,
+} from "../../email/src/scan.js";
+import {
+  selectVerificationLink,
+  verificationDescriptorSchema,
+  verificationRuleHash,
+  verificationRuleSchema,
+} from "../../email/src/verification.js";
 import { type VaultBinding, VaultCipher, vaultEnvelopeSchema } from "../../security/src/vault.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { ExceptionRepository } from "./exception-repository.js";
 import { Repository } from "./repository.js";
 
-type ConnectionData = { testing: boolean; mailboxHash: string; reason: string };
+type ConnectionData = {
+  testing: boolean;
+  mailboxHash: string;
+  reason: string;
+  cursorSecretId?: string | null;
+  lastContextKey?: string | null;
+  scanPaused?: boolean;
+};
 export interface MailLease {
   generation: number;
   expiresAt: string;
@@ -50,7 +69,7 @@ export class EmailRepository extends Repository {
     this.cipher = key ? new VaultCipher(key) : null;
   }
 
-  private async seal(tx: SqlExecutor, purpose: VaultBinding["purpose"], value: unknown) {
+  protected async seal(tx: SqlExecutor, purpose: VaultBinding["purpose"], value: unknown) {
     if (!this.cipher)
       throw new DomainError("CONFIG_INVALID", "Mailbox workflows require a configured vault key.");
     const id = randomUUID();
@@ -67,7 +86,7 @@ export class EmailRepository extends Repository {
     return id;
   }
 
-  private async open(
+  protected async open(
     tx: SqlExecutor,
     id: string,
     purpose: VaultBinding["purpose"],
@@ -96,7 +115,7 @@ export class EmailRepository extends Repository {
     }
   }
 
-  private async active(tx: SqlExecutor) {
+  protected async active(tx: SqlExecutor) {
     const control = await this.readControl(tx);
     if (control.restoreBlocked || control.stopped)
       throw new DomainError(
@@ -132,7 +151,11 @@ export class EmailRepository extends Repository {
           }),
         ],
       );
-      for (const id of [old?.client_secret_id, old?.token_secret_id])
+      for (const id of [
+        old?.client_secret_id,
+        old?.token_secret_id,
+        old ? readData(old).cursorSecretId : null,
+      ])
         if (id)
           await tx.query("DELETE FROM vault_secrets WHERE owner_id=$1 AND id=$2", [
             this.ownerId,
@@ -283,7 +306,11 @@ export class EmailRepository extends Repository {
 
   async invalidate(
     lease: MailLease,
-    reason: "consent_failed" | "authorization_expired" | "temporarily_unavailable",
+    reason:
+      | "consent_failed"
+      | "authorization_expired"
+      | "temporarily_unavailable"
+      | "scan_needs_review",
   ) {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
@@ -294,7 +321,9 @@ export class EmailRepository extends Repository {
         ])
       )[0];
       if (!row) return;
-      const retry = reason === "temporarily_unavailable" && lease.state === "connected";
+      const retry =
+        ["temporarily_unavailable", "scan_needs_review"].includes(reason) &&
+        lease.state === "connected";
       await tx.query(
         "UPDATE email_connections SET state=$1,lease_until=NULL,token_secret_id=$2,data=$3,generation=generation+1 WHERE owner_id=$4 AND generation=$5",
         [
@@ -302,8 +331,11 @@ export class EmailRepository extends Repository {
           retry ? (row.token_secret_id ?? null) : null,
           JSON.stringify({
             ...readData(row),
+            scanPaused: reason === "scan_needs_review",
             reason: retry
-              ? "Gmail is temporarily unavailable; retry later."
+              ? reason === "scan_needs_review"
+                ? "Mailbox scan needs review; reset its checkpoint after resolving the cause."
+                : "Gmail is temporarily unavailable; retry later."
               : "Gmail authorization requires reconnecting.",
           }),
           this.ownerId,
@@ -338,12 +370,25 @@ export class EmailRepository extends Repository {
       }
       await tx.query(
         "UPDATE email_connections SET state='disconnected',token_secret_id=NULL,generation=generation+1,lease_until=NULL,expires_at=NULL,refresh_expires_at=NULL,data=$1 WHERE owner_id=$2",
-        [JSON.stringify({ ...readData(row), reason: "Gmail is disconnected." }), this.ownerId],
+        [
+          JSON.stringify({
+            ...readData(row),
+            cursorSecretId: null,
+            lastContextKey: null,
+            reason: "Gmail is disconnected.",
+          }),
+          this.ownerId,
+        ],
       );
       if (row.token_secret_id)
         await tx.query("DELETE FROM vault_secrets WHERE owner_id=$1 AND id=$2", [
           this.ownerId,
           row.token_secret_id,
+        ]);
+      if (readData(row).cursorSecretId)
+        await tx.query("DELETE FROM vault_secrets WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          readData(row).cursorSecretId ?? null,
         ]);
       await this.audit(
         tx,
@@ -407,7 +452,7 @@ export class EmailRepository extends Repository {
       ].slice(0, 10);
     };
     const rows = await tx.query(
-      "SELECT a.id,a.job_id,t.id AS attempt_id,t.started_at,i.packet_id,i.snapshot,i.sha256,c.content,j.data AS job_data FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1 AND a.state IN ('UNKNOWN','NEEDS_REVIEW','CONFIRMED') AND t.state IN ('UNKNOWN','CONFIRMED') AND t.started_at>=$2 ORDER BY t.started_at DESC,t.id DESC LIMIT 50",
+      "SELECT a.id,a.job_id,t.id AS attempt_id,t.started_at,i.packet_id,i.snapshot,i.sha256,c.content,j.data AS job_data FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1 AND a.state IN ('UNKNOWN','NEEDS_REVIEW','CONFIRMED') AND t.state IN ('UNKNOWN','CONFIRMED') AND t.started_at>=$2 AND NOT EXISTS (SELECT 1 FROM attempts n WHERE n.owner_id=t.owner_id AND n.application_id=t.application_id AND (n.started_at>t.started_at OR (n.started_at=t.started_at AND n.id>t.id))) ORDER BY t.started_at DESC,t.id DESC LIMIT 1001",
       [this.ownerId, cutoff],
     );
     const output: MailContext[] = [];
@@ -450,7 +495,7 @@ export class EmailRepository extends Repository {
       );
     }
     const accounts = await tx.query(
-      "SELECT a.id,a.employer_origin,a.identity_email_hash,s.id AS attempt_id,s.started_at,p.data AS profile FROM employer_accounts a JOIN signup_attempts s ON s.owner_id=a.owner_id AND s.account_id=a.id JOIN candidates c ON c.owner_id=a.owner_id AND c.id=a.candidate_id JOIN profile_versions p ON p.owner_id=c.owner_id AND p.id=c.active_profile_id WHERE a.owner_id=$1 AND a.state IN ('needs_verification','unknown') AND s.started_at>=$2 AND s.state IN ('CONFIRMED','UNKNOWN') ORDER BY s.started_at DESC LIMIT 50",
+      "SELECT a.id,a.employer_origin,a.identity_email_hash,s.id AS attempt_id,s.started_at,p.data AS profile FROM employer_accounts a JOIN signup_attempts s ON s.owner_id=a.owner_id AND s.account_id=a.id JOIN candidates c ON c.owner_id=a.owner_id AND c.id=a.candidate_id JOIN profile_versions p ON p.owner_id=c.owner_id AND p.id=c.active_profile_id WHERE a.owner_id=$1 AND a.state IN ('needs_verification','unknown') AND s.started_at>=$2 AND s.state IN ('CONFIRMED','UNKNOWN') AND NOT EXISTS (SELECT 1 FROM signup_attempts n WHERE n.owner_id=s.owner_id AND n.account_id=s.account_id AND (n.started_at>s.started_at OR (n.started_at=s.started_at AND n.id>s.id))) ORDER BY s.started_at DESC,s.id DESC LIMIT 1001",
       [this.ownerId, cutoff],
     );
     for (const row of accounts) {
@@ -483,7 +528,119 @@ export class EmailRepository extends Repository {
         }),
       );
     }
-    return output.slice(0, 50);
+    if (rows.length + accounts.length > 1000)
+      throw new DomainError(
+        "CONFIG_INVALID",
+        "Mailbox context safety limit exceeded; correlation needs review.",
+      );
+    return output;
+  }
+
+  async scanPlan(lease: MailLease) {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = await this.assertLease(tx, lease);
+      const data = readData(row);
+      const all = await this.contexts(tx);
+      const byKey = new Map(all.map((context) => [mailContextKey(context), context]));
+      let scan = data.cursorSecretId
+        ? mailScanSchema.parse(await this.open(tx, data.cursorSecretId, "email_scan"))
+        : null;
+      if (scan) {
+        const nextKey = scan.entries[scan.nextIndex]?.key;
+        scan.entries = scan.entries.filter((entry) => byKey.has(entry.key));
+        if (scan.pending && !scan.entries.some((entry) => entry.key === scan?.pending?.key))
+          scan.pending = null;
+        scan.nextIndex = Math.max(
+          0,
+          scan.entries.findIndex((entry) => entry.key === nextKey),
+        );
+        if (!scan.entries.some((entry) => !entry.done)) scan = null;
+      }
+      if (!scan) {
+        const ordered = [...byKey].sort(([a], [b]) => a.localeCompare(b));
+        const following = ordered.filter(
+          ([key]) => !data.lastContextKey || key > data.lastContextKey,
+        );
+        scan = newMailScan(
+          (following.length ? following : ordered).slice(0, 50).map(([, context]) => context),
+        );
+      }
+      return {
+        contexts: scan.entries.map((entry) => byKey.get(entry.key) as MailContext),
+        scan: mailScanSchema.parse(scan),
+        totalContexts: all.length,
+      };
+    });
+  }
+
+  async saveScan(lease: MailLease, input: MailScan) {
+    const scan = mailScanSchema.parse(input);
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const row = await this.assertLease(tx, lease);
+      const data = readData(row);
+      const complete = scan.entries.every((entry) => entry.done);
+      const secret = complete ? null : await this.seal(tx, "email_scan", scan);
+      await tx.query("UPDATE email_connections SET data=$1 WHERE owner_id=$2 AND generation=$3", [
+        JSON.stringify({
+          ...data,
+          cursorSecretId: secret,
+          lastContextKey: complete
+            ? (scan.entries.at(-1)?.key ?? data.lastContextKey ?? null)
+            : (data.lastContextKey ?? null),
+        }),
+        this.ownerId,
+        lease.generation,
+      ]);
+      if (data.cursorSecretId)
+        await tx.query("DELETE FROM vault_secrets WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          data.cursorSecretId,
+        ]);
+    });
+  }
+
+  async resetScan() {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.active(tx);
+      const row = (
+        await tx.query("SELECT * FROM email_connections WHERE owner_id=$1", [this.ownerId])
+      )[0];
+      if (row?.state !== "connected" || (row.lease_until && String(row.lease_until) > this.now()))
+        throw new DomainError(
+          "STATE_INVALID",
+          "Wait for an idle connected mailbox before resetting scan progress.",
+        );
+      const data = readData(row);
+      await tx.query(
+        "UPDATE email_connections SET data=$1,generation=generation+1 WHERE owner_id=$2",
+        [
+          JSON.stringify({
+            ...data,
+            cursorSecretId: null,
+            lastContextKey: null,
+            scanPaused: false,
+            reason: "Mailbox scan progress was reset by the owner.",
+          }),
+          this.ownerId,
+        ],
+      );
+      if (data.cursorSecretId)
+        await tx.query("DELETE FROM vault_secrets WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          data.cursorSecretId,
+        ]);
+      await this.audit(
+        tx,
+        this.ownerId,
+        "email.scan_reset",
+        Number(row.generation) + 1,
+        {},
+        `owner:${this.ownerId}`,
+      );
+    });
   }
 
   async removeSender(employerOrigin: string, senderDomain: string) {
@@ -514,7 +671,7 @@ export class EmailRepository extends Repository {
       const mailboxHash = readData(connection).mailboxHash;
       const existing = (
         await tx.query(
-          "SELECT id,evidence FROM email_messages WHERE owner_id=$1 AND mailbox_hash=$2 AND provider_message_id=$3",
+          "SELECT id,evidence,sha256 FROM email_messages WHERE owner_id=$1 AND mailbox_hash=$2 AND provider_message_id=$3",
           [this.ownerId, mailboxHash, message.id],
         )
       )[0];
@@ -524,6 +681,12 @@ export class EmailRepository extends Repository {
             tx,
             emailReceiptEvidenceSchema.parse(JSON.parse(String(existing.evidence))),
           );
+        if (
+          match.context?.kind === "account" &&
+          match.kind === "verification" &&
+          existing.sha256 === mailHash(JSON.stringify(message))
+        )
+          await this.captureVerification(tx, String(existing.id), match.context, message);
         return String(existing.id);
       }
       const id = randomUUID(),
@@ -568,6 +731,8 @@ export class EmailRepository extends Repository {
           [this.ownerId, id, context.id, match.kind, this.now()],
         );
       if (evidence) await this.queueReceipt(tx, evidence);
+      if (context?.kind === "account" && match.kind === "verification")
+        await this.captureVerification(tx, id, context, message);
       await this.audit(tx, id, "email.observed", 1, {
         correlation: match.status,
         classification: match.kind,
@@ -593,6 +758,49 @@ export class EmailRepository extends Repository {
         tx,
         evidence.applicationId,
       );
+  }
+
+  private async captureVerification(
+    tx: SqlExecutor,
+    messageId: string,
+    context: MailContext,
+    message: MailMessage,
+  ) {
+    if (
+      (
+        await tx.query(
+          "SELECT id FROM email_verification_links WHERE owner_id=$1 AND message_id=$2",
+          [this.ownerId, messageId],
+        )
+      ).length
+    )
+      return;
+    const rules = (
+      await tx.query(
+        "SELECT data FROM email_verification_rules WHERE owner_id=$1 AND employer_origin=$2",
+        [this.ownerId, context.employerOrigin],
+      )
+    ).map((row) => verificationRuleSchema.parse(JSON.parse(String(row.data))));
+    const selected = selectVerificationLink(message.text, rules);
+    const expiresAt = new Date(
+      Math.min(Date.parse(message.receivedAt) + 86400000, this.clock().getTime() + 3600000),
+    ).toISOString();
+    if (!selected || expiresAt <= this.now()) return;
+    const descriptor = verificationDescriptorSchema.parse({
+      url: selected.url,
+      accountId: context.id,
+      signupAttemptId: context.attemptId,
+      identityEmailHash: recipientHash(context.recipient),
+      messageSha256: mailHash(JSON.stringify(message)),
+      ruleHash: verificationRuleHash(selected.rule),
+    });
+    const secret = await this.seal(tx, "email_verification", descriptor);
+    const id = randomUUID();
+    await tx.query(
+      "INSERT INTO email_verification_links(owner_id,id,message_id,account_id,secret_id,state,expires_at) VALUES($1,$2,$3,$4,$5,'pending',$6)",
+      [this.ownerId, id, messageId, context.id, secret, expiresAt],
+    );
+    await this.audit(tx, id, "email.verification_proposed", 1, { accountId: context.id });
   }
 
   async receipt(applicationId: string): Promise<EmailReceiptEvidence | null> {
@@ -633,6 +841,7 @@ export class EmailRepository extends Repository {
         reason: expired
           ? "Mailbox operation expired; reconnect."
           : (data?.reason ?? "Gmail is not configured."),
+        scanPaused: data?.scanPaused ?? false,
       },
       messages: messages.map((item) => ({
         id: String(item.id),

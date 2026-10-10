@@ -1,7 +1,8 @@
-import { ExternalLink, Link, Mail, RefreshCw, Save, Trash2, Unlink } from "lucide-react";
+import { ExternalLink, Link, Mail, RefreshCw, RotateCcw, Save, Trash2, Unlink } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { MailSnapshot } from "../../../packages/contracts/src/email.js";
 import { request } from "./api.js";
+import { EmailVerification } from "./email-verification.js";
 
 export function EmailWorkspace({ demo }: { demo: boolean }) {
   const [snapshot, setSnapshot] = useState<MailSnapshot | null>(null);
@@ -78,6 +79,18 @@ export function EmailWorkspace({ demo }: { demo: boolean }) {
           </span>
         </div>
         <div className="button-group">
+          {snapshot?.connection.scanPaused && (
+            <button
+              type="button"
+              className="button secondary"
+              title="Reset paused mail scan"
+              aria-label="Reset paused mail scan"
+              disabled={busy || demo || !connected}
+              onClick={() => void command(() => request("/v1/email/reset-scan", {}))}
+            >
+              <RotateCcw size={16} />
+            </button>
+          )}
           <button
             type="button"
             className="button secondary"
@@ -268,6 +281,7 @@ export function EmailWorkspace({ demo }: { demo: boolean }) {
           </li>
         ))}
       </ul>
+      <EmailVerification demo={demo} />
       <h3>Application mail</h3>
       <div className="table-scroll">
         <table>

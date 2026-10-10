@@ -26,6 +26,7 @@ import { HandoffRepository } from "../../../packages/persistence/src/handoff-rep
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import { SubmissionRepository } from "../../../packages/persistence/src/submission-repository.js";
+import { VerificationRepository } from "../../../packages/persistence/src/verification-repository.js";
 import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 import { runInspectionTask } from "./inspection.js";
 
@@ -53,7 +54,9 @@ await artifacts.initialize();
 const adapters = createAdapterRegistry(config.dataDir);
 const email = new EmailRepository(repository.db, repository.ownerId, config.vaultKey);
 const gmail = new GmailService(email);
+const verification = new VerificationRepository(repository.db, repository.ownerId, config.vaultKey);
 let nextMailSync = 0;
+let mailSync: Promise<void> | null = null;
 const matchingRepository = new MatchingRepository(repository.db, repository.ownerId);
 const matching = new MatchingRunner(matchingRepository, config);
 const letterDraftRunner = config.inference.apiKey
@@ -69,13 +72,20 @@ try {
   while (!controller.signal.aborted) {
     try {
       await repository.heartbeat(workerId, "scheduler");
-      if (config.profile !== "demo" && config.vaultKey && Date.now() >= nextMailSync) {
+      if (config.profile !== "demo" && config.vaultKey && !mailSync && Date.now() >= nextMailSync) {
         nextMailSync = Date.now() + 300000;
-        try {
-          await gmail.sync();
-        } catch {
-          logger.warn("Read-only mailbox sync deferred.");
-        }
+        mailSync = gmail
+          .sync(controller.signal)
+          .then(async () => {
+            if (config.externalSubmissionEnabled)
+              await verification.followPending(controller.signal);
+          })
+          .catch(() => {
+            logger.warn("Read-only mailbox sync deferred.");
+          })
+          .finally(() => {
+            mailSync = null;
+          });
       }
       await matching.run();
       const canPrepare =
@@ -327,6 +337,7 @@ try {
     }
   }
 } finally {
+  await mailSync;
   await gmail.close();
   await repository.db.close();
 }

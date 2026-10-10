@@ -14,6 +14,7 @@ export const vaultBindingSchema = z
       "oauth_token",
       "oauth_client",
       "email_verification",
+      "email_scan",
     ]),
     keyVersion: z.number().int().positive(),
   })

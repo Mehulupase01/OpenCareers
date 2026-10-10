@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GMAIL_READ_SCOPE } from "../../packages/contracts/src/email.js";
 import { GmailProvider } from "../../packages/email/src/gmail.js";
+import { newMailScan } from "../../packages/email/src/scan.js";
 import { GmailService } from "../../packages/email/src/service.js";
 import {
   type Database,
@@ -57,6 +58,53 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const lease = await repository.lease("connecting");
         await repository.connected(lease, tokens);
       };
+      it("pauses invalid scans without discarding OAuth and supports explicit owner reset", async () => {
+        await connect();
+        const lease = await repository.lease("connected");
+        await repository.invalidate(lease, "scan_needs_review");
+        expect((await repository.snapshot()).connection).toMatchObject({
+          state: "connected",
+          scanPaused: true,
+        });
+        let networkCalls = 0;
+        const service = new GmailService(
+          repository,
+          new GmailProvider(async () => {
+            networkCalls++;
+            throw new Error("Unexpected synthetic request");
+          }),
+        );
+        expect(await service.sync()).toEqual({ status: "needs_review", observed: 0 });
+        expect(networkCalls).toBe(0);
+        await repository.resetScan();
+        expect((await repository.snapshot()).connection.scanPaused).toBe(false);
+        await expect(repository.credentials(lease)).rejects.toMatchObject({
+          code: "SESSION_EXPIRED",
+        });
+        const fresh = await repository.lease("connected");
+        expect((await repository.credentials(fresh)).tokens?.refreshToken).toBe(
+          tokens.refreshToken,
+        );
+        await repository.finishSync(fresh);
+      });
+      it("fences active mail acquisition on stop and restore without exposing credentials", async () => {
+        await connect();
+        const lease = await repository.lease("connected");
+        await repository.setControl({ stopped: true });
+        await expect(repository.credentials(lease)).rejects.toMatchObject({
+          code: "POLICY_REVOKED",
+        });
+        await repository.setControl({ stopped: false });
+        await db.query("UPDATE controls SET data=$1 WHERE owner_id=$2", [
+          JSON.stringify({ ...(await repository.getControl()), restoreBlocked: true }),
+          owner,
+        ]);
+        await expect(repository.credentials(lease)).rejects.toMatchObject({
+          code: "POLICY_REVOKED",
+        });
+        await repository.disconnect();
+        expect((await repository.snapshot()).connection.state).toBe("disconnected");
+      });
 
       it("is useful when disconnected and stores no plaintext client or token", async () => {
         expect((await repository.snapshot()).connection.state).toBe("unconfigured");
@@ -131,6 +179,58 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(
           await db.query("SELECT id FROM vault_secrets WHERE owner_id=$1", [owner]),
         ).toHaveLength(1);
+      });
+      it("encrypts checkpoints, preserves them through token refresh, and removes them on disconnect", async () => {
+        await connect();
+        const lease = await repository.lease("connected");
+        const scan = newMailScan([
+          {
+            id: "synthetic-context",
+            kind: "application",
+            attemptId: "synthetic-attempt",
+            packetId: "synthetic-packet",
+            jobId: "synthetic-job",
+            recipient: tokens.mailbox,
+            employerOrigin: "https://careers.example.test",
+            senderDomains: ["careers.example.test"],
+            role: "Engineer",
+            references: ["REQ-123"],
+            after: "2026-10-10T11:00:00.000Z",
+            before: now.toISOString(),
+          },
+        ]);
+        const entry = scan.entries[0];
+        if (!entry) throw new Error("Missing synthetic cursor entry.");
+        entry.pageToken = "private-page-token";
+        scan.pending = {
+          key: entry.key,
+          ids: ["private-provider-message-id"],
+          nextPageToken: "private-next-page-token",
+        };
+        await repository.saveScan(lease, scan);
+        const serialized = JSON.stringify(
+          await db.query("SELECT * FROM vault_secrets WHERE owner_id=$1", [owner]),
+        );
+        expect(serialized).not.toContain("private-page-token");
+        expect(serialized).not.toContain("private-provider-message-id");
+        await repository.finishSync(lease, false);
+        await repository.connected(await repository.lease("refreshing"), tokens);
+        expect(
+          await db.query(
+            "SELECT id FROM vault_secrets WHERE owner_id=$1 AND purpose='email_scan'",
+            [owner],
+          ),
+        ).toHaveLength(1);
+        await repository.disconnect();
+        expect(
+          await db.query(
+            "SELECT id FROM vault_secrets WHERE owner_id=$1 AND purpose='email_scan'",
+            [owner],
+          ),
+        ).toHaveLength(0);
+        await expect(repository.saveScan(lease, scan)).rejects.toMatchObject({
+          code: "SESSION_EXPIRED",
+        });
       });
       it("stores no record or action for unrelated mail", async () => {
         await connect();

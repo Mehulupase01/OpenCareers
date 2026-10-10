@@ -36,7 +36,7 @@ export function publicAddress(address: string): boolean {
     return false;
   }
 }
-const safeLookup: LookupFunction = (hostname, options, callback) => {
+export const publicLookup: LookupFunction = (hostname, options, callback) => {
   lookup(hostname, { all: true, family: options.family ?? 0 }, (error, addresses) => {
     if (error) return callback(error, "", 4);
     if (!addresses.length || addresses.some((a) => !publicAddress(a.address)))
@@ -60,7 +60,7 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
       url,
       {
         method: "GET",
-        lookup: safeLookup,
+        lookup: publicLookup,
         agent: false,
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(10000)])

@@ -6,8 +6,10 @@ import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError } from "../../../packages/contracts/src/index.js";
 import { type GmailProvider, oauthClientSchema } from "../../../packages/email/src/gmail.js";
 import { GmailService } from "../../../packages/email/src/service.js";
+import { verificationRuleSchema } from "../../../packages/email/src/verification.js";
 import { EmailRepository } from "../../../packages/persistence/src/email-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { VerificationRepository } from "../../../packages/persistence/src/verification-repository.js";
 
 export async function emailRoutes(
   app: FastifyInstance,
@@ -17,6 +19,7 @@ export async function emailRoutes(
 ) {
   const repository = new EmailRepository(owner.db, owner.ownerId, config.vaultKey);
   const service = new GmailService(repository, provider);
+  const verification = new VerificationRepository(owner.db, owner.ownerId, config.vaultKey);
   app.addHook("onClose", async () => {
     await service.close();
   });
@@ -27,6 +30,27 @@ export async function emailRoutes(
       throw new DomainError("CONFIG_INVALID", "Gmail access requires a configured vault key.");
   };
   app.get("/v1/email", () => repository.snapshot());
+  app.get("/v1/email/verification", () => verification.verificationSnapshot());
+  app.post("/v1/email/verification/rules", async (request) => {
+    privateOnly();
+    await verification.approveRule(verificationRuleSchema.parse(request.body));
+    return verification.verificationSnapshot();
+  });
+  app.delete("/v1/email/verification/rules", async (request) => {
+    const input = z
+      .object({ employerOrigin: z.url(), pathname: z.string().max(180) })
+      .strict()
+      .parse(request.body);
+    await verification.removeRule(input.employerOrigin, input.pathname);
+    return verification.verificationSnapshot();
+  });
+  app.post("/v1/email/verification/:id/follow", async (request) => {
+    privateOnly();
+    if (!config.externalSubmissionEnabled)
+      throw new DomainError("POLICY_REVOKED", "External account actions are disabled.");
+    const { id } = z.object({ id: z.uuid() }).parse(request.params);
+    return verification.followLink(id);
+  });
   app.post("/v1/email/configure", async (request) => {
     privateOnly();
     const input = z
@@ -95,6 +119,11 @@ export async function emailRoutes(
   app.post("/v1/email/sync", async () => {
     privateOnly();
     return service.sync();
+  });
+  app.post("/v1/email/reset-scan", async () => {
+    privateOnly();
+    await repository.resetScan();
+    return repository.snapshot();
   });
   app.post("/v1/email/senders", async (request) => {
     privateOnly();

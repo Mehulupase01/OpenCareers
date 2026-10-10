@@ -6,6 +6,7 @@ import {
 } from "../../packages/contracts/src/email.js";
 import { classifyMail, correlateMail } from "../../packages/email/src/correlation.js";
 import { GmailProvider, gmailQuery, parseGmailMessage } from "../../packages/email/src/gmail.js";
+import { type MailScan, newMailScan } from "../../packages/email/src/scan.js";
 
 const context: MailContext = {
   id: "application-a",
@@ -122,6 +123,29 @@ describe("conservative mail correlation", () => {
 });
 
 describe("Gmail acquisition and OAuth", () => {
+  it("does not classify a truncated body or an oversized multipart envelope", () => {
+    const fixture = raw();
+    for (const size of [32001, 40000]) {
+      expect(
+        parseGmailMessage({
+          ...fixture,
+          payload: {
+            ...fixture.payload,
+            body: { data: Buffer.from("x".repeat(size)).toString("base64url") },
+          },
+        }),
+      ).toBeNull();
+    }
+    expect(
+      parseGmailMessage({
+        ...fixture,
+        payload: {
+          ...fixture.payload,
+          parts: Array(41).fill({ mimeType: "application/octet-stream" }),
+        },
+      }),
+    ).toBeNull();
+  });
   it("uses provider receipt time and rejects duplicate Google authentication headers", () => {
     const envelope = raw();
     envelope.payload.headers.push({ name: "Date", value: "Tue, 01 Jan 2000 00:00:00 GMT" });
@@ -169,7 +193,7 @@ describe("Gmail acquisition and OAuth", () => {
     ).toEqual({ complete: true, inspected: 2 });
     expect(observed).toEqual(["mail-a", "mail-b"]);
     expect(calls.filter((url) => !url.pathname.endsWith("/messages"))).toHaveLength(2);
-    expect(checks).toBe(6);
+    expect(checks).toBe(4);
   });
   it("preserves observations before later request failure", async () => {
     const provider = new GmailProvider(async (input) => {
@@ -186,6 +210,89 @@ describe("Gmail acquisition and OAuth", () => {
       }),
     ).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(observed).toEqual(["mail-a"]);
+  });
+  it("resumes a saved page after interruption without refetching its completed message", async () => {
+    let saved = newMailScan([context]);
+    const observe: string[] = [];
+    let failed = false;
+    const calls: string[] = [];
+    const provider = new GmailProvider(async (input) => {
+      const url = new URL(String(input));
+      calls.push(url.pathname);
+      if (url.pathname.endsWith("/messages"))
+        return json({ messages: [{ id: "mail-a" }, { id: "mail-b" }] });
+      if (url.pathname.endsWith("mail-b") && !failed) {
+        failed = true;
+        return json({}, 503);
+      }
+      return json(raw(url.pathname.split("/").at(-1)));
+    });
+    const progress = () => ({
+      scan: saved,
+      save: async (scan: MailScan) => {
+        saved = structuredClone(scan);
+      },
+    });
+    await expect(
+      provider.messages(
+        "synthetic-access-token",
+        [context],
+        async (mail) => {
+          observe.push(mail.id);
+        },
+        async () => {},
+        progress(),
+      ),
+    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    expect(saved.pending?.ids).toEqual(["mail-b"]);
+    expect(
+      await provider.messages(
+        "synthetic-access-token",
+        [context],
+        async (mail) => {
+          observe.push(mail.id);
+        },
+        async () => {},
+        progress(),
+      ),
+    ).toEqual({ complete: true, inspected: 1 });
+    expect(observe).toEqual(["mail-a", "mail-b"]);
+    expect(calls.filter((path) => path.endsWith("/messages"))).toHaveLength(1);
+    expect(calls.filter((path) => path.endsWith("mail-a"))).toHaveLength(1);
+  });
+  it("rotates pages across contexts before exhausting one busy sender", async () => {
+    const second = {
+      ...context,
+      id: "application-b",
+      attemptId: "attempt-b",
+      recipient: "second@example.test",
+    };
+    const order: string[] = [];
+    let page = 0;
+    const provider = new GmailProvider(async (input) => {
+      const url = new URL(String(input));
+      order.push(url.searchParams.get("q")?.includes("second@example.test") ? "second" : "first");
+      return json({ nextPageToken: `page-${++page}` });
+    });
+    let saved = newMailScan([context, second]);
+    expect(
+      (
+        await provider.messages(
+          "synthetic-access-token",
+          [context, second],
+          async () => {},
+          async () => {},
+          {
+            scan: saved,
+            save: async (scan) => {
+              saved = structuredClone(scan);
+            },
+          },
+        )
+      ).complete,
+    ).toBe(false);
+    expect(order.slice(0, 4)).toEqual(["first", "second", "first", "second"]);
+    expect(saved.entries.every((entry) => entry.pageToken !== null)).toBe(true);
   });
   it("refuses repeating pagination tokens", async () => {
     const provider = new GmailProvider(async () => json({ nextPageToken: "same-page" }));

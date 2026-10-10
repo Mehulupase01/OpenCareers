@@ -614,3 +614,25 @@ Receipt timing review also covers mail arriving during a stale read-only
 reconciliation. Duplicate ingestion now requeues only the same latest unknown
 attempt after the earlier task finishes, without duplicating the outcome event.
 The documents integration fixture explicitly exercises this interleaving.
+
+## 2026-10-10: P11 Recovery And Reviewed Verification
+
+Durable encrypted page checkpoints, fair context rotation and full-set correlation
+are implemented. Invalid scans pause without revoking OAuth; owner reset fences old
+readers. Private Gmail sync now runs outside the worker's task-claiming loop.
+Migration 14 adds reviewed verification routes and hashed success evidence. Only
+uniquely correlated pending signups create encrypted link proposals; exact reviewed
+GET destinations and redirect chains are rechecked against current policy. Unknown
+GET outcomes cannot replay or be bypassed with a second token for that account.
+The Mailbox surface exposes approvals and redacted status, never URL tokens.
+
+All 46 desktop/mobile E2E cases passed and the mobile mailbox screenshot was
+inspected. Public scan passed 280 files; dependency audit is clean. Final local
+suite and cross-platform CI are pending recording. P11 must not close until these
+are green. Live Gmail remains externally blocked by missing credentials path and
+owner consent; no private services, real credentials or employers were touched.
+Next engineering work follows `docs/plans/PRODUCTION-COMPLETION.md`: P08 live
+receipt needs actual authority and access, and P18 LinkedIn/Indeed source breadth
+comes before P12 optimization. Do not wait on live prerequisites to develop owned
+fixtures. P12 remains a fixed bounded preparation graph, never submission authority.
+Follow the current privacy amendment, not the older plan's strict-only wording.

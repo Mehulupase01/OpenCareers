@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -45,15 +45,74 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("imports a bounded desktop OAuth fixture without exposing its secret or path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "opencareers-oauth-fixture-"));
+    cleanup.push(() => rm(dir, { recursive: true, force: true }));
+    const credentialsPath = join(dir, "synthetic-client.json");
+    await writeFile(
+      credentialsPath,
+      JSON.stringify({
+        installed: {
+          client_id: "synthetic-google-client",
+          client_secret: "synthetic-google-secret",
+          auth_uri: "https://accounts.google.com/o/oauth2/auth",
+          token_uri: "https://oauth2.googleapis.com/token",
+        },
+      }),
+    );
+    const { app, headers, db, repository } = await setup("local", {
+      vaultKey: Buffer.alloc(32, 29).toString("base64"),
+    });
+    const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/email/configure",
+      headers: authenticated,
+      payload: { credentialsPath, mailbox: "candidate@example.test", testing: true },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().connection.state).toBe("disconnected");
+    const stored =
+      response.body +
+      JSON.stringify(
+        await db.query("SELECT * FROM vault_secrets WHERE owner_id=$1", [repository.ownerId]),
+      );
+    expect(stored).not.toContain("synthetic-google-secret");
+    expect(stored).not.toContain(credentialsPath);
+    await writeFile(credentialsPath, "x".repeat(65537));
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/email/configure",
+          headers: authenticated,
+          payload: { credentialsPath, mailbox: "candidate@example.test", testing: true },
+        })
+      ).statusCode,
+    ).toBe(409);
+    expect(
+      (await app.inject({ url: "/v1/email", headers: authenticated })).json().connection.state,
+    ).toBe("disconnected");
+  });
   it("protects mailbox metadata and refuses Gmail network access in demo or without a vault", async () => {
     const { app, headers } = await setup();
     expect((await app.inject({ url: "/v1/email", headers })).statusCode).toBe(401);
+    expect((await app.inject({ url: "/v1/email/verification", headers })).statusCode).toBe(401);
     const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
     const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
     expect(
       (await app.inject({ url: "/v1/email", headers: authenticated })).json().connection.state,
     ).toBe("unconfigured");
-    for (const action of ["connect", "sync"]) {
+    expect(
+      (await app.inject({ url: "/v1/email/verification", headers: authenticated })).json(),
+    ).toEqual({ rules: [], links: [] });
+    for (const action of [
+      "connect",
+      "sync",
+      "reset-scan",
+      "verification/rules",
+      `verification/${randomUUID()}/follow`,
+    ]) {
       const response = await app.inject({
         method: "POST",
         url: `/v1/email/${action}`,
@@ -72,6 +131,62 @@ describe("API trust boundary", () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json().message).toContain("vault key");
+  });
+  it("validates reviewed verification rules and refuses external dispatch when disabled", async () => {
+    const { app, headers } = await setup("local", {
+      vaultKey: Buffer.alloc(32, 29).toString("base64"),
+      externalSubmissionEnabled: false,
+    });
+    const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const rule = {
+      employerOrigin: "https://careers.synthetic.example",
+      pathname: "/verify",
+      queryKeys: ["token"],
+      successMarker: "Your email address is verified.",
+    };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/email/verification/rules",
+          headers: authenticated,
+          payload: { ...rule, pathname: "/password/reset" },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/email/verification/rules",
+          headers: authenticated,
+          payload: rule,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await app.inject({ url: "/v1/email/verification", headers: authenticated })).json().rules,
+    ).toEqual([rule]);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/email/verification/${randomUUID()}/follow`,
+          headers: authenticated,
+          payload: {},
+        })
+      ).json().code,
+    ).toBe("POLICY_REVOKED");
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/v1/email/verification/rules",
+          headers: authenticated,
+          payload: { employerOrigin: rule.employerOrigin, pathname: rule.pathname },
+        })
+      ).json().rules,
+    ).toEqual([]);
   });
   it("requires an owner session and exact request bodies for restore review and release", async () => {
     const { app, headers, db, repository } = await setup();
