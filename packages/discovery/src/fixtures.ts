@@ -4,6 +4,46 @@ export const readFixture: ReadPublic = async (input, etag) => {
   const url = new URL(input);
   if (etag === '"synthetic-v1"') return { status: 304, body: "", etag, retryAfter: null };
   const ids = [1, 2, 3];
+  if (url.hostname === "api.smartrecruiters.com") {
+    const board = url.pathname.split("/")[3];
+    const posting = url.pathname.split("/")[5];
+    const jobs = ids.map((id) => ({
+      id: String(400 + id),
+      name: `SmartRecruiters Software Engineer ${id}`,
+      company: { identifier: board },
+    }));
+    const selected = jobs.find((job) => job.id === posting);
+    return {
+      status: selected || !posting ? 200 : 404,
+      etag: null,
+      retryAfter: null,
+      body: JSON.stringify(
+        posting
+          ? {
+              ...selected,
+              active: true,
+              postingUrl: `https://jobs.smartrecruiters.com/${board}/${posting}-synthetic-engineer`,
+              refNumber: `REF-${posting}`,
+              releasedDate: "2026-10-10T12:00:00Z",
+              location: { city: "Amsterdam", country: "nl", remote: true },
+              jobAd: {
+                sections: {
+                  jobDescription: {
+                    title: "Responsibilities",
+                    text: "<p>Build reliable synthetic TypeScript services. Fixture vacancy only.</p>",
+                  },
+                },
+              },
+            }
+          : {
+              limit: 100,
+              offset: Number(url.searchParams.get("offset")),
+              totalFound: 3,
+              content: Number(url.searchParams.get("offset")) === 0 ? jobs : [],
+            },
+      ),
+    };
+  }
   if (url.hostname.includes(".jobs.personio."))
     return {
       status: 200,

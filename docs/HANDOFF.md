@@ -710,3 +710,28 @@ must be enforced. Do not treat summary-only discovery or a partial timed-out
 scan as a complete board. Universal hosted forms, reviewed owner ingestion,
 20-source operational coverage and five gated families are still required.
 Real Gmail credential path/consent and P08 genuine private receipt remain external.
+
+## 2026-10-10: P18 SmartRecruiters Discovery
+
+Personio commit `bab3d5d9226f834eb394614f3bc8c4975a8e9cc7` passed Windows,
+Ubuntu and PostgreSQL CI 38088022749. SmartRecruiters public list/detail discovery
+is implemented, with explicit PUBLIC destination, fixed company URLs and exact
+posting identity checks. A dated public Sana Commerce scan normalized six jobs
+with descriptions, retaining seven raw responses and hashes in an isolated probe
+database; see `docs/evidence/P18-smartrecruiters-discovery.md`. The documented
+sample company had zero listings and is not counted as a normalized-job sample.
+
+Focused regressions: 51 passed, 12 PostgreSQL skipped across six files. Lint,
+typecheck, ledger and production build passed; public scan 297 files. All eight
+desktop/mobile Discovery cases passed and mobile screenshot inspected. Complete
+CI is pending after push. The earlier Personio full check passed 417 tests and
+50 browser cases; do not attribute that older full-suite result to this increment.
+No private service, candidate, credential or employer application was touched.
+
+P18-G4 remains in progress. SmartRecruiters has a 200-request/60-second bound,
+not resumable large-board support; incomplete scans never replace the prior
+snapshot. Next documented public routes: Workable's published
+`www.workable.com/api/accounts/{tenant}?details=true` (the `workable` sample tenant
+returned 404; no successful sample claimed), and Teamtailor `jobs.rss` with
+offset/per_page pagination. Teamtailor RSS defaults to only 100 jobs, so one page
+is not complete. Breezy access route still needs primary-source review.

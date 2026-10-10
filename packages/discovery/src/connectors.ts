@@ -17,6 +17,7 @@ import {
   sourceKey,
 } from "./normalize.js";
 import { normalizePersonio } from "./personio.js";
+import { normalizeSmartPage, pollSmartSource } from "./smartrecruiters.js";
 import {
   DiscoveryFailure,
   pageEvidence,
@@ -94,6 +95,7 @@ export function normalizePage(
   page: number,
 ): { jobs: NormalizedJob[]; size: number } {
   const jobs: NormalizedJob[] = [];
+  if (source.connector === "smartrecruiters") return normalizeSmartPage(raw, source, page);
   if (source.connector === "personio") return normalizePersonio(raw, source, page);
   if (source.connector === "ashby") {
     const data = z
@@ -279,6 +281,7 @@ export async function pollSource(
   read: ReadPublic = readPublic,
   delay: (ms: number) => Promise<unknown> = setTimeout,
 ): Promise<DiscoveryBatch> {
+  if (source.connector === "smartrecruiters") return pollSmartSource(source, read, delay);
   const result: DiscoveryBatch = {
     jobs: [],
     pages: [],

@@ -18,6 +18,22 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  smartrecruiters: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    adapterVersion: null,
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    limitations: [
+      "Public postings and descriptions only; no SmartRecruiters application adapter.",
+      "200 requests/60 seconds per complete scan; larger or shifting boards fail without closing jobs.",
+    ],
+  },
   personio: {
     accountNeed: "unknown",
     challengeNeed: "unknown",
@@ -110,6 +126,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "smartrecruiters-public-posting-v1",
+    family: "smartrecruiters",
+    variant: "Public paginated postings plus descriptions",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.smartrecruiters.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Sana Commerce public read: 6 postings plus descriptions; retained hashed responses, plus bounded synthetic discovery",
+    limitations: support.smartrecruiters.limitations,
+  },
   {
     id: "personio-public-xml-v1",
     family: "personio",

@@ -31,6 +31,7 @@ const hosts = new Set([
   "api.lever.co",
   "api.eu.lever.co",
   "api.ashbyhq.com",
+  "api.smartrecruiters.com",
 ]);
 const approvedHost = (hostname: string) =>
   hosts.has(hostname) ||
@@ -56,6 +57,13 @@ export const readPublic: ReadPublic = async (input, etag, signal) => {
   const url = new URL(input);
   if (
     !approvedHost(url.hostname) ||
+    (url.hostname === "api.smartrecruiters.com" &&
+      !(
+        (/^\/v1\/companies\/[a-zA-Z0-9_-]{1,100}\/postings$/.test(url.pathname) &&
+          /^\?destination=PUBLIC&limit=100&offset=\d{1,5}$/.test(url.search)) ||
+        (/^\/v1\/companies\/[a-zA-Z0-9_-]{1,100}\/postings\/[1-9][0-9]{0,17}$/.test(url.pathname) &&
+          !url.search)
+      )) ||
     (url.hostname.includes(".jobs.personio.") &&
       (url.pathname !== "/xml" || url.search !== "?language=en")) ||
     (url.hostname === "api.ashbyhq.com" &&
