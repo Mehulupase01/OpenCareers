@@ -23,6 +23,7 @@ that portal family.
 | SmartRecruiters public Posting API | Fixture-tested and public read P18 | Planned | Planned | Planned | Sana Commerce, 6 postings plus descriptions, 2026-10-10; bounded complete scans only, no employer write |
 | Workable published public account feed | Fixture-tested and public read P18 | Planned | Planned | Planned | Workable careers, 2 postings plus descriptions, 2026-10-10; exact widget redirect, primary visible location only, no employer write |
 | Teamtailor public tenant RSS | Fixture-tested and public read P18 | Planned | Planned | Planned | Teamtailor career feed, 13 postings, 2026-10-10; offset/per_page to a short terminal page, primary location only, no employer write |
+| Breezy public tenant list and JobPosting pages | Fixture-tested and public read P18 | Planned | Planned | Planned | Codebase, 7 full descriptions and 9 retained responses, 2026-10-10 UTC; observed publishing route, bounded scans, no employer write |
 
 Select the first real adapter from relevant permitted vacancies at P08. Support
 levels: planned, fixture-tested, dry-run-tested, live-verified. Each variant records

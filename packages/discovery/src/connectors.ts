@@ -6,6 +6,7 @@ import {
   type NormalizedJob,
   normalizedJobSchema,
 } from "../../contracts/src/discovery.js";
+import { pollBreezySource } from "./breezy.js";
 import {
   digest,
   hostedUrl,
@@ -285,6 +286,7 @@ export async function pollSource(
   read: ReadPublic = readPublic,
   delay: (ms: number) => Promise<unknown> = setTimeout,
 ): Promise<DiscoveryBatch> {
+  if (source.connector === "breezy") return pollBreezySource(source, read, delay);
   if (source.connector === "smartrecruiters") return pollSmartSource(source, read, delay);
   const result: DiscoveryBatch = {
     jobs: [],

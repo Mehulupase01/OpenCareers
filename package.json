@@ -41,6 +41,7 @@
     "html-to-text": "10.0.1",
     "ipaddr.js": "2.5.0",
     "lucide-react": "1.46.0",
+    "parse5": "8.0.1",
     "pdfjs-dist": "6.3.289",
     "pdfkit": "^0.20.2",
     "pg": "8.23.0",

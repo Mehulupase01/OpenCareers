@@ -1,5 +1,33 @@
 import { expect, test } from "@playwright/test";
 
+test("Breezy public source shows structured evidence and discovery-only support", async ({
+  page,
+}, info) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Discovery", exact: true }).click();
+  await page.getByRole("tab", { name: "Sources", exact: true }).click();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add discovery source" });
+  await editor.getByRole("combobox", { name: "Connector", exact: true }).selectOption("breezy");
+  await expect(editor.getByRole("combobox", { name: "Region", exact: true })).toBeDisabled();
+  await editor.getByLabel("Board token", { exact: true }).fill("synthetic-breezy-e2e");
+  await editor.getByLabel("Company", { exact: true }).fill("Synthetic Breezy Employer");
+  await editor.getByLabel("Employer ID", { exact: true }).fill("synthetic-breezy-employer");
+  await editor.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(
+    page.locator(".source-health-list article").filter({ hasText: "synthetic-breezy-e2e" }),
+  ).toContainText("3 postings", { timeout: 25000 });
+  await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  await expect(
+    page
+      .locator(".coverage-table tbody tr")
+      .filter({ hasText: "Public tenant list and structured vacancy pages" }),
+  ).toContainText("planned / planned");
+  await page.screenshot({ path: `test-results/breezy-${info.project.name}.png`, fullPage: true });
+});
+
 test("Teamtailor paginated RSS source shows discovery-only support", async ({ page }, info) => {
   test.setTimeout(90000);
   await page.goto("/");

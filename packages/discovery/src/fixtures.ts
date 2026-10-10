@@ -4,6 +4,27 @@ export const readFixture: ReadPublic = async (input, etag) => {
   const url = new URL(input);
   if (etag === '"synthetic-v1"') return { status: 304, body: "", etag, retryAfter: null };
   const ids = [1, 2, 3];
+  if (url.hostname.endsWith(".breezy.hr")) {
+    const list = ids.map((id) => ({
+      id: String(id).padStart(12, "0"),
+      friendly_id: `${String(id).padStart(12, "0")}-synthetic-role`,
+      name: `Breezy Software Engineer ${id}`,
+      url: `https://${url.hostname}/p/${String(id).padStart(12, "0")}-synthetic-role`,
+      published_date: "2026-10-10T12:00:00.000Z",
+      company: { friendly_id: url.hostname.split(".")[0] },
+      location: { name: "Amsterdam, Netherlands", country: { id: "NL" }, is_remote: true },
+    }));
+    const job = list.find((item) => url.pathname === `/p/${item.friendly_id}`);
+    return {
+      status: 200,
+      etag: null,
+      retryAfter: null,
+      body:
+        url.pathname === "/json"
+          ? JSON.stringify(list)
+          : `<script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", url: job?.url, title: job?.name, description: "<p>Build reliable synthetic TypeScript services. Fixture vacancy only.</p>", hiringOrganization: { sameAs: url.origin } })}</script>`,
+    };
+  }
   if (url.hostname.endsWith(".teamtailor.com"))
     return {
       status: 200,

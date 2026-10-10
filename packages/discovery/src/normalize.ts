@@ -91,6 +91,8 @@ export function hostedUrl(
     return `https://jobs.ashbyhq.com/${source.board}/${encodeURIComponent(posting)}`;
   if (source.connector === "teamtailor")
     return `https://${source.board}.teamtailor.com/jobs/${encodeURIComponent(posting)}`;
+  if (source.connector === "breezy")
+    return `https://${source.board}.breezy.hr/p/${encodeURIComponent(posting)}`;
   if (source.connector === "workable")
     return `https://apply.workable.com/${source.board}/j/${encodeURIComponent(posting)}`;
   if (source.connector === "smartrecruiters")
@@ -126,6 +128,14 @@ export function recognizeUrl(input: string): {
   ) {
     connector = "greenhouse";
     postingId = parts[2] as string;
+  } else if (
+    /^[a-z0-9][a-z0-9-]{0,62}\.breezy\.hr$/.test(url.hostname) &&
+    parts.length === 2 &&
+    parts[0] === "p" &&
+    /^[a-f0-9]{12}(?:-[a-zA-Z0-9_-]{1,180})?$/.test(parts[1] ?? "")
+  ) {
+    connector = "breezy";
+    postingId = parts[1] as string;
   } else if (
     /^[a-z0-9][a-z0-9-]{0,62}\.teamtailor\.com$/.test(url.hostname) &&
     parts.length === 2 &&
@@ -188,7 +198,7 @@ export function recognizeUrl(input: string): {
       "This URL is not a supported public ATS vacancy. Redirectors are not followed.",
     );
   const board =
-    connector === "teamtailor"
+    connector === "teamtailor" || connector === "breezy"
       ? (url.hostname.split(".")[0] ?? "")
       : connector === "personio"
         ? (url.hostname.split(".")[0] ?? "")

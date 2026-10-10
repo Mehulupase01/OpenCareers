@@ -797,3 +797,25 @@ P18 stays open, 11/19 phases and 79/128 gates complete. Universal hosted forms,
 reviewed owner ingestion, 20-source operational coverage and five gated adapter
 families are still required. No private account, service, candidate data,
 credential or real employer submission was touched.
+
+## 2026-10-11: Public Discovery Milestone
+
+Owner approved larger workflow batches and dependency-safe P12/P13 engineering
+without waiting for all P18 breadth. See the sequencing amendment in the
+production-completion plan. Breezy public discovery is implemented: typed
+tenant list, inert JobPosting JSON-LD descriptions, exact identity checks,
+bounded requests and final list consistency reread. Seven actual public jobs
+and nine hashed responses are retained in an isolated ignored probe database;
+see `docs/evidence/P18-breezy-discovery.md`. Its public publishing route is
+observed, not a documented stable employer API. No credentials or writes.
+
+Frozen full local check: 483 passed, 157 PostgreSQL skipped, 58 files; lint,
+types, ledger and build passed. All 14 desktop/mobile Discovery browser cases
+passed; mobile screenshot inspected; public scan passed 308 files. Existing
+lint any/chunk-size warnings remain. P18-G4 and P18-04 close: all six planned
+public families have readers and dated normalized/raw evidence. P18 itself
+stays open. Counts now 11/19 phases and 80/128 gates; session consumption,
+resumable large scans, shared forms, 20-source operational coverage and gated
+adapters remain. Next: shared low-risk form inspection/fill primitives, then
+P12/P13 alongside P18 breadth. Genuine P08 receipt and Gmail owner consent
+remain external verification prerequisites. Private installations untouched.

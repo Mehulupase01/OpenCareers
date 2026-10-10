@@ -18,6 +18,23 @@ const support: Record<
     "accountNeed" | "challengeNeed" | "support" | "adapterVersion" | "limitations"
   >
 > = {
+  breezy: {
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    adapterVersion: null,
+    support: {
+      discovery: "public_read",
+      inspection: "planned",
+      commit: "planned",
+      receipt: "planned",
+      reconciliation: "planned",
+    },
+    limitations: [
+      "Public tenant JSON list and structured vacancy pages only; no application adapter.",
+      "198 jobs/200 requests/60 seconds per complete scan; larger, drifting or unsupported boards fail without closing jobs.",
+      "Primary location only; the public route has no published snapshot token or stability guarantee.",
+    ],
+  },
   teamtailor: {
     accountNeed: "unknown",
     challengeNeed: "unknown",
@@ -158,6 +175,19 @@ const levelWeight: Record<CoverageLevel, number> = {
 };
 
 const supportMatrix: PortalSupportVariant[] = [
+  {
+    id: "breezy-public-jsonld-v1",
+    family: "breezy",
+    variant: "Public tenant list and structured vacancy pages",
+    adapterVersion: null,
+    accountNeed: "unknown",
+    challengeNeed: "unknown",
+    support: support.breezy.support,
+    observedAt: "2026-10-10",
+    evidence:
+      "Codebase public read: 7 descriptions and 9 retained responses; synthetic discovery contract",
+    limitations: support.breezy.limitations,
+  },
   {
     id: "teamtailor-public-rss-v1",
     family: "teamtailor",

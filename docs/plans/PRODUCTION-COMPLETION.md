@@ -7,6 +7,15 @@ P08 at 6/7, and P11-P18 not started. Completion labels require re-verification.
 
 ## Execution Order
 
+2026-10-11 owner-approved sequencing amendment: finish discovery foundations,
+then shared hosted-form preparation. P12 and P13 engineering need not wait for
+all P18 source/portal breadth or externally blocked P08/P11 verification.
+Continue P18 breadth alongside independent engineering; original phase gates
+and their closure dependencies remain unchanged. P14-P17 follow their ledger
+dependencies. Verify whole milestones, update continuity once per milestone,
+and commit/push with a descriptive body at each completed phase. Actual 24-hour
+and 72-hour qualifying soaks are not replaced by simulated elapsed time.
+
 1. Recover CI, artifact-path safety, dependency security, public/private inventory,
    and truthful documentation. This repairs P01/P06/P15 prerequisites, not a new
    claim that all production gates have closed.

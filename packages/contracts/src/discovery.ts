@@ -14,6 +14,7 @@ export const sourceInputSchema = z
       "smartrecruiters",
       "workable",
       "teamtailor",
+      "breezy",
     ]),
     board: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
     region: z.enum(["global", "eu"]),
@@ -25,6 +26,15 @@ export const sourceInputSchema = z
   })
   .strict()
   .superRefine((source, context) => {
+    if (
+      source.connector === "breezy" &&
+      (source.region !== "global" || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(source.board))
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["board"],
+        message: "Breezy requires a lowercase global career-site token.",
+      });
     if (
       source.connector === "teamtailor" &&
       (source.region !== "global" || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(source.board))

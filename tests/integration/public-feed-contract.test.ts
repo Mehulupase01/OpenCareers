@@ -13,7 +13,7 @@ import { DiscoveryRepository } from "../../packages/persistence/src/discovery-re
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { sourceFixture } from "../helpers/discovery-fixtures.js";
 
-for (const connector of ["teamtailor"] as const)
+for (const connector of ["teamtailor", "breezy"] as const)
   for (const engine of ["sqlite", "postgres"] as const) {
     describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
       `${engine} ${connector} public feed contract`,
@@ -46,7 +46,7 @@ for (const connector of ["teamtailor"] as const)
             const source = await repo.claimSource();
             if (!source) throw new Error("Missing owned source lease.");
             const batch = await pollSource(source, readFixture);
-            expect(batch.pages).toHaveLength(1);
+            expect(batch.pages).toHaveLength(connector === "breezy" ? 5 : 1);
             expect(batch.pages[0]?.sha256).toMatch(/^[a-f0-9]{64}$/);
             await repo.ingest(source, batch);
             now = new Date(now.getTime() + 1201000);
