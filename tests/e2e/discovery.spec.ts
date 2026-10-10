@@ -21,6 +21,13 @@ test("discovery source, evidence, historical import and reversible identity", as
     fullPage: true,
   });
   await page.getByRole("tab", { name: "Sources", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Owner-source sessions", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Import source session", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByLabel("Scoped session JSON", { exact: true })).toBeDisabled();
   await expect(page.getByRole("heading", { name: "Source health" })).toBeVisible();
   const existing = page.locator(".source-health-list article").filter({ hasText: "synthetic-e2e" });
   if (!(await existing.count())) {

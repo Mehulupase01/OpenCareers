@@ -643,3 +643,23 @@ Fresh synthetic preview: http://127.0.0.1:14324 (API 14323), hidden development
 manager PID 9980; logs `.cache/p11-preview.stdout.log` and `.cache/p11-preview.stderr.log`.
 It skips `.env`, uses a fresh demo run ID and cannot submit externally. Private
 4317/4318 services were not restarted. API/worker changes require a fresh preview.
+
+## 2026-10-10: P18 Owner-Source Session Foundation
+
+P11 closure commit `a4437a352fe4dbbf4cd25e1051bcebc5a9d5721c` also passed all
+three CI lanes in run 38086015851. P18 is now in progress, not closed. Migration
+15 and the scoped encrypted source-session repository, authenticated metadata/
+import/revoke routes and Discovery controls are implemented. No network adapter
+is activated by storing a session. Cookie-only exact-host state is deliberately
+bounded and rejects challenge material; generic localStorage/capture and reviewed
+ingestion are still pending. See `docs/evidence/P18-source-session-foundation.md`.
+
+Focused checks: 28 passed, 12 PostgreSQL skipped before the added restore test;
+both desktop/mobile Discovery cases passed and the mobile Sources screenshot was
+inspected. Frozen full check: 388 passed, 149 PostgreSQL skipped, 47 files; lint,
+typecheck, ledger and build passed. Public scan: 285 files. Cross-platform CI is
+pending for this increment. The fresh demo manager is now PID 21064 on the same
+14323/14324 ports, after checking the old preview's process tree and listeners.
+Only that owned synthetic preview was replaced; private 4317/4318 were untouched.
+The LinkedIn/Indeed permission review is documented, not replaced by an assumption
+that a logged-in account grants automated access. No real accounts were touched.

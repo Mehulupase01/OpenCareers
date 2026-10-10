@@ -45,6 +45,90 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("protects owner-source sessions, never returns their material, and allows local revocation", async () => {
+    const demo = await setup();
+    expect(
+      (await demo.app.inject({ url: "/v1/discovery/source-sessions", headers: demo.headers }))
+        .statusCode,
+    ).toBe(401);
+    const login = await demo.app.inject({
+      method: "POST",
+      url: "/v1/session",
+      headers: demo.headers,
+      payload: {},
+    });
+    const demoHeaders = { ...demo.headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    expect(
+      (
+        await demo.app.inject({ url: "/v1/discovery/source-sessions", headers: demoHeaders })
+      ).json(),
+    ).toEqual([]);
+    expect(
+      (
+        await demo.app.inject({
+          method: "POST",
+          url: "/v1/discovery/source-sessions",
+          headers: demoHeaders,
+          payload: {},
+        })
+      ).json().code,
+    ).toBe("CONFIG_INVALID");
+    const local = await setup("local", { vaultKey: Buffer.alloc(32, 31).toString("base64") });
+    const headers = { ...local.headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const payload = {
+      sourceId: "synthetic-board",
+      adapterId: "synthetic-read-v1",
+      expectedRevision: 0,
+      ownedAccount: true,
+      permissionEvidenceSha256: "a".repeat(64),
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      session: {
+        origin: "https://jobs.synthetic.example",
+        cookies: [
+          {
+            name: "session",
+            value: "synthetic-private-cookie",
+            domain: "jobs.synthetic.example",
+            path: "/",
+            expires: -1,
+            httpOnly: true,
+            secure: true,
+            sameSite: "Lax",
+          },
+        ],
+      },
+    };
+    const response = await local.app.inject({
+      method: "POST",
+      url: "/v1/discovery/source-sessions",
+      headers,
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()[0]).toMatchObject({
+      sourceId: "synthetic-board",
+      state: "stored",
+      revision: 1,
+    });
+    expect(response.body).not.toContain("synthetic-private-cookie");
+    expect(response.body).not.toContain('"cookies"');
+    await local.repository.setControl({ stopped: true });
+    expect(
+      (
+        await local.app.inject({
+          method: "DELETE",
+          url: "/v1/discovery/source-sessions/synthetic-board",
+          headers,
+          payload: { expectedRevision: 1 },
+        })
+      ).json()[0]?.state,
+    ).toBe("revoked");
+    expect(
+      await local.db.query("SELECT id FROM vault_secrets WHERE owner_id=$1", [
+        local.repository.ownerId,
+      ]),
+    ).toHaveLength(0);
+  });
   it("imports a bounded desktop OAuth fixture without exposing its secret or path", async () => {
     const dir = await mkdtemp(join(tmpdir(), "opencareers-oauth-fixture-"));
     cleanup.push(() => rm(dir, { recursive: true, force: true }));

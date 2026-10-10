@@ -126,6 +126,9 @@ export const migrations = [
     "CREATE TABLE email_verification_rules (owner_id TEXT NOT NULL REFERENCES owners(id), employer_origin TEXT NOT NULL, pathname TEXT NOT NULL, data TEXT NOT NULL, approved_at TEXT NOT NULL, PRIMARY KEY(owner_id,employer_origin,pathname))",
     "CREATE TABLE email_verification_evidence (owner_id TEXT NOT NULL, link_id TEXT NOT NULL, response_sha256 TEXT NOT NULL, rule_sha256 TEXT NOT NULL, observed_at TEXT NOT NULL, PRIMARY KEY(owner_id,link_id), FOREIGN KEY(owner_id,link_id) REFERENCES email_verification_links(owner_id,id))",
   ],
+  [
+    "CREATE TABLE owner_source_sessions (owner_id TEXT NOT NULL REFERENCES owners(id), source_id TEXT NOT NULL, adapter_id TEXT NOT NULL, origin TEXT NOT NULL, revision INTEGER NOT NULL, state TEXT NOT NULL, secret_id TEXT, permission_sha256 TEXT NOT NULL, expires_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

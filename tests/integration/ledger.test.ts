@@ -191,7 +191,17 @@ describe("phase ledger", () => {
     expect(p18?.dependsOn).toContain("P10");
     expect(p18?.gates).toHaveLength(7);
     expect(p18?.externalVerification.status).toBe("not_required");
-    expect(p18?.gates.every((gate) => gate.status === "not_started")).toBe(true);
+    for (const gate of p18?.gates ?? []) {
+      expect(gate.evidence.some((path) => path.includes("P09"))).toBe(false);
+      if (gate.status !== "not_started") {
+        expect(
+          gate.evidence.some(
+            (path) => path.startsWith("tests/") || path.startsWith("docs/evidence/P18"),
+          ),
+        ).toBe(true);
+        for (const path of gate.evidence) expect(existsSync(resolve(root, path))).toBe(true);
+      }
+    }
     const p09 = byId.get("P09");
     expect(p09?.status).toBe("complete");
     expect(p09?.evidence).toContain("docs/plans/P09-portal-breadth-amendment.md");

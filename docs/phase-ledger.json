@@ -1974,7 +1974,7 @@
     {
       "id": "P18",
       "title": "Owner-account sources, universal hosted forms, and portal breadth",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P09", "P10"],
       "externalPrerequisites": [
         "Owner confirmation of which third-party accounts the automation may hold a logged-in session for, and that the account is the owner\u0027s own."
@@ -1992,8 +1992,12 @@
         {
           "id": "P18-G1",
           "requirement": "An owner-account browser session is stored encrypted, and its material never reaches model prompts, logs, audit payloads, or API responses.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P18-source-session-foundation.md",
+            "tests/integration/source-sessions.test.ts",
+            "tests/integration/api.test.ts"
+          ]
         },
         {
           "id": "P18-G2",
@@ -2036,9 +2040,12 @@
         {
           "id": "P18-01",
           "text": "Owner-account session store. Store encrypted browser storage state for owner-authorized account sessions in the vault, never exposing or logging session material.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T03", "T31", "T32"],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P18-source-session-foundation.md",
+            "tests/integration/source-sessions.test.ts"
+          ],
           "nextAction": "P18-01"
         },
         {

@@ -28,6 +28,7 @@ import {
   sourceInputSchema,
 } from "../../../packages/contracts/src/discovery.js";
 import { request } from "./api.js";
+import { SourceSessions } from "./source-sessions.js";
 
 type Act = (operation: () => Promise<unknown>) => Promise<boolean>;
 const words = (text: string) => text.replaceAll("_", " ");
@@ -943,6 +944,7 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
           )}
         </>
       )}
+      {tab === "sources" && <SourceSessions demo={demo} />}
       {adding && <SourceEditor demo={demo} act={act} busy={busy} close={() => setAdding(false)} />}
       {selected && <VacancyDetail listing={selected} close={() => setSelected(null)} />}
     </div>
