@@ -1712,3 +1712,34 @@ hybrid engineering. Docker CLI registry inspection works but the local engine
 is unavailable; do not claim local image/Compose execution. Private ports,
 data/secrets and live model/mail/employer operations were untouched. Qualifying
 actual-duration soaks, hardware drills and genuine receipt gates remain open.
+
+## 2026-10-12: Screened Server Image And Private Topology
+
+Recovery commit 4bf7a88925229fd440489bd37a3e8fd5a17f4213 is pushed; CI
+38182786548 has green Ubuntu/PostgreSQL, Windows pending at this milestone.
+The successor introduces a screened public compiled build-context producer,
+digest-pinned Node 24.21.0 Linux amd64 multi-stage image, locked production
+dependencies, matching Chromium and non-root runtime. API and scheduler use
+separate services because the existing local launcher correctly refuses server
+installation. Both share one PostgreSQL authority/artifact volume. Secrets
+arrive from separately scoped external env files; Compose explicitly selects
+its env file rather than loading repository .env. No DB/browser ports publish;
+API is host-loopback only, requiring a separately managed HTTPS proxy. Bounds,
+init, restart, private network and read-only/dropped-capability settings exist.
+
+See deploy/server/README.md and docs/evidence/P14-server-image-foundation.md.
+Focused context/topology tests 4/4; full check 732 / 259 skips in 97 files;
+types/lint/ledger/build pass; public scan 454. Actual context preparation: 161
+files, manifest e04d8d26b876abcc45e45e116e284eedf6087e42118fe359499d9e67ed71846e.
+Docker public registry inspection works; local Linux daemon unavailable and
+not started. New opt-in CI lane must prove image build, network-isolated mock
+receipts and PostgreSQL service boot/auth/readiness/port isolation. Do not
+claim it passed until observed. Its mock receipts still use synthetic SQLite,
+not a full PostgreSQL-backed application or hybrid workflow. External final
+submissions remain forced off. OS package reproducibility/security, actual TLS,
+host sandbox compatibility, migration/restore and hybrid remain open.
+
+P14-01 is now in progress. No gate/phase closes: 12/19 and 94/128. Continue into
+fresh Chromium-cache clean-install verification and remaining production
+engineering while image CI runs. Private runtime/secrets were untouched; no
+live inference, Gmail access, employer submission or qualifying soak occurred.

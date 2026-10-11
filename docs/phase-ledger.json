@@ -1670,9 +1670,13 @@
         {
           "id": "P14-01",
           "text": "Server images and Compose. Build reproducible images with pinned browser and runtime compatibility, PostgreSQL, persistent artifacts, an authenticated API, TLS configuration, health checks, and restart policies.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T27"],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P14-server-image-foundation.md",
+            "tests/integration/server-context.test.ts",
+            "tests/integration/server-image.test.ts"
+          ],
           "nextAction": "P14-01"
         },
         {

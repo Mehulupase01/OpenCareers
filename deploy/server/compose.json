@@ -1,0 +1,109 @@
+{
+  "name": "opencareers-server",
+  "services": {
+    "database": {
+      "image": "postgres@sha256:7ad98329d513dd497293b951c195ca354274a77f12ddbbbbf85e68a811823d72",
+      "env_file": [
+        {
+          "path": "${OPENCAREERS_POSTGRES_ENV:?Provide an absolute private PostgreSQL env file}",
+          "required": true
+        }
+      ],
+      "volumes": ["database:/var/lib/postgresql/data"],
+      "networks": ["data"],
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 10
+      },
+      "mem_limit": "1g",
+      "cpus": 1,
+      "pids_limit": 128,
+      "logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "3" } }
+    },
+    "api": {
+      "image": "${OPENCAREERS_SERVER_IMAGE:?Provide a locally verified image tag or registry digest}",
+      "env_file": [
+        {
+          "path": "${OPENCAREERS_SERVER_ENV:?Provide an absolute private server env file}",
+          "required": true
+        }
+      ],
+      "environment": {
+        "AUTOPILOT_SKIP_ENV_FILE": "1",
+        "AUTOPILOT_PROFILE": "server",
+        "AUTOPILOT_HOST": "0.0.0.0",
+        "AUTOPILOT_PORT": "4317",
+        "AUTOPILOT_DATA_DIR": "/var/lib/opencareers",
+        "AUTOPILOT_EXTERNAL_SUBMISSION": "false"
+      },
+      "depends_on": { "database": { "condition": "service_healthy" } },
+      "ports": ["127.0.0.1:4317:4317"],
+      "volumes": ["runtime:/var/lib/opencareers"],
+      "networks": ["data", "egress"],
+      "init": true,
+      "user": "1000:1000",
+      "read_only": true,
+      "tmpfs": ["/tmp:size=268435456,mode=1777"],
+      "shm_size": "256m",
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "restart": "unless-stopped",
+      "stop_grace_period": "45s",
+      "mem_limit": "3g",
+      "cpus": 2,
+      "pids_limit": 256,
+      "logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "3" } }
+    },
+    "worker": {
+      "image": "${OPENCAREERS_SERVER_IMAGE:?Provide a locally verified image tag or registry digest}",
+      "command": ["node", "dist/apps/worker/src/main.js"],
+      "env_file": [
+        {
+          "path": "${OPENCAREERS_SERVER_ENV:?Provide an absolute private server env file}",
+          "required": true
+        }
+      ],
+      "environment": {
+        "AUTOPILOT_SKIP_ENV_FILE": "1",
+        "AUTOPILOT_PROFILE": "server",
+        "AUTOPILOT_HOST": "0.0.0.0",
+        "AUTOPILOT_PORT": "4317",
+        "AUTOPILOT_DATA_DIR": "/var/lib/opencareers",
+        "AUTOPILOT_EXTERNAL_SUBMISSION": "false"
+      },
+      "depends_on": { "database": { "condition": "service_healthy" } },
+      "volumes": ["runtime:/var/lib/opencareers"],
+      "networks": ["data", "egress"],
+      "init": true,
+      "user": "1000:1000",
+      "read_only": true,
+      "tmpfs": ["/tmp:size=268435456,mode=1777"],
+      "shm_size": "256m",
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "restart": "unless-stopped",
+      "stop_grace_period": "45s",
+      "mem_limit": "3g",
+      "cpus": 2,
+      "pids_limit": 256,
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://api:4317/health/runtime',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "60s",
+        "retries": 3
+      },
+      "logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "3" } }
+    }
+  },
+  "networks": { "data": { "internal": true }, "egress": {} },
+  "volumes": { "database": {}, "runtime": {} }
+}
