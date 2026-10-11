@@ -150,6 +150,9 @@ export const migrations = [
     "CREATE TABLE application_outcomes (owner_id TEXT NOT NULL, application_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), event_id TEXT NOT NULL, PRIMARY KEY(owner_id,application_id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,application_id,event_id) REFERENCES outcome_events(owner_id,application_id,id))",
     "CREATE INDEX outcomes_attribution ON outcome_events(owner_id,application_id,revision)",
   ],
+  [
+    "CREATE TABLE calibration_datasets (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, binding TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

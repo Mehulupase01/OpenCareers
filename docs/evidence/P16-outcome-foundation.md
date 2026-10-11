@@ -80,9 +80,17 @@ flags to exercise report eligibility. No resulting fixture rate is published as
 an employer measurement. No private DB, Gmail consent, model call, real application
 or live outcome was inspected or changed. Successor CI is pending at publication.
 
+Subsequent CI 38167046432 at 0d89407d0af245b0d66d7502980b686a15e75696
+passes Windows, Ubuntu and PostgreSQL, including full browser regressions and
+extracted production-only Windows installation. P16-G1 (application provenance)
+and P16-G2 (no silence-based rejection) now close, and P16-01 is complete.
+P16 and its P15 dependency remain open: 12/19 phases and 91/128 gates.
+The successor score-calibration batch has separate evidence.
+
 ## Remaining Acceptance
 
-P16 remains in progress, with no gate closure in this batch. Still required:
+P16 remains in progress. The initial local batch closed no gates; subsequent
+remote evidence supports the two closures above. Still required:
 immutable/group-compatible cohort reporting and comparison refusal, score-band
 calibration against fixed reviewed labels, sanitized correction-to-regression
 import, controlled pre-dispatch experiment assignment/stop semantics and a final

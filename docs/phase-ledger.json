@@ -1884,13 +1884,13 @@
         {
           "id": "P16-01",
           "text": "Outcome ledger. Track receipt, screening, interview, rejection, offer, owner withdrawal, and unknown outcome with source and date, keeping recruiter messages and manual corrections auditable.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-outcome-foundation.md",
             "tests/integration/outcomes.test.ts"
           ],
-          "nextAction": "P16-01"
+          "nextAction": null
         },
         {
           "id": "P16-02",
@@ -1903,9 +1903,13 @@
         {
           "id": "P16-03",
           "text": "Score calibration. Evaluate whether high fit scores correspond to better reviewed relevance and eventually better outcomes, publishing no interview probabilities before enough reliable labeled outcomes exist.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P16-score-calibration.md",
+            "tests/unit/score-calibration.test.ts",
+            "tests/integration/calibration.test.ts"
+          ],
           "nextAction": "P16-03"
         },
         {
@@ -1929,7 +1933,7 @@
         {
           "id": "P16-G1",
           "requirement": "Every outcome is linked to an existing application with provenance.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P16-outcome-foundation.md",
             "tests/integration/outcomes.test.ts"
@@ -1938,7 +1942,7 @@
         {
           "id": "P16-G2",
           "requirement": "Recent and unresolved applications are not mislabeled as rejections.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P16-outcome-foundation.md",
             "tests/unit/outcome-classification.test.ts",
@@ -1981,13 +1985,21 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "0d89407d0af245b0d66d7502980b686a15e75696",
+      "remoteVerification": [
+        {
+          "runId": "38167046432",
+          "commit": "0d89407d0af245b0d66d7502980b686a15e75696",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Attributed owner-scoped outcome events, conservative Gmail integration, reversible corrections, cohort exclusions, browser regressions and Windows production-only installation. Closes G1/G2 and outcome-ledger ticket only, not successor calibration or remaining P16 requirements."
+        }
+      ],
       "acceptanceTests": [],
-      "nextAction": "P16-01",
+      "nextAction": "P16-02",
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
-        "docs/evidence/P16-outcome-foundation.md"
+        "docs/evidence/P16-outcome-foundation.md",
+        "docs/evidence/P16-score-calibration.md"
       ]
     },
     {

@@ -57,6 +57,48 @@ describe("API trust boundary", () => {
         .statusCode,
     ).toBe(401);
     const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const fixedDataset = {
+      id: randomUUID(),
+      from: "2026-01-01T00:00:00.000Z",
+      through: "2026-01-02T00:00:00.000Z",
+      labels: [
+        {
+          assessmentId: "missing",
+          relevant: true,
+          reviewedAt: "2026-01-02T00:00:00.000Z",
+          evidenceRef: "synthetic-evidence",
+          evidenceSha256: "a".repeat(64),
+        },
+      ],
+    };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes/calibration/datasets",
+          headers,
+          payload: fixedDataset,
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes/calibration/datasets",
+          headers: authenticated,
+          payload: fixedDataset,
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          url: `/v1/outcomes/calibration/datasets/${fixedDataset.id}`,
+          headers: authenticated,
+        })
+      ).statusCode,
+    ).toBe(404);
     expect((await app.inject({ url, headers: authenticated })).json()).toEqual([]);
     const payload = {
       applicationId: application.id,

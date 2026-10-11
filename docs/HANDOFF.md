@@ -1393,3 +1393,33 @@ and controlled pre-dispatch experiment assignment. P15 dependency remains open.
 No phase/gate closes: 12/19 and 89/128. No private services, Gmail/model call,
 real submission or long soak touched. The policy-blocked preview remains stopped.
 Scheduling was unavailable; no overnight continuation automation was created.
+
+## 2026-10-11: Fixed Reviewed-Relevance Diagnostics
+
+Outcome commit 0d89407d0af245b0d66d7502980b686a15e75696 passes CI
+38167046432 on Windows, Ubuntu and PostgreSQL, with full browser regressions
+and extracted production-only Windows installation. P16-01, G1 and G2 close on
+that code/remote evidence. Counts: 12/19 phases and 91/128 gates. P16 remains
+open, as does its P15 dependency; this is not full production acceptance.
+
+The successor batch adds immutable owner-reviewed calibration datasets and
+authenticated record/report routes. Scores and synthetic status come from
+digest-checked same-owner assessments, not caller assertions. Duplicate canonical
+jobs, repeated labels, mixed routes, invalid timelines and changed-identity retries
+fail. Minimized datasets remain fixed after source edits and verify integrity on
+reads/retries. Policy and submission authority remain unchanged.
+
+Ranking diagnostics exclude synthetic samples, require 20 members and label/score
+variation, and report tied-rank Spearman correlation, tie-aware reviewed-relevance
+AUC and fixed-band counts. They are subjective reviewed-relevance diagnostics,
+not employer selection probabilities or empirical quality claims. See
+docs/evidence/P16-score-calibration.md for methodology, API and remaining scope.
+
+Frozen-code pnpm check: 672 passed / 232 skipped in 88 files; lint/types/ledger/
+build pass. Rebuilt production-only Windows installation passes 1/1 in 23.13s.
+Successor CI pending; PostgreSQL calibration cases were not locally verified.
+P16-03 is in progress. Next: grouped fixed outcome cohorts/comparison refusal,
+calibration workspace/import and code-version compatibility, sanitized regression
+import and controlled pre-dispatch experiments. No private service, live evidence
+or soak touched. Preview remains policy-blocked/stopped; no scheduled coding
+continuation exists. Do not retry the denied launch through another mechanism.

@@ -2,11 +2,17 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { idSchema } from "../../../packages/contracts/src/index.js";
 import { outcomeInputSchema } from "../../../packages/contracts/src/outcome.js";
+import { CalibrationRepository } from "../../../packages/persistence/src/calibration-repository.js";
 import { OutcomeRepository } from "../../../packages/persistence/src/outcome-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 
 export async function outcomeRoutes(app: FastifyInstance, repository: Repository) {
   const outcomes = new OutcomeRepository(repository.db, repository.ownerId);
+  const calibration = new CalibrationRepository(repository.db, repository.ownerId);
+  app.post("/v1/outcomes/calibration/datasets", (request) => calibration.record(request.body));
+  app.get("/v1/outcomes/calibration/datasets/:id", (request) =>
+    calibration.report(z.object({ id: z.uuid() }).parse(request.params).id),
+  );
   app.get("/v1/outcomes/:applicationId", (request) =>
     outcomes.history(z.object({ applicationId: idSchema }).parse(request.params).applicationId),
   );

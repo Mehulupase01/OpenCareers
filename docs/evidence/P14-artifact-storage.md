@@ -75,4 +75,5 @@ regressions. No real bucket, private profile or model call was used.
 P14-02 is in progress; no P14 gate closes. Container topology, TLS deployment,
 live service/permission verification, remote handoff, hybrid command transport,
 migration, backup/restore and complete server workflow remain unverified or
-unimplemented. Counts remain 12/19 phases and 89/128 gates.
+unimplemented. At the storage milestone counts were 12/19 phases and 89/128
+gates; use the phase ledger for current totals.
