@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { MailContext } from "../../packages/contracts/src/email.js";
 import { GMAIL_READ_SCOPE } from "../../packages/contracts/src/email.js";
 import { GmailProvider } from "../../packages/email/src/gmail.js";
 import { newMailScan } from "../../packages/email/src/scan.js";
@@ -14,7 +15,9 @@ import {
 } from "../../packages/persistence/src/database.js";
 import { EmailRepository } from "../../packages/persistence/src/email-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
+import { OutcomeRepository } from "../../packages/persistence/src/outcome-repository.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
+import { documentJob } from "../fixtures/document-packets.js";
 
 for (const engine of ["sqlite", "postgres"] as const) {
   describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
@@ -58,6 +61,60 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const lease = await repository.lease("connecting");
         await repository.connected(lease, tokens);
       };
+      it("atomically records a correlated interview once without relabeling the application", async () => {
+        await connect();
+        const applications = new Repository(db, owner, () => now);
+        await applications.putJob(documentJob);
+        const application = await applications.createApplication(
+          documentJob.id,
+          "synthetic-candidate",
+        );
+        class FixtureMailbox extends EmailRepository {
+          override async contexts(): Promise<MailContext[]> {
+            return [
+              {
+                id: application.id,
+                kind: "application",
+                attemptId: "synthetic-attempt",
+                packetId: "synthetic-packet",
+                jobId: documentJob.id,
+                recipient: tokens.mailbox,
+                employerOrigin: "https://careers.synthetic.example",
+                senderDomains: ["careers.synthetic.example"],
+                role: documentJob.title,
+                references: ["synthetic-requisition"],
+                after: now.toISOString(),
+                before: now.toISOString(),
+              },
+            ];
+          }
+        }
+        const mailbox = new FixtureMailbox(db, owner, key, () => now);
+        const lease = await mailbox.lease("connected");
+        const message = {
+          id: "synthetic-interview-message",
+          receivedAt: now.toISOString(),
+          sender: "recruiter@careers.synthetic.example",
+          recipients: [tokens.mailbox],
+          authenticatedDomain: "careers.synthetic.example",
+          subject: "Interview invitation",
+          text: "Interview invitation for synthetic-requisition",
+        };
+        const id = await mailbox.ingest(lease, message);
+        expect(await mailbox.ingest(lease, message)).toBe(id);
+        expect(
+          await new OutcomeRepository(db, owner, () => now).history(application.id),
+        ).toMatchObject([{ kind: "INTERVIEW", source: "email", evidenceRef: id, revision: 1 }]);
+        expect(
+          (
+            await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              application.id,
+            ])
+          )[0]?.state,
+        ).toBe("DISCOVERED");
+        await mailbox.finishSync(lease);
+      });
       it("pauses invalid scans without discarding OAuth and supports explicit owner reset", async () => {
         await connect();
         const lease = await repository.lease("connected");

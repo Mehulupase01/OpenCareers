@@ -19,6 +19,7 @@ import { emailRoutes } from "./email.js";
 import { exceptionRoutes } from "./exception.js";
 import { handoffRoutes } from "./handoff.js";
 import { matchingRoutes } from "./matching.js";
+import { outcomeRoutes } from "./outcomes.js";
 import { restoreRoutes } from "./restore.js";
 
 export async function buildServer(
@@ -242,6 +243,7 @@ export async function buildServer(
   await emailRoutes(app, config, repository, dependencies.gmailProvider);
   await exceptionRoutes(app, repository);
   await restoreRoutes(app, repository);
+  await outcomeRoutes(app, repository);
 
   const webRoot = resolve(process.cwd(), "dist/web");
   if (existsSync(webRoot)) {

@@ -964,8 +964,48 @@ td:last-child {
 .candidate-section h2 {
   margin: 0 0 10px;
 }
-.email-workspace h3 {
+.email-workspace h3,
+.outcomes-workspace h3 {
   margin-top: 24px;
+}
+.outcome-application {
+  display: grid;
+  gap: 8px;
+  max-width: 600px;
+}
+.outcome-application select {
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #ccd9d2;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.outcomes-workspace select,
+.outcomes-workspace input {
+  min-width: 0;
+  max-width: 100%;
+}
+.outcome-evidence {
+  overflow-wrap: anywhere;
+  max-width: 220px;
+}
+.outcome-report {
+  border-top: 1px solid #e0e6e2;
+  margin-top: 24px;
+  padding-top: 8px;
+  overflow-wrap: anywhere;
+}
+.outcome-exclusions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.outcome-exclusions dd {
+  margin: 4px 0;
+  font-weight: 600;
 }
 .email-heading {
   display: flex;

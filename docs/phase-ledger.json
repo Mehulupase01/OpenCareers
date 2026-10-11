@@ -1757,8 +1757,15 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "69862593bb9a80bff93f9509c9e41da07d4755c7",
+      "remoteVerification": [
+        {
+          "runId": "38159025819",
+          "commit": "69862593bb9a80bff93f9509c9e41da07d4755c7",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Encrypted local/S3 shared contracts using actual SDK loopback fixtures, configuration and readiness guards, full browser regressions and production-only Windows bundle. Not real S3/IAM, complete server/hybrid deployment or P14 gate closure."
+        }
+      ],
       "acceptanceTests": ["T27"],
       "nextAction": "P14-01",
       "evidence": ["docs/plans/P14-server-hybrid.md", "docs/evidence/P14-artifact-storage.md"]
@@ -1871,23 +1878,26 @@
     {
       "id": "P16",
       "title": "Outcomes, calibration, and continuous improvement",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P15"],
       "tickets": [
         {
           "id": "P16-01",
           "text": "Outcome ledger. Track receipt, screening, interview, rejection, offer, owner withdrawal, and unknown outcome with source and date, keeping recruiter messages and manual corrections auditable.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P16-outcome-foundation.md",
+            "tests/integration/outcomes.test.ts"
+          ],
           "nextAction": "P16-01"
         },
         {
           "id": "P16-02",
           "text": "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants using fixed application cohorts and suitable observation windows.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
+          "evidence": ["docs/evidence/P16-outcome-foundation.md"],
           "nextAction": "P16-02"
         },
         {
@@ -1919,14 +1929,21 @@
         {
           "id": "P16-G1",
           "requirement": "Every outcome is linked to an existing application with provenance.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P16-outcome-foundation.md",
+            "tests/integration/outcomes.test.ts"
+          ]
         },
         {
           "id": "P16-G2",
           "requirement": "Recent and unresolved applications are not mislabeled as rejections.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P16-outcome-foundation.md",
+            "tests/unit/outcome-classification.test.ts",
+            "tests/e2e/outcomes.spec.ts"
+          ]
         },
         {
           "id": "P16-G3",
@@ -1968,7 +1985,10 @@
       "remoteVerification": [],
       "acceptanceTests": [],
       "nextAction": "P16-01",
-      "evidence": ["docs/plans/P16-outcomes-calibration.md"]
+      "evidence": [
+        "docs/plans/P16-outcomes-calibration.md",
+        "docs/evidence/P16-outcome-foundation.md"
+      ]
     },
     {
       "id": "P17",

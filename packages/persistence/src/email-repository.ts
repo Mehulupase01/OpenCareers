@@ -34,6 +34,7 @@ import {
 import { type VaultBinding, VaultCipher, vaultEnvelopeSchema } from "../../security/src/vault.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { ExceptionRepository } from "./exception-repository.js";
+import { OutcomeRepository } from "./outcome-repository.js";
 import { Repository } from "./repository.js";
 
 type ConnectionData = {
@@ -436,6 +437,7 @@ export class EmailRepository extends Repository {
 
   async contexts(tx: SqlExecutor = this.db): Promise<MailContext[]> {
     const cutoff = new Date(this.clock().getTime() - 14 * 86400000).toISOString();
+    const applicationCutoff = new Date(this.clock().getTime() - 180 * 86400000).toISOString();
     const rules = await tx.query(
       "SELECT employer_origin,sender_domain FROM email_sender_rules WHERE owner_id=$1",
       [this.ownerId],
@@ -453,7 +455,7 @@ export class EmailRepository extends Repository {
     };
     const rows = await tx.query(
       "SELECT a.id,a.job_id,t.id AS attempt_id,t.started_at,i.packet_id,i.snapshot,i.sha256,c.content,j.data AS job_data FROM applications a JOIN attempts t ON t.owner_id=a.owner_id AND t.application_id=a.id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id JOIN packet_contents c ON c.owner_id=i.owner_id AND c.packet_id=i.packet_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id WHERE a.owner_id=$1 AND a.state IN ('UNKNOWN','NEEDS_REVIEW','CONFIRMED') AND t.state IN ('UNKNOWN','CONFIRMED') AND t.started_at>=$2 AND NOT EXISTS (SELECT 1 FROM attempts n WHERE n.owner_id=t.owner_id AND n.application_id=t.application_id AND (n.started_at>t.started_at OR (n.started_at=t.started_at AND n.id>t.id))) ORDER BY t.started_at DESC,t.id DESC LIMIT 1001",
-      [this.ownerId, cutoff],
+      [this.ownerId, applicationCutoff],
     );
     const output: MailContext[] = [];
     for (const row of rows) {
@@ -687,6 +689,10 @@ export class EmailRepository extends Repository {
           existing.sha256 === mailHash(JSON.stringify(message))
         )
           await this.captureVerification(tx, String(existing.id), match.context, message);
+        await new OutcomeRepository(this.db, this.ownerId, this.clock).recordMailInTransaction(
+          tx,
+          String(existing.id),
+        );
         return String(existing.id);
       }
       const id = randomUUID(),
@@ -731,6 +737,10 @@ export class EmailRepository extends Repository {
           [this.ownerId, id, context.id, match.kind, this.now()],
         );
       if (evidence) await this.queueReceipt(tx, evidence);
+      await new OutcomeRepository(this.db, this.ownerId, this.clock).recordMailInTransaction(
+        tx,
+        id,
+      );
       if (context?.kind === "account" && match.kind === "verification")
         await this.captureVerification(tx, id, context, message);
       await this.audit(tx, id, "email.observed", 1, {

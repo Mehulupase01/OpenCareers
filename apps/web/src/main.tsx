@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BrainCircuit,
   BriefcaseBusiness,
+  ChartNoAxesColumn,
   CheckCircle2,
   Circle,
   CircleAlert,
@@ -34,6 +35,7 @@ import { DocumentsWorkspace } from "./documents.js";
 import { EmailWorkspace } from "./email.js";
 import { ExceptionsPanel } from "./exceptions.js";
 import { MatchingWorkspace } from "./matching.js";
+import { OutcomesWorkspace } from "./outcomes.js";
 import "./styles.css";
 
 type View =
@@ -45,7 +47,8 @@ type View =
   | "discovery"
   | "matching"
   | "documents"
-  | "email";
+  | "email"
+  | "outcomes";
 
 const driftLabels = {
   ADAPTER_IDENTITY_CHANGED: "Adapter target or version changed",
@@ -155,6 +158,7 @@ function App() {
     matching: "Matching",
     documents: "Documents",
     email: "Mailbox",
+    outcomes: "Outcomes",
   };
   const navigation = [
     { id: "applications" as const, label: "Applications", icon: BriefcaseBusiness },
@@ -163,6 +167,7 @@ function App() {
     { id: "matching" as const, label: "Matching", icon: BrainCircuit },
     { id: "documents" as const, label: "Documents", icon: Files },
     { id: "email" as const, label: "Mailbox", icon: Mail },
+    { id: "outcomes" as const, label: "Outcomes", icon: ChartNoAxesColumn },
     { id: "queue" as const, label: "Work queue", icon: Workflow },
     { id: "workers" as const, label: "Workers", icon: Activity },
     { id: "settings" as const, label: "Controls", icon: Settings2 },
@@ -477,6 +482,7 @@ function App() {
               {view === "discovery" && <DiscoveryWorkspace demo={summary.profile === "demo"} />}
               {view === "matching" && <MatchingWorkspace jobs={summary.jobs} />}
               {view === "email" && <EmailWorkspace demo={summary.profile === "demo"} />}
+              {view === "outcomes" && <OutcomesWorkspace summary={summary} />}
               {view === "documents" && (
                 <DocumentsWorkspace jobs={summary.jobs} demo={summary.profile === "demo"} />
               )}

@@ -1357,3 +1357,39 @@ production audit finds no known vulnerabilities. Successor CI is pending.
 P14 and P14-02 are in progress, not complete. No gate closes: 12/19 phases and
 89/128 gates. No real S3 service, owner credentials, private services, live
 application or soak was touched. Preview remains stopped; do not bypass denial.
+
+## 2026-10-11: Outcome Ledger And Owner Workflow
+
+S3 commit 69862593bb9a80bff93f9509c9e41da07d4755c7 is green in CI
+38159025819 on Windows, Ubuntu and PostgreSQL. P14 remote evidence now records
+that bounded storage/bundle verification, not complete server/hybrid acceptance.
+
+P16 independent engineering adds an additive owner-scoped outcome ledger,
+revision/request guards, attributed append-only corrections and reversal. Gmail
+ingestion derives evidence-backed events in its existing transaction; account,
+ambiguous or unrelated messages cannot become application outcomes. Owner
+corrections and newer/advanced evidence take precedence. Submission state and
+policy remain unchanged. Application context lookback is 180 days, signup 14,
+with the existing bounded/resumable mailbox acquisition intact.
+
+Authenticated API and Outcomes workspace cover history, manual evidence and
+reversal, plus mature receipt-verified outcome fractions. Reports exclude
+synthetic, unresolved, unverified and recent records, refuse rates below 20,
+state UTC window/denominator/exclusions and preserve UNKNOWN for silence. They
+are advisory current-outcome fractions, not conversion or hiring probability.
+Membership is not yet an immutable grouped cohort. See
+docs/evidence/P16-outcome-foundation.md for detailed methodology and limits.
+
+Frozen-code pnpm check: 665 passed / 228 skipped in 86 files; lint/types/ledger/
+build pass. Final desktop/mobile owner workflow passes 2/2; inspected screenshots
+and overflow checks pass. Production-only Windows installation passes 1/1 in
+23.09s. Successor CI pending; local PostgreSQL cases were skipped, not verified.
+Initial browser iterations caught selector naming and client-clock skew; both
+are corrected, with final evidence from the passing frozen source.
+
+P16, P16-01/P16-02 and G1/G2 are in progress, not complete. Next: immutable
+group-compatible cohorts, score-band calibration, sanitized regression import
+and controlled pre-dispatch experiment assignment. P15 dependency remains open.
+No phase/gate closes: 12/19 and 89/128. No private services, Gmail/model call,
+real submission or long soak touched. The policy-blocked preview remains stopped.
+Scheduling was unavailable; no overnight continuation automation was created.

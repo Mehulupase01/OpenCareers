@@ -144,6 +144,12 @@ export const migrations = [
     "CREATE TABLE discovery_scans (owner_id TEXT NOT NULL, source_id TEXT NOT NULL, revision INTEGER NOT NULL, cache_version INTEGER NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id), FOREIGN KEY(owner_id,source_id) REFERENCES sources(owner_id,id))",
     "CREATE TABLE discovery_scan_reads (owner_id TEXT NOT NULL, source_id TEXT NOT NULL, ordinal INTEGER NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, verified_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id,ordinal), FOREIGN KEY(owner_id,source_id) REFERENCES discovery_scans(owner_id,source_id))",
   ],
+  [
+    "CREATE TABLE outcome_events (owner_id TEXT NOT NULL, id TEXT NOT NULL, application_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), kind TEXT NOT NULL, source TEXT NOT NULL, actor TEXT NOT NULL, evidence_ref TEXT NOT NULL, evidence_sha256 TEXT NOT NULL, occurred_at TEXT NOT NULL, recorded_at TEXT NOT NULL, previous_event_id TEXT, request_id TEXT NOT NULL, binding TEXT NOT NULL, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,application_id,revision), UNIQUE(owner_id,request_id), UNIQUE(owner_id,application_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,application_id,previous_event_id) REFERENCES outcome_events(owner_id,application_id,id))",
+    "CREATE UNIQUE INDEX unique_outcome_mail ON outcome_events(owner_id,evidence_ref) WHERE source='email'",
+    "CREATE TABLE application_outcomes (owner_id TEXT NOT NULL, application_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), event_id TEXT NOT NULL, PRIMARY KEY(owner_id,application_id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,application_id,event_id) REFERENCES outcome_events(owner_id,application_id,id))",
+    "CREATE INDEX outcomes_attribution ON outcome_events(owner_id,application_id,revision)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

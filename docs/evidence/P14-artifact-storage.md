@@ -68,7 +68,9 @@ ledger/build pass. Production audit reports no known vulnerabilities. Rebuilt
 production-only Windows installation passes its packet, guarded mock receipts,
 ambiguity, isolated startup and parent/child drain checks (24.24 seconds).
 The earlier mixed-source check had one readiness-test failure and is not evidence.
-Successor CI is pending. No real bucket, private profile or model call was used.
+CI 38159025819 at 69862593bb9a80bff93f9509c9e41da07d4755c7 passes Windows,
+Ubuntu and PostgreSQL, including extracted Windows installation and full browser
+regressions. No real bucket, private profile or model call was used.
 
 P14-02 is in progress; no P14 gate closes. Container topology, TLS deployment,
 live service/permission verification, remote handoff, hybrid command transport,

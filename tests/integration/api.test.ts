@@ -45,6 +45,89 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("guards outcome evidence, corrections and read-only cohort reports", async () => {
+    const { app, repository, headers } = await setup("local");
+    const job = documentGenerationInput().job;
+    await repository.putJob(job);
+    const application = await repository.createApplication(job.id, "synthetic-candidate");
+    const url = `/v1/outcomes/${application.id}`;
+    expect((await app.inject({ url, headers })).statusCode).toBe(401);
+    expect(
+      (await app.inject({ method: "POST", url: "/v1/outcomes/cohort", headers, payload: {} }))
+        .statusCode,
+    ).toBe(401);
+    const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    expect((await app.inject({ url, headers: authenticated })).json()).toEqual([]);
+    const payload = {
+      applicationId: application.id,
+      expectedRevision: 0,
+      requestId: randomUUID(),
+      kind: "UNKNOWN",
+      evidenceRef: "synthetic-manual-evidence",
+      evidenceSha256: "a".repeat(64),
+      occurredAt: new Date().toISOString(),
+    };
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/outcomes",
+      headers: authenticated,
+      payload,
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({ kind: "UNKNOWN", source: "owner", revision: 1 });
+    expect(
+      (
+        await app.inject({ method: "POST", url: "/v1/outcomes", headers: authenticated, payload })
+      ).json(),
+    ).toEqual(first.json());
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes",
+          headers: authenticated,
+          payload: { ...payload, requestId: randomUUID(), kind: "OFFER" },
+        })
+      ).json().code,
+    ).toBe("REVISION_STALE");
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes",
+          headers: authenticated,
+          payload: { ...payload, source: "email" },
+        })
+      ).statusCode,
+    ).toBe(400);
+    const report = await app.inject({
+      method: "POST",
+      url: "/v1/outcomes/cohort",
+      headers: authenticated,
+      payload: {
+        from: "2026-01-01T00:00:00.000Z",
+        through: "2026-01-02T00:00:00.000Z",
+        asOf: new Date().toISOString(),
+      },
+    });
+    expect(report.statusCode).toBe(200);
+    expect(report.json()).toMatchObject({
+      status: "insufficient_data",
+      denominator: 0,
+      fractions: null,
+      advisoryOnly: true,
+    });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes/mail",
+          headers: authenticated,
+          payload: { messageId: "missing", classification: "rejection" },
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
   it("requires a fresh same-owner scheduler heartbeat for managed runtime health", async () => {
     const { app, repository, db, headers } = await setup();
     expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(503);
