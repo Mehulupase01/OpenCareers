@@ -19,7 +19,7 @@ export const agentBudget: GraphRunBudget = {
   wallTimeMs: 30000,
   tokens: 8000,
   requests: 6,
-  nodeTokens: 1000,
+  nodeTokens: 4000,
   nodeRequests: 1,
 };
 export const agentBinding = (nodes = [agentNode]) => ({

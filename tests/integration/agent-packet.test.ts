@@ -21,7 +21,7 @@ import { syntheticCatalogue } from "../helpers/route-fixtures.js";
 
 const model = "synthetic/model:free";
 const provider = "synthetic-provider";
-const limits = { requests: 3, tokens: 1000, wallTimeMs: 30000 };
+const limits = { requests: 3, tokens: 8000, wallTimeMs: 30000 };
 for (const engine of ["sqlite", "postgres"] as const)
   describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
     `${engine} bounded reviewed LLM packets`,

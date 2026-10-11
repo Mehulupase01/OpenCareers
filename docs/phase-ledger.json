@@ -1379,10 +1379,13 @@
         {
           "id": "P12-02",
           "text": "Checkpointing. Save calculation checkpoints with graph, prompt, and schema versions, resuming compatible work and explicitly migrating or restarting incompatible pure preparation.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": ["T12", "T30"],
-          "evidence": [],
-          "nextAction": "P12-02"
+          "evidence": [
+            "docs/evidence/P12-preparation-foundations.md",
+            "tests/integration/graph-checkpoint.test.ts"
+          ],
+          "nextAction": null
         },
         {
           "id": "P12-03",
@@ -1403,9 +1406,9 @@
         {
           "id": "P12-05",
           "text": "Evaluation and ablation. Compare the deterministic and template baseline, single-model generation, and drafter-plus-critic on the same held-out jobs, measuring claim errors, correction rate, latency, and requests per accepted packet.",
-          "status": "not_started",
+          "status": "code_complete_verification_pending",
           "acceptanceTests": ["T12", "T30"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P12-routing-ablation.md"],
           "nextAction": "P12-05"
         }
       ],
@@ -1413,38 +1416,47 @@
         {
           "id": "P12-G1",
           "requirement": "Agent execution has bounded steps, time, tokens, and request count.",
-          "status": "not_started",
-          "evidence": []
+          "status": "code_complete_verification_pending",
+          "evidence": ["docs/evidence/P12-routing-ablation.md"]
         },
         {
           "id": "P12-G2",
           "requirement": "Graph replay cannot perform or repeat a final submission.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P12-preparation-foundations.md",
+            "tests/integration/graph-checkpoint.test.ts"
+          ]
         },
         {
           "id": "P12-G3",
           "requirement": "Batch contamination, duplicate IDs, missing items, and truncated output are detected.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": ["docs/evidence/P12-preparation-foundations.md", "tests/unit/batch.test.ts"]
         },
         {
           "id": "P12-G4",
           "requirement": "Free-only routing remains enforced under fallback and manual model selection.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P12-preparation-foundations.md",
+            "tests/unit/agent-routing.test.ts"
+          ]
         },
         {
           "id": "P12-G5",
           "requirement": "The measured multi-agent variant improves a declared metric or is not enabled by default.",
-          "status": "not_started",
-          "evidence": []
+          "status": "code_complete_verification_pending",
+          "evidence": ["docs/evidence/P12-routing-ablation.md"]
         },
         {
           "id": "P12-G6",
           "requirement": "A 50-request simulation exhausts predictably, preserves reserve accounting, and defers work without falsifying success.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P12-preparation-foundations.md",
+            "tests/integration/agent-preparation.test.ts"
+          ]
         }
       ],
       "externalPrerequisites": [],
@@ -1452,14 +1464,22 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "1f1ea9c264fc3c3e6309c212ba2643b63ab7a8ab",
+      "remoteVerification": [
+        {
+          "runId": "38098680540",
+          "commit": "1f1ea9c264fc3c3e6309c212ba2643b63ab7a8ab",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Pure graph checkpoint/replay isolation, batch integrity, free-only transport, task allocations, minimized nodes, bounded letter review and all 58 desktop/mobile browser cases per lane; not the subsequent migration-17 routing/ablation milestone"
+        }
+      ],
       "acceptanceTests": ["T12", "T30"],
       "nextAction": "P12-01",
       "evidence": [
         "docs/plans/P12-bounded-agents.md",
         "docs/evidence/P12-preparation-foundations.md",
-        "docs/evidence/P12-letter-review.md"
+        "docs/evidence/P12-letter-review.md",
+        "docs/evidence/P12-routing-ablation.md"
       ]
     },
     {

@@ -3,6 +3,8 @@ import type { RoutePolicy } from "../../contracts/src/matching.js";
 import { type PrivacyRevision, providerPrivacy } from "./privacy.js";
 import { verifyRequestRoute } from "./router.js";
 
+export { boundCompletionTokens, completionContextBound } from "./limits.js";
+
 export interface CompletionRequest {
   model: string;
   messages: Array<{ role: "system" | "user"; content: string }>;

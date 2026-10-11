@@ -189,10 +189,14 @@ describe("LLM letter proposal boundary", () => {
       "packet_drafting",
     );
     expect(ledger.markSent).toHaveBeenCalledOnce();
-    expect(ledger.finish).toHaveBeenCalledWith("reservation-1", {
-      status: "completed",
-      responseHash: draft.responseHash,
-    });
+    expect(ledger.finish).toHaveBeenCalledWith(
+      "reservation-1",
+      {
+        status: "completed",
+        responseHash: draft.responseHash,
+      },
+      { latencyMs: expect.any(Number), tokens: 120 },
+    );
     expect(ledger.release).not.toHaveBeenCalled();
   });
 
@@ -228,10 +232,14 @@ describe("LLM letter proposal boundary", () => {
       route: { status: "ready", modelId: "synthetic/model:free", provider: "synthetic" },
     });
     await expect(runner.draft(input, content)).rejects.toThrow("not valid JSON");
-    expect(ledger.finish).toHaveBeenCalledWith("reservation-2", {
-      status: "failed",
-      errorCode: "CLAIM_UNSUPPORTED",
-    });
+    expect(ledger.finish).toHaveBeenCalledWith(
+      "reservation-2",
+      {
+        status: "failed",
+        errorCode: "CLAIM_UNSUPPORTED",
+      },
+      { latencyMs: expect.any(Number), tokens: 2 },
+    );
   });
 
   it("records a rate-limited sent call without releasing its daily quota", async () => {
@@ -262,6 +270,7 @@ describe("LLM letter proposal boundary", () => {
         errorCode: "RATE_LIMITED",
         backoffUntil: expect.any(String),
       }),
+      { latencyMs: expect.any(Number), tokens: null },
     );
     expect(ledger.release).not.toHaveBeenCalled();
   });

@@ -13,7 +13,11 @@ import {
   privacyBinding,
   providerPrivacy,
 } from "./privacy.js";
-import type { CompletionRequest, OpenRouterTransport } from "./transport.js";
+import {
+  boundCompletionTokens,
+  type CompletionRequest,
+  type OpenRouterTransport,
+} from "./transport.js";
 
 export const productionGraphEnabled = false;
 type NodeLedger = Pick<
@@ -78,7 +82,7 @@ export function createPreparationNodeHandler(
     assertPrivacyRoute(route, revision);
     const schema = nodeOutputSchema.options.find((option) => option.shape.kind.value === node.kind);
     if (!schema) throw new DomainError("CONFIG_INVALID", "Unknown fixed node schema.");
-    const request: CompletionRequest = {
+    let request: CompletionRequest = {
       model: route.modelId,
       messages: [
         {
@@ -102,6 +106,7 @@ export function createPreparationNodeHandler(
     };
     if (Buffer.byteLength(JSON.stringify(request.messages)) > 24000)
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Node exceeds minimized disclosure bounds.");
+    request = boundCompletionTokens(request, limits.maxTokens);
     const reservation = await ledger.reserve(
       route.modelId,
       route.provider,
@@ -111,6 +116,9 @@ export function createPreparationNodeHandler(
       nodeAllocation[node.kind],
     );
     let sent = false;
+    const started = performance.now();
+    const latencyMs = () => Math.min(600000, Math.max(0, Math.round(performance.now() - started)));
+    let observedTokens: number | null = null;
     try {
       limits.signal.throwIfAborted();
       await ledger.markSent(
@@ -122,6 +130,7 @@ export function createPreparationNodeHandler(
       const response = await transport.complete(request, limits.signal);
       limits.signal.throwIfAborted();
       const tokens = response.usage.promptTokens + response.usage.completionTokens;
+      if (Number.isSafeInteger(tokens) && tokens >= 0 && tokens <= 1000000) observedTokens = tokens;
       if (
         [response.usage.promptTokens, response.usage.completionTokens].some(
           (value) => !Number.isSafeInteger(value) || value < 0,
@@ -138,18 +147,29 @@ export function createPreparationNodeHandler(
       if (response.content.length > 20000)
         throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Preparation output exceeds bounds.");
       const output = validateNodeOutput(JSON.parse(response.content), node);
-      await ledger.finish(reservation.id, {
-        status: "completed",
-        responseHash: hash(response.content),
-      });
+      await ledger.finish(
+        reservation.id,
+        {
+          status: "completed",
+          responseHash: hash(response.content),
+        },
+        { latencyMs: latencyMs(), tokens: observedTokens },
+      );
       return { output, tokens, requests: 1 };
     } catch (error) {
       if (!sent) await ledger.release(reservation.id);
       else
-        await ledger.finish(reservation.id, {
-          status: "failed",
-          errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
-        });
+        await ledger.finish(
+          reservation.id,
+          {
+            status: "failed",
+            errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
+            ...(error instanceof DomainError && error.code === "RATE_LIMITED"
+              ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
+              : {}),
+          },
+          { latencyMs: latencyMs(), tokens: observedTokens },
+        );
       throw error instanceof DomainError
         ? error
         : new DomainError("MODEL_ROUTE_INELIGIBLE", "Preparation inference failed closed.");

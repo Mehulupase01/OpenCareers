@@ -104,6 +104,45 @@ for (const engine of ["sqlite", "postgres"] as const)
         );
         expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(5);
       });
+      it("persists owner/task-scoped route observations atomically with outcomes", async () => {
+        const reservation = await matching.reserve(
+          "synthetic/model:free",
+          "synthetic-provider",
+          50,
+        );
+        await matching.markSent(reservation.id, "a".repeat(64));
+        await expect(
+          matching.finish(
+            reservation.id,
+            { status: "completed", responseHash: "b".repeat(64) },
+            { latencyMs: -1, tokens: 10 },
+          ),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        expect(
+          (
+            await db.query("SELECT state FROM inference_reservations WHERE owner_id=$1 AND id=$2", [
+              owner,
+              reservation.id,
+            ])
+          )[0]?.state,
+        ).toBe("sent");
+        await matching.finish(
+          reservation.id,
+          { status: "completed", responseHash: "b".repeat(64) },
+          { latencyMs: 20, tokens: 10 },
+        );
+        expect(await new MatchingRepository(db, owner).routeSamples("semantic_triage")).toEqual([
+          expect.objectContaining({
+            accepted: true,
+            latencyMs: 20,
+            modelId: "synthetic/model:free",
+          }),
+        ]);
+        expect(await matching.routeSamples("packet_drafting")).toEqual([]);
+        const other = `route-${randomUUID()}`;
+        await new Repository(db, other).initialize();
+        expect(await new MatchingRepository(db, other).routeSamples("semantic_triage")).toEqual([]);
+      });
       it("caps active runs and expires abandoned pure work before admitting replacements", async () => {
         let clock = Date.now();
         const bounded = new GraphRepository(db, owner, () => new Date(clock));
@@ -212,7 +251,11 @@ for (const engine of ["sqlite", "postgres"] as const)
       it("prevents node overrun and late completion from checkpointing", async () => {
         await expect(
           runPreparationGraph(graph, agentBinding(), agentBudget, [agentNode], {
-            extractor: async () => ({ output: agentOutput, tokens: 1001, requests: 1 }),
+            extractor: async () => ({
+              output: agentOutput,
+              tokens: agentBudget.nodeTokens + 1,
+              requests: 1,
+            }),
           }),
         ).rejects.toMatchObject({ code: "MODEL_QUOTA_EXHAUSTED" });
         expect(await graph.cached(agentBinding(), graphDigest(agentNode), "extractor")).toBeNull();

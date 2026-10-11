@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildRequest } from "../../packages/inference/src/gateway.js";
-import { verifyRequestRoute } from "../../packages/inference/src/router.js";
+import { selectMeasuredRoute, verifyRequestRoute } from "../../packages/inference/src/router.js";
 import { OpenRouterTransport } from "../../packages/inference/src/transport.js";
 import { matchingEvaluationCases } from "../fixtures/matching-evaluation.js";
 import { syntheticCatalogue, syntheticRoutePolicy } from "../helpers/route-fixtures.js";
@@ -88,5 +88,87 @@ describe("Per-call free route revalidation", () => {
       new OpenRouterTransport("synthetic-key", fetcher).complete(request()),
     ).rejects.toThrow("explicit route policy");
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("Measured route selection remains subordinate to policy", () => {
+  const now = new Date("2026-10-11T00:00:00.000Z");
+  const alternate = "synthetic/alternate:free";
+  const catalogue = {
+    data: [...syntheticCatalogue(model).data, ...syntheticCatalogue(alternate).data],
+  };
+  const expanded = { ...policy, modelAllowlist: [model, alternate] };
+  const samples = (modelId: string, accepted: boolean[], latencyMs = 1000) =>
+    accepted.map((value) => ({
+      modelId,
+      provider: "synthetic-provider",
+      accepted: value,
+      latencyMs,
+      observedAt: now.toISOString(),
+    }));
+  const choose = (
+    history: ReturnType<typeof samples>,
+    raw: unknown = catalogue,
+    options = expanded,
+    at = now,
+  ) => selectMeasuredRoute(raw, options, now.toISOString(), history, "strict-zdr-v1", at);
+  it("prefers measured validator acceptance, then latency only with adequate evidence", () => {
+    expect(
+      choose([
+        ...samples(model, [true, true, true, true, false], 10),
+        ...samples(alternate, [true, true, true, true, true], 100),
+      ]).modelId,
+    ).toBe(alternate);
+    expect(
+      choose([
+        ...samples(model, [true, true, true, true, true], 1000),
+        ...samples(alternate, [true, true, true, true, true], 100),
+      ]).modelId,
+    ).toBe(alternate);
+    expect(
+      choose([...samples(model, [true, true, true, true, true]), ...samples(alternate, [true], 10)])
+        .modelId,
+    ).toBe(model);
+  });
+  it("temporarily excludes three recent failures without changing provider or price rules", () => {
+    const failures = samples(model, [false, false, false]);
+    expect(choose(failures).modelId).toBe(alternate);
+    expect(
+      choose(failures, catalogue, expanded, new Date(now.getTime() + 15 * 60000)).modelId,
+    ).toBe(model);
+    expect(choose([...failures, ...samples(alternate, [false, false, false])]).eligible).toBe(
+      false,
+    );
+  });
+  it("discards stale and future samples instead of pretending they are measured quality", () => {
+    for (const observedAt of ["2026-01-01T00:00:00.000Z", "2026-10-12T00:00:00.000Z"]) {
+      const history = [
+        ...samples(model, [true, true, true, true, true]),
+        ...samples(alternate, [true, true, true, true, true], 10).map((sample) => ({
+          ...sample,
+          observedAt,
+        })),
+      ];
+      expect(choose(history).modelId).toBe(model);
+    }
+  });
+  it("cannot rank a repriced model ahead of an eligible route or override a manual allowlist", () => {
+    const changed = structuredClone(catalogue);
+    const candidate = changed.data.find((entry) => entry.id === alternate);
+    if (!candidate) throw new Error("Missing synthetic alternate.");
+    candidate.pricing.prompt = "0.01";
+    const history = [
+      ...samples(model, [true, true, true, true, false]),
+      ...samples(alternate, [true, true, true, true, true], 10),
+    ];
+    expect(choose(history, changed).modelId).toBe(model);
+    expect(choose(history, catalogue, policy).modelId).toBe(model);
+  });
+  it("filters context-ineligible routes even when their measured acceptance is higher", () => {
+    const changed = structuredClone(catalogue);
+    const candidate = changed.data.find((entry) => entry.id === alternate);
+    if (!candidate) throw new Error("Missing synthetic alternate.");
+    candidate.context_length = 65536;
+    expect(choose([], changed, { ...expanded, minimumContext: 40000 }).modelId).toBe(alternate);
   });
 });

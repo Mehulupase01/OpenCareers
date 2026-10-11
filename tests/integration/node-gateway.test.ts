@@ -143,7 +143,7 @@ for (const engine of ["sqlite", "postgres"] as const)
               model,
               provider,
               content: JSON.stringify(agentOutput),
-              usage: { promptTokens: 1001, completionTokens: 2 },
+              usage: { promptTokens: agentBudget.nodeTokens + 1, completionTokens: 2 },
             }),
           },
           documentFacts,
@@ -196,6 +196,18 @@ for (const engine of ["sqlite", "postgres"] as const)
             { maxTokens: 1000, maxRequests: 1, signal: new AbortController().signal },
           ),
         ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+      });
+      it("rejects oversized prompts before reserving quota or making a model call", async () => {
+        const complete = vi.fn();
+        const handler = createPreparationNodeHandler(ledger, 50, { complete }, documentFacts);
+        await expect(
+          handler(
+            { ...node, input: { ...node.input, description: "Python ".repeat(1500) } },
+            { maxTokens: 4000, maxRequests: 1, signal: new AbortController().signal },
+          ),
+        ).rejects.toMatchObject({ code: "MODEL_QUOTA_EXHAUSTED" });
+        expect(complete).not.toHaveBeenCalled();
+        expect((await ledger.snapshot(50)).budget).toMatchObject({ used: 0, reserved: 0 });
       });
     },
   );

@@ -8,7 +8,11 @@ import {
   type PrivacyRevision,
   privacyBinding,
 } from "../../inference/src/privacy.js";
-import type { CompletionRequest, OpenRouterTransport } from "../../inference/src/transport.js";
+import {
+  boundCompletionTokens,
+  type CompletionRequest,
+  type OpenRouterTransport,
+} from "../../inference/src/transport.js";
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
 import type { PacketGenerationInput } from "./domain.js";
 import { buildLetterRequest, compileLetterProposal } from "./letter-draft.js";
@@ -184,7 +188,7 @@ export class LetterDraftRunner {
     if (route.status !== "ready" || !route.modelId || !route.provider)
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "No reviewed free letter route is ready.");
     assertPrivacyRoute(route, this.privacyRevision);
-    const request = transform(
+    let request = transform(
       buildLetterRequest(input, content, route.modelId, route.provider, this.privacyRevision),
     );
     if (Buffer.byteLength(JSON.stringify(request.messages)) > 24000)
@@ -192,7 +196,7 @@ export class LetterDraftRunner {
         "MODEL_ROUTE_INELIGIBLE",
         "Letter review exceeds minimized disclosure bounds.",
       );
-    if (budget) request.max_tokens = Math.min(request.max_tokens, budget.tokens);
+    if (budget) request = boundCompletionTokens(request, budget.tokens);
     const reservation = await this.ledger.reserve(
       route.modelId,
       route.provider,
@@ -204,6 +208,9 @@ export class LetterDraftRunner {
       allocationClass,
     );
     let sent = false;
+    const started = performance.now();
+    const latencyMs = () => Math.min(600000, Math.max(0, Math.round(performance.now() - started)));
+    let observedTokens: number | null = null;
     try {
       budget?.signal.throwIfAborted();
       await this.ledger.markSent(
@@ -218,6 +225,9 @@ export class LetterDraftRunner {
       const response = budget
         ? await this.transport.complete(request, budget.signal)
         : await this.transport.complete(request);
+      const totalTokens = response.usage.promptTokens + response.usage.completionTokens;
+      if (Number.isSafeInteger(totalTokens) && totalTokens >= 0 && totalTokens <= 1000000)
+        observedTokens = totalTokens;
       budget?.signal.throwIfAborted();
       if (budget) {
         const tokens = response.usage.promptTokens + response.usage.completionTokens;
@@ -245,10 +255,14 @@ export class LetterDraftRunner {
         throw new DomainError("CLAIM_UNSUPPORTED", "Letter proposal was not valid JSON.");
       }
       const value = validate(parsed);
-      await this.ledger.finish(reservation.id, {
-        status: "completed",
-        responseHash: digest(response.content),
-      });
+      await this.ledger.finish(
+        reservation.id,
+        {
+          status: "completed",
+          responseHash: digest(response.content),
+        },
+        { latencyMs: latencyMs(), tokens: observedTokens },
+      );
       return {
         value,
         modelId: route.modelId,
@@ -258,13 +272,17 @@ export class LetterDraftRunner {
     } catch (error) {
       if (!sent) await this.ledger.release(reservation.id);
       else
-        await this.ledger.finish(reservation.id, {
-          status: "failed",
-          errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
-          ...(error instanceof DomainError && error.code === "RATE_LIMITED"
-            ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
-            : {}),
-        });
+        await this.ledger.finish(
+          reservation.id,
+          {
+            status: "failed",
+            errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
+            ...(error instanceof DomainError && error.code === "RATE_LIMITED"
+              ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
+              : {}),
+          },
+          { latencyMs: latencyMs(), tokens: observedTokens },
+        );
       if (error instanceof DomainError && error.code === "RATE_LIMITED") throw error;
       throw error instanceof DomainError
         ? error

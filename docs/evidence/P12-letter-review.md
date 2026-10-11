@@ -53,7 +53,8 @@ review variant are not enabled in the worker by default; the explicit
   cancellation, bad repairs, budget exhaustion and independent validation.
 - Public-source scan passed 330 files; production dependency audit was clean.
 - All 58 desktop/mobile browser tests passed after the quota and pause fixes.
-  Successor CI results are still pending.
+  Successor CI run 38098680540 at `1f1ea9c264fc3c3e6309c212ba2643b63ab7a8ab`
+  passed Windows, Ubuntu and PostgreSQL, including all 58 browser cases per lane.
 
 ## CI Correction
 

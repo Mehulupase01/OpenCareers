@@ -136,6 +136,10 @@ export const migrations = [
     "CREATE TABLE graph_nodes (owner_id TEXT NOT NULL, run_id TEXT NOT NULL, ordinal INTEGER NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, token_cap INTEGER NOT NULL, request_cap INTEGER NOT NULL, output_sha256 TEXT, PRIMARY KEY(owner_id,run_id,ordinal), FOREIGN KEY(owner_id,run_id) REFERENCES graph_runs(owner_id,id))",
     "CREATE TABLE graph_checkpoints (owner_id TEXT NOT NULL REFERENCES owners(id), cache_key TEXT NOT NULL, kind TEXT NOT NULL, binding TEXT NOT NULL, output TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,cache_key))",
   ],
+  [
+    "CREATE TABLE inference_observations (owner_id TEXT NOT NULL, reservation_id TEXT NOT NULL, latency_ms INTEGER NOT NULL, tokens INTEGER, observed_at TEXT NOT NULL, PRIMARY KEY(owner_id,reservation_id), FOREIGN KEY(owner_id,reservation_id) REFERENCES inference_reservations(owner_id,id))",
+    "CREATE INDEX inference_observations_recent ON inference_observations(owner_id,observed_at)",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

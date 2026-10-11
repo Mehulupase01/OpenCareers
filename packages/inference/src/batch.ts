@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type NodeInput, type NodeOutput, nodeInputSchema } from "../../contracts/src/agents.js";
+import { DomainError } from "../../contracts/src/index.js";
 import { validateNodeOutput } from "./graph.js";
 
 const optionsSchema = z
@@ -17,7 +18,7 @@ export interface BatchItem {
 export interface BatchResult {
   id: string;
   output: NodeOutput | null;
-  error: "context_pressure" | "invalid_output" | "budget_exhausted" | null;
+  error: "context_pressure" | "invalid_output" | "budget_exhausted" | "route_unavailable" | null;
 }
 export type PureBatchDispatch = (
   items: readonly BatchItem[],
@@ -50,12 +51,13 @@ export async function runIsolatedBatch(
   const signal = AbortSignal.timeout(options.wallTimeMs);
   const results = new Map<string, BatchResult>();
   let calls = 0;
+  let deferred: "budget_exhausted" | "route_unavailable" | null = null;
   const bytes = (group: BatchItem[]) => Buffer.byteLength(JSON.stringify(group));
   const run = async (group: BatchItem[]): Promise<void> => {
     if (!group.length) return;
-    if (signal.aborted || calls >= options.maxCalls) {
+    if (deferred || signal.aborted || calls >= options.maxCalls) {
       for (const item of group)
-        results.set(item.id, { id: item.id, output: null, error: "budget_exhausted" });
+        results.set(item.id, { id: item.id, output: null, error: deferred ?? "budget_exhausted" });
       return;
     }
     if (bytes(group) > options.maxContextBytes) {
@@ -97,12 +99,17 @@ export async function runIsolatedBatch(
         parsed.results.some((result) => !group.some((item) => item.id === result.id))
       )
         parsed = null;
-    } catch {
+    } catch (error) {
+      if (error instanceof DomainError) {
+        if (error.code === "MODEL_QUOTA_EXHAUSTED") deferred = "budget_exhausted";
+        else if (["MODEL_ROUTE_INELIGIBLE", "RATE_LIMITED"].includes(error.code))
+          deferred = "route_unavailable";
+      }
       parsed = null;
     }
-    if (signal.aborted) {
+    if (deferred || signal.aborted) {
       for (const item of group)
-        results.set(item.id, { id: item.id, output: null, error: "budget_exhausted" });
+        results.set(item.id, { id: item.id, output: null, error: deferred ?? "budget_exhausted" });
       return;
     }
     if (!parsed) {

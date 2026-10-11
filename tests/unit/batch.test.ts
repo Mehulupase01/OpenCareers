@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DomainError } from "../../packages/contracts/src/index.js";
 import { type BatchItem, runIsolatedBatch } from "../../packages/inference/src/batch.js";
 import { agentNode, agentOutput } from "../helpers/agent-fixtures.js";
 
@@ -12,6 +13,29 @@ const valid = (group: readonly BatchItem[]) => ({
   results: group.map((item) => ({ id: item.id, output: agentOutput })),
 });
 describe("Independent pure preparation batches", () => {
+  it.each(["MODEL_QUOTA_EXHAUSTED", "RATE_LIMITED", "MODEL_ROUTE_INELIGIBLE"] as const)(
+    "defers %s without splitting or repeating an unavailable inference route",
+    async (code) => {
+      let calls = 0;
+      const result = await runIsolatedBatch(
+        items,
+        async () => {
+          calls++;
+          throw new DomainError(code, "Synthetic inference deferral.");
+        },
+        { ...options, maxItems: 1 },
+      );
+      expect(calls).toBe(1);
+      expect(
+        result.results.every(
+          (item) =>
+            item.output === null &&
+            item.error ===
+              (code === "MODEL_QUOTA_EXHAUSTED" ? "budget_exhausted" : "route_unavailable"),
+        ),
+      ).toBe(true);
+    },
+  );
   it("accepts reordered output with exact item IDs", async () => {
     const result = await runIsolatedBatch(
       items,

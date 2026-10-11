@@ -889,3 +889,37 @@ background matching ignoring preparation pause; regression tests also cover
 emergency stop and restore quarantine. Graph storage now caps six active runs,
 expires abandoned work, and retains 1,000 terminal runs and 1,000 checkpoints.
 Final frozen code verification passed; successor CI evidence still needs recording.
+
+## 2026-10-11: P12 Routing And Ablation
+
+Successor CI 38098680540 at `1f1ea9c264fc3c3e6309c212ba2643b63ab7a8ab`
+passed Windows, Ubuntu and PostgreSQL, including all 58 browser cases per lane.
+P12 checkpoint ticket and gates G2/G3/G4/G6 now close on that verified code.
+Counts: 11/19 phases, 84/128 gates. P12 remains open.
+
+Migration 17 adds atomic, bounded owner/task-scoped route observations. Matching
+catalogue refresh ranks eligible free/privacy-compatible candidates only when
+all have sufficient observations; otherwise owner order remains. Three recent
+failures suspend a candidate. Matching validates claims before successful ledger
+completion, so unsupported evidence cannot improve ranking. This acceptance
+metric is not human-labelled semantic accuracy. Other task classes record
+observations but do not yet automatically select task-specific routes.
+
+Conservative byte-based context/token admission now runs before node quota
+reservation and before reviewed-letter calls. It is not an exact tokenizer or
+an upstream billing guarantee. Batch quota/route exhaustion defers after one
+dispatch, without retry amplification. See `docs/evidence/P12-routing-ablation.md`.
+
+Held-out synthetic ablation: 12 jobs, zero routing errors, three eligible packets.
+All three variants had zero claim errors/corrections; critique required two
+requests per accepted packet versus one for normal drafting. No improvement is
+established, so the graph/review variant stays default-off. Real applications
+still require LLM-generated letters. Full local suite: 558 passed, 181 PostgreSQL
+skipped, 67 files; subsequent matching regression: 11 passed/11 skipped. Build,
+typecheck and ledger passed; public scan 334 files; production audit clean.
+Milestone CI for these new changes remains pending until push. Private services,
+secrets, CVs and authorizations were untouched; no real applications were sent.
+
+Next: complete P12 worker/task integration without granting agents submission
+authority, then independent Windows runtime engineering alongside P18 coverage.
+Genuine receipts, Gmail consent and real 24/72-hour soaks remain unfinished.

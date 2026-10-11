@@ -222,6 +222,28 @@ for (const engine of ["sqlite", "postgres"] as const) {
             [owner, `%${privacyBinding("reviewed-career-facts-v1")}%`],
           ),
         ).toHaveLength(1);
+        const unsupported = fixtureProposal(input);
+        if (!unsupported.requirements[0]) throw new Error("Expected fixture requirement.");
+        unsupported.requirements[0].factIds = ["unknown-fact"];
+        transport.complete.mockResolvedValueOnce({
+          model,
+          provider: "novita",
+          content: JSON.stringify(unsupported),
+          usage: { promptTokens: 50, completionTokens: 20 },
+        });
+        expect((await runner.assessNow(jobId)).outcome).toBe("inference_paused");
+        expect(await matching.routeSamples("semantic_triage")).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ accepted: true }),
+            expect.objectContaining({ accepted: false }),
+          ]),
+        );
+        expect(
+          await db.query(
+            "SELECT state,error_code FROM inference_reservations WHERE owner_id=$1 AND error_code='CLAIM_UNSUPPORTED'",
+            [owner],
+          ),
+        ).toEqual([{ state: "failed", error_code: "CLAIM_UNSUPPORTED" }]);
       });
 
       it("parks an unqualified reviewed endpoint without sending, consuming quota or polling it every tick", async () => {

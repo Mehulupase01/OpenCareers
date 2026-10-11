@@ -251,7 +251,19 @@ export class MatchingRepository extends Repository {
     result:
       | { status: "completed"; responseHash: string }
       | { status: "failed"; errorCode: string; backoffUntil?: string },
+    metrics?: { latencyMs: number; tokens: number | null },
   ) {
+    if (
+      metrics &&
+      (!Number.isSafeInteger(metrics.latencyMs) ||
+        metrics.latencyMs < 0 ||
+        metrics.latencyMs > 600000 ||
+        (metrics.tokens !== null &&
+          (!Number.isSafeInteger(metrics.tokens) ||
+            metrics.tokens < 0 ||
+            metrics.tokens > 1000000)))
+    )
+      throw new DomainError("CONFIG_INVALID", "Invalid bounded inference observation.");
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const rows = await tx.query(
@@ -266,6 +278,16 @@ export class MatchingRepository extends Repository {
         ],
       );
       if (!rows.length) throw new DomainError("REVISION_STALE", "Inference outcome is stale.");
+      if (metrics) {
+        await tx.query(
+          "INSERT INTO inference_observations(owner_id,reservation_id,latency_ms,tokens,observed_at) VALUES($1,$2,$3,$4,$5)",
+          [this.ownerId, id, metrics.latencyMs, metrics.tokens, this.now()],
+        );
+        await tx.query(
+          "DELETE FROM inference_observations WHERE owner_id=$1 AND reservation_id NOT IN (SELECT reservation_id FROM inference_observations WHERE owner_id=$1 ORDER BY observed_at DESC,reservation_id DESC LIMIT 2000)",
+          [this.ownerId],
+        );
+      }
       if (result.status === "failed" && result.backoffUntil)
         await tx.query(
           "UPDATE inference_state SET status='rate_limited',backoff_until=$1,data=$2,updated_at=$3 WHERE owner_id=$4",
@@ -290,6 +312,24 @@ export class MatchingRepository extends Repository {
         [this.now(), this.ownerId, id],
       );
     });
+  }
+
+  async routeSamples(allocationClass: AllocationClass) {
+    allocationClassSchema.parse(allocationClass);
+    const cutoff = new Date(this.clock().getTime() - 30 * 86400000).toISOString();
+    const rows = await this.db.query(
+      "SELECT r.model_id,r.provider,r.state,r.error_code,o.latency_ms,o.observed_at FROM inference_observations o JOIN inference_reservations r ON r.owner_id=o.owner_id AND r.id=o.reservation_id WHERE o.owner_id=$1 AND r.allocation_class=$2 AND o.observed_at >= $3 ORDER BY o.observed_at DESC,o.reservation_id DESC LIMIT 2000",
+      [this.ownerId, allocationClass, cutoff],
+    );
+    return rows
+      .filter((row) => row.error_code !== "MODEL_QUOTA_EXHAUSTED")
+      .map((row) => ({
+        modelId: String(row.model_id),
+        provider: String(row.provider),
+        accepted: row.state === "completed",
+        latencyMs: Number(row.latency_ms),
+        observedAt: String(row.observed_at),
+      }));
   }
 
   async pendingJobIds(limit = 5): Promise<string[]> {

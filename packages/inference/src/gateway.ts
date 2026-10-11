@@ -17,7 +17,7 @@ import {
   validateProposal,
 } from "../../matching/src/domain.js";
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
-import { assertNoTools, selectRoute } from "./policy.js";
+import { assertNoTools } from "./policy.js";
 import {
   assertPrivacyRoute,
   assertReviewedEndpoint,
@@ -26,6 +26,7 @@ import {
   privacyBinding,
   providerPrivacy,
 } from "./privacy.js";
+import { selectMeasuredRoute } from "./router.js";
 import {
   type CompletionRequest,
   type CompletionResponse,
@@ -249,7 +250,7 @@ export class MatchingRunner {
     try {
       const catalogue = await this.transport.catalogue();
       const fetchedAt = new Date().toISOString();
-      const decision = selectRoute(
+      const decision = selectMeasuredRoute(
         catalogue,
         {
           modelAllowlist: this.config.inference.modelAllowlist,
@@ -259,6 +260,8 @@ export class MatchingRunner {
           dailyLimit: this.config.inference.dailyLimit,
         },
         fetchedAt,
+        await this.repo.routeSamples("semantic_triage"),
+        this.config.inference.privacyRevision,
       );
       decision.privacyBinding = binding;
       if (decision.eligible && decision.provider) {
@@ -383,6 +386,8 @@ export class MatchingRunner {
     let proposal: SemanticProposal;
     let reservation: Awaited<ReturnType<MatchingRepository["reserve"]>> | null = null;
     let sent = false;
+    const started = performance.now();
+    const latencyMs = () => Math.min(600000, Math.max(0, Math.round(performance.now() - started)));
     try {
       reservation = await this.repo.reserve(
         snapshot.route.modelId,
@@ -409,11 +414,19 @@ export class MatchingRunner {
       );
       sent = true;
       if (fixture) {
-        proposal = fixtureProposal(input);
-        await this.repo.finish(reservation.id, {
-          status: "completed",
-          responseHash: digest(JSON.stringify(proposal)),
-        });
+        proposal = validateProposal(
+          fixtureProposal(input),
+          input.job.description,
+          inferenceFacts(input.facts),
+        );
+        await this.repo.finish(
+          reservation.id,
+          {
+            status: "completed",
+            responseHash: digest(JSON.stringify(proposal)),
+          },
+          { latencyMs: latencyMs(), tokens: null },
+        );
       } else {
         if (!this.transport)
           throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference transport is unavailable.");
@@ -425,23 +438,38 @@ export class MatchingRunner {
           response.provider !== snapshot.route.provider
         )
           throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference route evidence changed.");
-        proposal = parseStructured(response.content);
-        await this.repo.finish(reservation.id, {
-          status: "completed",
-          responseHash: digest(response.content),
-        });
+        proposal = validateProposal(
+          parseStructured(response.content),
+          input.job.description,
+          inferenceFacts(input.facts),
+        );
+        await this.repo.finish(
+          reservation.id,
+          {
+            status: "completed",
+            responseHash: digest(response.content),
+          },
+          {
+            latencyMs: latencyMs(),
+            tokens: response.usage.promptTokens + response.usage.completionTokens,
+          },
+        );
       }
     } catch (error) {
       if (reservation) {
         if (!sent) await this.repo.release(reservation.id);
         else
-          await this.repo.finish(reservation.id, {
-            status: "failed",
-            errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
-            ...(error instanceof DomainError && error.code === "RATE_LIMITED"
-              ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
-              : {}),
-          });
+          await this.repo.finish(
+            reservation.id,
+            {
+              status: "failed",
+              errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
+              ...(error instanceof DomainError && error.code === "RATE_LIMITED"
+                ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
+                : {}),
+            },
+            { latencyMs: latencyMs(), tokens: null },
+          );
       }
       if (error instanceof DomainError && error.code === "RATE_LIMITED")
         await this.repo.setUnavailable(
@@ -460,11 +488,7 @@ export class MatchingRunner {
         error instanceof Error ? error.message : "Inference failed closed.",
       );
     }
-    const validated = validateProposal(
-      proposal,
-      input.job.description,
-      inferenceFacts(input.facts),
-    );
+    const validated = proposal;
     const score = scoreMatch(gates, validated.requirements, validated.uncertainty);
     const assessedOutcome = outcome(gates, validated.requirements, score, validated.uncertainty);
     let applicationId: string | null = null;
