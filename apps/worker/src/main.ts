@@ -18,7 +18,7 @@ import { OpenRouterTransport } from "../../../packages/inference/src/transport.j
 import { createLogger } from "../../../packages/observability/src/index.js";
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
-import { DiscoveryRepository } from "../../../packages/persistence/src/discovery-repository.js";
+import { DiscoveryScanRepository } from "../../../packages/persistence/src/discovery-scan-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import { EmailRepository } from "../../../packages/persistence/src/email-repository.js";
 import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
@@ -47,7 +47,7 @@ process.on("message", (message) => {
 const config = loadConfig();
 const repository = await connect(config);
 await new CandidateRepository(repository.db, repository.ownerId).initialize();
-const discovery = new DiscoveryRepository(repository.db, repository.ownerId);
+const discovery = new DiscoveryScanRepository(repository.db, repository.ownerId);
 const documents = new DocumentRepository(repository.db, repository.ownerId);
 const browser = new BrowserRepository(repository.db, repository.ownerId);
 const submissions = new SubmissionRepository(

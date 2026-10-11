@@ -2030,6 +2030,7 @@
       "nextAction": "P18-01",
       "evidence": [
         "docs/plans/P18-owner-sources-hosted-forms.md",
+        "docs/evidence/P18-resumable-public-scans.md",
         "docs/evidence/P18-source-session-foundation.md",
         "docs/evidence/P18-ashby-discovery.md",
         "docs/evidence/P18-personio-discovery.md",

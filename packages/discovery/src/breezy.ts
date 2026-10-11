@@ -5,6 +5,7 @@ import {
   type DiscoverySource,
   normalizedJobSchema,
 } from "../../contracts/src/discovery.js";
+import { DomainError } from "../../contracts/src/index.js";
 import {
   digest,
   locationFields,
@@ -174,6 +175,7 @@ export async function pollBreezySource(
     if ((await get(listUrl)) !== initial) throw new Error("Public job list changed during scan.");
     return batch;
   } catch (error) {
+    if (error instanceof DomainError) throw error;
     const failure =
       error instanceof DiscoveryFailure
         ? error

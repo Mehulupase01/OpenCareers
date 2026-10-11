@@ -239,7 +239,7 @@ export class DiscoveryRepository extends Repository {
       return sourceFrom(claimed[0] as Row);
     });
   }
-  private async held(tx: SqlExecutor, source: DiscoverySource): Promise<DiscoverySource> {
+  protected async held(tx: SqlExecutor, source: DiscoverySource): Promise<DiscoverySource> {
     const row = (
       await tx.query("SELECT * FROM sources WHERE owner_id=$1 AND id=$2", [this.ownerId, source.id])
     )[0];
@@ -294,6 +294,8 @@ export class DiscoveryRepository extends Repository {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const current = await this.held(tx, source);
+      if (health !== "rate_limited" && health !== "unavailable")
+        await this.clearScan(tx, source.id);
       const wait = Math.max(
         retryAfterMs,
         Math.min(86400000, 60000 * 2 ** Math.min(current.failures, 10)),
@@ -336,6 +338,7 @@ export class DiscoveryRepository extends Repository {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const current = await this.held(tx, source);
+      await this.clearScan(tx, source.id);
       if (batch.notModified) {
         if (!current.etag)
           throw new DomainError("STATE_INVALID", "Unsolicited source revalidation.");
@@ -476,6 +479,16 @@ export class DiscoveryRepository extends Repository {
       await this.pruneRuns(tx, source.id);
       return runId;
     });
+  }
+  protected async clearScan(tx: SqlExecutor, sourceId: string) {
+    await tx.query("DELETE FROM discovery_scan_reads WHERE owner_id=$1 AND source_id=$2", [
+      this.ownerId,
+      sourceId,
+    ]);
+    await tx.query("DELETE FROM discovery_scans WHERE owner_id=$1 AND source_id=$2", [
+      this.ownerId,
+      sourceId,
+    ]);
   }
   private async candidateId(tx: SqlExecutor) {
     const row = (await tx.query("SELECT id FROM candidates WHERE owner_id=$1", [this.ownerId]))[0];

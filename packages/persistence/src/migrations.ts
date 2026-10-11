@@ -140,6 +140,10 @@ export const migrations = [
     "CREATE TABLE inference_observations (owner_id TEXT NOT NULL, reservation_id TEXT NOT NULL, latency_ms INTEGER NOT NULL, tokens INTEGER, observed_at TEXT NOT NULL, PRIMARY KEY(owner_id,reservation_id), FOREIGN KEY(owner_id,reservation_id) REFERENCES inference_reservations(owner_id,id))",
     "CREATE INDEX inference_observations_recent ON inference_observations(owner_id,observed_at)",
   ],
+  [
+    "CREATE TABLE discovery_scans (owner_id TEXT NOT NULL, source_id TEXT NOT NULL, revision INTEGER NOT NULL, cache_version INTEGER NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id), FOREIGN KEY(owner_id,source_id) REFERENCES sources(owner_id,id))",
+    "CREATE TABLE discovery_scan_reads (owner_id TEXT NOT NULL, source_id TEXT NOT NULL, ordinal INTEGER NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, verified_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id,ordinal), FOREIGN KEY(owner_id,source_id) REFERENCES discovery_scans(owner_id,source_id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

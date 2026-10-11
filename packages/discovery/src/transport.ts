@@ -16,6 +16,7 @@ export class DiscoveryFailure extends Error {
   }
 }
 export interface ReadResponse {
+  fetchedAt?: string;
   location?: string | null;
   status: number;
   body: string;
@@ -162,6 +163,6 @@ export function pageEvidence(url: string, response: ReadResponse, now: Date): So
     body: response.body,
     sha256: digest(response.body),
     etag: response.etag,
-    fetchedAt: now.toISOString(),
+    fetchedAt: response.fetchedAt ?? now.toISOString(),
   };
 }

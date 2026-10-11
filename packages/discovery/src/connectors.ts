@@ -6,6 +6,7 @@ import {
   type NormalizedJob,
   normalizedJobSchema,
 } from "../../contracts/src/discovery.js";
+import { DomainError } from "../../contracts/src/index.js";
 import { pollBreezySource } from "./breezy.js";
 import {
   digest,
@@ -390,6 +391,7 @@ export async function pollSource(
       "Source pagination limit reached before completion.",
     );
   } catch (error) {
+    if (error instanceof DomainError) throw error;
     const failure =
       error instanceof DiscoveryFailure
         ? error

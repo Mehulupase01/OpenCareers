@@ -83,6 +83,7 @@ export const sourceInputSchema = z
 export type SourceInput = z.infer<typeof sourceInputSchema>;
 export type SourceHealth =
   | "waiting"
+  | "scanning"
   | "healthy"
   | "quality_warning"
   | "parser_failed"

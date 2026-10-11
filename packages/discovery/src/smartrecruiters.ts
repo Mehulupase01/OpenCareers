@@ -4,6 +4,7 @@ import {
   type DiscoverySource,
   normalizedJobSchema,
 } from "../../contracts/src/discovery.js";
+import { DomainError } from "../../contracts/src/index.js";
 import {
   digest,
   locationFields,
@@ -170,6 +171,7 @@ export async function pollSmartSource(
     }
     throw new Error("Source pagination limit reached before completion.");
   } catch (error) {
+    if (error instanceof DomainError) throw error;
     const failure =
       error instanceof DiscoveryFailure
         ? error

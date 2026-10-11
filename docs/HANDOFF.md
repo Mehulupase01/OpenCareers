@@ -965,3 +965,37 @@ actual approved startup, packaging, scheduling, operations/capacity evidence,
 real 24-hour soak and genuine receipt-backed ramp. P14-P17 and P18 source-session
 consumption, resumable large polls, operational 20-source breadth and policy-bound
 shared-form/adapters remain. No overnight Codex continuation was created.
+
+## 2026-10-11: Resumable Discovery Milestone
+
+Windows CI exposed a real verification issue: the installer dry run timed out
+after ten seconds before PowerShell produced output. `b799433` added structured
+synthetic failure diagnostics; `370e584` moved the approval guard before private
+configuration loading and allowed a bounded 45-second cold process startup.
+All seven Windows lifecycle tests passed in run 38131370706. That run passed
+Ubuntu and PostgreSQL but initially failed one mock-ATS browser unit case with
+Chromium `ERR_NO_BUFFER_SPACE`. Only the failed Windows lane was rerun; its
+result must be checked before closing P12. Prior runs 38102016001 and 38102627473
+failed the installer test and do not count as successful milestone evidence.
+
+Migration 18 and the production discovery worker now checkpoint bounded public
+GET slices, reconstruct after SIGKILL, revalidate cached responses, preserve
+dated evidence and publish only complete scans. Same authoritative database,
+parsers and guarded ingest; no separate automation stack. See
+`docs/evidence/P18-resumable-public-scans.md` for storage/time ceilings, drift,
+backoff, permission boundaries and the five-minute consistency window.
+
+Frozen full local check: 588 passed / 199 PostgreSQL skipped, 72 files; lint,
+types, ledger and build passed. All 58 desktop/mobile browser cases passed.
+Final transport-spacing/coverage regression: 11 passed / 11 skipped. Subsequent
+worker-entry-point regression: 10 passed / 10 skipped, including 500 jobs through
+neutral scan deferral and one completed ingest. Do not claim a full-local 589
+result. Public scan 356 files before final documentation; dependency audit clean.
+The new discovery milestone needs its own remote CI after push.
+
+Counts remain 11/19 phases and 86/128 gates until evidence-backed closure.
+P18 is not complete: logged-in permission-bound session consumption, operational
+20-source coverage, policy/API-bound hosted forms and remaining portal families
+are still open. No real inference, employer submission, Gmail consent, private
+runtime migration, Windows task installation or 24/72-hour soak was performed.
+No background Codex coding continuation was created.

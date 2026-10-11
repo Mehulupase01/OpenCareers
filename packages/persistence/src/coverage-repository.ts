@@ -31,7 +31,7 @@ const support: Record<
     },
     limitations: [
       "Public tenant JSON list and structured vacancy pages only; no application adapter.",
-      "198 jobs/200 requests/60 seconds per complete scan; larger, drifting or unsupported boards fail without closing jobs.",
+      "198 jobs/200 logical reads per parsed scan; live reads checkpoint in five-request slices. Larger, drifting or unsupported boards fail without closing jobs.",
       "Primary location only; the public route has no published snapshot token or stability guarantee.",
     ],
   },
@@ -80,7 +80,7 @@ const support: Record<
     },
     limitations: [
       "Public postings and descriptions only; no SmartRecruiters application adapter.",
-      "200 requests/60 seconds per complete scan; larger or shifting boards fail without closing jobs.",
+      "200 logical reads per parsed scan; live reads checkpoint in five-request slices. Larger or shifting boards fail without closing jobs.",
     ],
   },
   personio: {
