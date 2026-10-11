@@ -6,7 +6,15 @@ import { DocumentStorage, MAX_STORED_DOCUMENT_BYTES } from "../../security/src/d
 
 const digest = (buffer: Buffer) => createHash("sha256").update(buffer).digest("hex");
 
-export class ArtifactStore {
+export interface ArtifactStorage {
+  initialize(): Promise<void>;
+  storageKey(sha256: string): string;
+  put(buffer: Buffer): Promise<{ sha256: string; storageKey: string; bytes: number }>;
+  read(storageKey: string, expectedSha256: string): Promise<Buffer>;
+  close?(): void;
+}
+
+export class ArtifactStore implements ArtifactStorage {
   private root: string;
   private readonly dataDir: string;
   constructor(

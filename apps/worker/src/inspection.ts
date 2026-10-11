@@ -3,7 +3,7 @@ import type { Config } from "../../../packages/config/src/index.js";
 import type { BrowserPreparation } from "../../../packages/contracts/src/browser.js";
 import type { BrowserSessionState } from "../../../packages/contracts/src/browser-session.js";
 import { DomainError, jobInputSchema, type Task } from "../../../packages/contracts/src/index.js";
-import type { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
+import type { ArtifactStorage } from "../../../packages/documents/src/artifact-store.js";
 import type { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import type { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
@@ -35,7 +35,7 @@ export async function runInspectionTask(
     repository: Repository;
     documents: DocumentRepository;
     browser: BrowserRepository;
-    artifacts: ArtifactStore;
+    artifacts: ArtifactStorage;
     adapters: AdapterRegistry;
     clock?: () => Date;
   },

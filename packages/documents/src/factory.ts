@@ -10,7 +10,7 @@ import {
   type PacketManifest,
   packetManifestSchema,
 } from "../../contracts/src/documents.js";
-import type { ArtifactStore } from "./artifact-store.js";
+import type { ArtifactStorage } from "./artifact-store.js";
 import type { PacketGenerationInput } from "./domain.js";
 import { generatePacketContent } from "./domain.js";
 import { equivalenceIssues, extractDocx, extractPdf } from "./extract.js";
@@ -32,7 +32,7 @@ export interface BuiltPacket {
 }
 
 export async function buildPacket(
-  store: ArtifactStore,
+  store: ArtifactStorage,
   input: PacketGenerationInput,
   letterDraft?: {
     letter: LetterDocument;

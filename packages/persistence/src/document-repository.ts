@@ -7,7 +7,7 @@ import {
 } from "../../contracts/src/documents.js";
 import { DomainError, type JobInput, jobInputSchema } from "../../contracts/src/index.js";
 import { assessmentSchema, type MatchAssessment } from "../../contracts/src/matching.js";
-import type { ArtifactStore } from "../../documents/src/artifact-store.js";
+import type { ArtifactStorage } from "../../documents/src/artifact-store.js";
 import type { PacketGenerationInput } from "../../documents/src/domain.js";
 import type { BuiltPacket } from "../../documents/src/factory.js";
 import { CandidateRepository } from "./candidate-repository.js";
@@ -289,7 +289,7 @@ export class DocumentRepository extends Repository {
     }));
   }
 
-  async artifact(packetId: string, kind: string, store: ArtifactStore) {
+  async artifact(packetId: string, kind: string, store: ArtifactStorage) {
     const row = (
       await this.db.query(
         "SELECT a.*,pa.filename FROM packet_artifacts pa JOIN artifacts a ON a.owner_id=pa.owner_id AND a.id=pa.artifact_id LEFT JOIN packet_validity v ON v.owner_id=pa.owner_id AND v.packet_id=pa.packet_id WHERE pa.owner_id=$1 AND pa.packet_id=$2 AND pa.kind=$3 AND v.packet_id IS NULL",

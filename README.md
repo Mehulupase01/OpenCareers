@@ -65,6 +65,12 @@ and accepts no target overrides. This is not yet an accepted final release.
 See [bundle evidence](docs/evidence/P13-windows-bundle.md) and
 [packaged workflow evidence](docs/evidence/P17-packaged-workflow.md).
 
+Server profiles can optionally use encrypted S3-compatible artifact storage;
+Windows/local storage remains the default. Configuration, permissions and the
+synthetic verification level are recorded in
+[artifact storage evidence](docs/evidence/P14-artifact-storage.md). Complete
+server/hybrid deployment and artifact migration are not yet accepted.
+
 Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
 for mobile, and never reuse an existing server. Override them with
 `AUTOPILOT_E2E_API_PORT`, `AUTOPILOT_E2E_WEB_PORT`, `AUTOPILOT_E2E_MOBILE_API_PORT`

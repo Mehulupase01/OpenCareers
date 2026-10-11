@@ -1330,3 +1330,30 @@ compiled workflow, refusal of target overrides, packet checks, API/dashboard
 boot and manager/child drain. Public scan: 387 files. Successor CI is pending.
 No phase/gate closes: 12/19 and 89/128. Private services remain untouched and
 the policy-blocked preview remains stopped. Do not bypass its blocked relaunch.
+
+## 2026-10-11: Server Artifact Backend
+
+Packaged workflow CI 38156771601 at e5c504caa183d267886e11a7aa2cc0ebaa45174f
+is all green on Windows, Ubuntu and PostgreSQL, including the Windows extracted
+production-only workflow and browser regressions. That verifies the prior batch,
+not the successor S3 implementation.
+
+P14 independent engineering now includes encrypted S3 artifacts behind the
+existing shared storage contract, wired into API documents/browser and worker
+preparation/inspection. Local remains default. Config requires a keyed server,
+explicit exact HTTPS storage origin, bucket and region. Existing database,
+origin, owner, key and data-directory guards still apply. SDK 3.1149.0 is exact.
+Owner-prefixed objects use the existing AEAD codec; conditional writes verify
+the winning bytes without overwriting corruption. Bucket readiness, bounded
+stream size/time, error sanitization and client shutdown are covered.
+See docs/evidence/P14-artifact-storage.md for permissions and actual limits.
+
+29 focused tests pass, including a real SDK/loopback HTTP shared contract and
+PDF/DOCX packet readback on both encrypted backends. The first full run was
+invalidated by mixed source versions during a readiness edit; final frozen-code
+pnpm check passes 652 tests / 217 skipped in 84 files, lint/types/ledger/build.
+Production-only Windows installation passes the rebuilt workflow (24.24s);
+production audit finds no known vulnerabilities. Successor CI is pending.
+P14 and P14-02 are in progress, not complete. No gate closes: 12/19 phases and
+89/128 gates. No real S3 service, owner credentials, private services, live
+application or soak was touched. Preview remains stopped; do not bypass denial.

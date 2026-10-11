@@ -9,9 +9,9 @@ import {
   type TaskType,
 } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
-import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
+import { createArtifactStore } from "../../../packages/documents/src/s3-artifact-store.js";
 import { GmailService } from "../../../packages/email/src/service.js";
 import { MatchingRunner } from "../../../packages/inference/src/gateway.js";
 import { OpenRouterTransport } from "../../../packages/inference/src/transport.js";
@@ -26,7 +26,6 @@ import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import { SubmissionRepository } from "../../../packages/persistence/src/submission-repository.js";
 import { VerificationRepository } from "../../../packages/persistence/src/verification-repository.js";
-import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 import { runInspectionTask } from "./inspection.js";
 import { startPeriodicWork } from "./periodic-work.js";
 import { draftWorkerLetter } from "./preparation.js";
@@ -57,10 +56,7 @@ const submissions = new SubmissionRepository(
   undefined,
   config.profile !== "demo",
 );
-const artifacts = new ArtifactStore(
-  config.dataDir,
-  DocumentStorage.fromConfig(config, "document_artifact"),
-);
+const artifacts = createArtifactStore(config);
 await artifacts.initialize();
 const adapters = createAdapterRegistry(config.dataDir);
 const email = new EmailRepository(repository.db, repository.ownerId, config.vaultKey);
@@ -360,6 +356,7 @@ try {
   await heartbeat.stop();
   await mailSync;
   await gmail.close();
+  artifacts.close?.();
   await repository.db.close();
   if (process.connected) process.disconnect();
 }

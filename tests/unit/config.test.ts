@@ -4,6 +4,38 @@ import { loadConfig } from "../../packages/config/src/index.js";
 import { sqliteVersionSafe } from "../../packages/persistence/src/database.js";
 
 describe("configuration fails closed", () => {
+  it("requires keyed server-only S3 settings with an exact HTTPS origin", () => {
+    const env = {
+      AUTOPILOT_PROFILE: "server",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "synthetic-s3-data"),
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+      AUTOPILOT_DATABASE_URL: "postgresql://synthetic:synthetic@localhost/synthetic",
+      AUTOPILOT_ALLOWED_ORIGINS: "https://app.synthetic.example",
+      AUTOPILOT_VAULT_KEY: Buffer.alloc(32, 3).toString("base64"),
+      AUTOPILOT_ARTIFACT_BACKEND: "s3",
+      AUTOPILOT_S3_ENDPOINT: "https://storage.synthetic.example",
+      AUTOPILOT_S3_BUCKET: "synthetic-artifacts",
+      AUTOPILOT_S3_REGION: "eu-synthetic-1",
+    };
+    expect(loadConfig(env).artifactS3).toEqual({
+      endpoint: env.AUTOPILOT_S3_ENDPOINT,
+      bucket: env.AUTOPILOT_S3_BUCKET,
+      region: env.AUTOPILOT_S3_REGION,
+    });
+    for (const change of [
+      { AUTOPILOT_PROFILE: "local" },
+      { AUTOPILOT_VAULT_KEY: undefined },
+      { AUTOPILOT_S3_REGION: undefined },
+      { AUTOPILOT_S3_BUCKET: undefined },
+      { AUTOPILOT_S3_ENDPOINT: "http://storage.synthetic.example" },
+      { AUTOPILOT_S3_ENDPOINT: "https://user:secret@storage.synthetic.example" },
+      { AUTOPILOT_S3_ENDPOINT: "https://storage.synthetic.example/path" },
+      { AUTOPILOT_S3_ENDPOINT: "https://storage.synthetic.example?secret=synthetic" },
+      { AUTOPILOT_S3_ENDPOINT: "not-a-url" },
+      { AUTOPILOT_ARTIFACT_BACKEND: "local" },
+    ])
+      expect(() => loadConfig({ ...env, ...change })).toThrow();
+  });
   it("bounds the display target without enabling submission", () => {
     expect(loadConfig({ AUTOPILOT_DAILY_TARGET: "12" })).toMatchObject({
       dailyTarget: 12,

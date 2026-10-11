@@ -3,12 +3,11 @@ import { z } from "zod";
 import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
-import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
+import { createArtifactStore } from "../../../packages/documents/src/s3-artifact-store.js";
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
-import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 
 const dryRunInput = z
   .object({
@@ -49,10 +48,8 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
   const candidates = new CandidateRepository(repository.db, repository.ownerId);
-  const store = new ArtifactStore(
-    config.dataDir,
-    DocumentStorage.fromConfig(config, "document_artifact"),
-  );
+  const store = createArtifactStore(config);
+  app.addHook("onClose", async () => store.close?.());
   const adapters = createAdapterRegistry(config.dataDir);
   await store.initialize();
   app.get("/v1/browser", () => browser.snapshot());

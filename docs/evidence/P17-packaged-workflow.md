@@ -40,7 +40,10 @@ and exits the manager and both owned children after authenticated stop.
 Public-source scan passes 387 files, including explicit fixture/compiled inputs.
 The local draft archive SHA-256 is
 06d7fa6d6513910305d6b771f318a183f1170d43f7fcc7bde0501799ec0c65b7.
-Successor CI must independently verify this extension.
+CI [38156771601](https://github.com/Mehulupase01/OpenCareers/actions/runs/38156771601)
+at e5c504caa183d267886e11a7aa2cc0ebaa45174f passed Windows, Ubuntu and PostgreSQL,
+including the Windows production-only packaged workflow and browser regressions.
+That run does not verify the later S3 backend extension.
 
 This is not job discovery, real fit inference or OpenRouter letter evidence:
 assessment and letter content are deterministic reviewed synthetic fixtures.

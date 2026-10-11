@@ -21,6 +21,16 @@ const envSchema = z.object({
     .regex(/^[a-f0-9]{64}$/)
     .optional(),
   AUTOPILOT_DATABASE_URL: z.string().optional(),
+  AUTOPILOT_ARTIFACT_BACKEND: z.enum(["local", "s3"]).default("local"),
+  AUTOPILOT_S3_ENDPOINT: z.string().optional(),
+  AUTOPILOT_S3_BUCKET: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/)
+    .optional(),
+  AUTOPILOT_S3_REGION: z
+    .string()
+    .regex(/^[a-z0-9-]{1,64}$/)
+    .optional(),
   AUTOPILOT_ALLOWED_ORIGINS: z.string().optional(),
   AUTOPILOT_OPENROUTER_API_KEY: z.string().min(20).max(512).optional(),
   AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: z.string().optional(),
@@ -45,6 +55,7 @@ export interface Config {
   runtimeInstance?: string | undefined;
   restoreSnapshotSha256?: string | undefined;
   databaseUrl: string | undefined;
+  artifactS3?: { endpoint: string; bucket: string; region: string } | undefined;
   allowedOrigins: string[];
   dailyTarget: number;
   inference: {
@@ -76,6 +87,35 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   }
   const e = parsed.data;
   const profile = e.AUTOPILOT_PROFILE;
+  let artifactS3: Config["artifactS3"];
+  if (e.AUTOPILOT_ARTIFACT_BACKEND === "s3") {
+    if (
+      profile !== "server" ||
+      !e.AUTOPILOT_S3_ENDPOINT ||
+      !e.AUTOPILOT_S3_BUCKET ||
+      !e.AUTOPILOT_S3_REGION ||
+      !e.AUTOPILOT_VAULT_KEY
+    )
+      throw new DomainError(
+        "CONFIG_INVALID",
+        "S3 artifacts require a keyed server profile and explicit endpoint, bucket and region.",
+      );
+    let endpoint: URL;
+    try {
+      endpoint = new URL(e.AUTOPILOT_S3_ENDPOINT);
+    } catch {
+      throw new DomainError("CONFIG_INVALID", "Invalid artifact endpoint.");
+    }
+    if (endpoint.protocol !== "https:" || endpoint.origin !== e.AUTOPILOT_S3_ENDPOINT)
+      throw new DomainError("CONFIG_INVALID", "Artifact endpoint must be an exact HTTPS origin.");
+    artifactS3 = {
+      endpoint: endpoint.origin,
+      bucket: e.AUTOPILOT_S3_BUCKET,
+      region: e.AUTOPILOT_S3_REGION,
+    };
+  } else if (e.AUTOPILOT_S3_ENDPOINT || e.AUTOPILOT_S3_BUCKET || e.AUTOPILOT_S3_REGION) {
+    throw new DomainError("CONFIG_INVALID", "S3 settings require the S3 artifact backend.");
+  }
   if (profile === "demo" && e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256)
     throw new DomainError(
       "CONFIG_INVALID",
@@ -214,6 +254,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     runtimeInstance: e.AUTOPILOT_RUNTIME_INSTANCE,
     restoreSnapshotSha256: e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
+    artifactS3,
     allowedOrigins,
     dailyTarget: e.AUTOPILOT_DAILY_TARGET,
     inference: {

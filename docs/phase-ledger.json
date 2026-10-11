@@ -1664,7 +1664,7 @@
     {
       "id": "P14",
       "title": "Fully deployable server and hybrid profiles",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P13"],
       "tickets": [
         {
@@ -1678,9 +1678,9 @@
         {
           "id": "P14-02",
           "text": "Secrets and storage. Support environment-mounted or external secret-store references without baking credentials into images, with S3-compatible storage contract tests and encryption configuration.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T27"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P14-artifact-storage.md"],
           "nextAction": "P14-02"
         },
         {
@@ -1761,7 +1761,7 @@
       "remoteVerification": [],
       "acceptanceTests": ["T27"],
       "nextAction": "P14-01",
-      "evidence": ["docs/plans/P14-server-hybrid.md"]
+      "evidence": ["docs/plans/P14-server-hybrid.md", "docs/evidence/P14-artifact-storage.md"]
     },
     {
       "id": "P15",
