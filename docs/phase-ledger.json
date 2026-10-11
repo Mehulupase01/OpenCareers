@@ -2022,7 +2022,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "cfabde72e1954c4b455dc8ebd2259ab79a5c1cce",
+      "lastVerifiedCommit": "9a25aaa0446746cbdb1be6f620dab71443610163",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2065,6 +2065,12 @@
           "commit": "cfabde72e1954c4b455dc8ebd2259ab79a5c1cce",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Private transactional workload proposals, immutable owner review and approved-only export, canonical Amsterdam date checks, complete browser and extracted Windows installation. With existing canonical authorization and analytical/experiment tests closes G7 only, not successor pipeline history/form fixtures or full P16."
+        },
+        {
+          "runId": "38180922212",
+          "commit": "9a25aaa0446746cbdb1be6f620dab71443610163",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Canonical matching pipeline history and frozen compatibility, mixed-version/profile refusal, legacy unknowns, executable categorical unsupported-control/form-drift cases, isolated outcome workflow, complete browser and production-only Windows install. Not successor native verifier, real effectiveness or full phase closure."
         }
       ],
       "acceptanceTests": [],
@@ -2164,8 +2170,13 @@
         {
           "id": "P17-G6",
           "requirement": "The repository and release artifacts contain no real credentials, personal CVs, browser sessions, or private receipts.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P17-bundle-integrity.md",
+            "docs/evidence/P13-windows-bundle.md",
+            "tests/integration/windows-bundle.test.ts",
+            "tests/integration/windows-clean-install.test.ts"
+          ]
         },
         {
           "id": "P17-G7",
@@ -2185,6 +2196,7 @@
       "nextAction": "P17-01",
       "evidence": [
         "docs/plans/P17-release-handoff.md",
+        "docs/evidence/P17-bundle-integrity.md",
         "docs/evidence/P13-windows-bundle.md",
         "docs/evidence/P17-packaged-workflow.md"
       ]

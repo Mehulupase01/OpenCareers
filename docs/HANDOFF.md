@@ -1656,3 +1656,33 @@ remaining seniority/sponsorship history, truthful variants and broad correction
 capture. Full P16/P15, real receipt/ramp, physical host/server/hybrid drills and
 qualifying actual-duration soaks remain open. Private runtime/secrets, model/mail
 calls and real employer actions were untouched. No background coding exists.
+
+## 2026-10-12: Native Bundle Verification
+
+Matching/history commit 9a25aaa0446746cbdb1be6f620dab71443610163 passes all CI lanes
+in 38180922212 (Windows, Ubuntu, PostgreSQL), full browser and production-only
+Windows install included. The successor adds a native-only compiled bundle verifier
+before dependency installation, with shared required runtime paths, strict bounded
+manifest checks, actual file sizes/hashes, redirect/collision/unlisted-dist refusal,
+bounded descriptor reads and optional externally obtained expected manifest hash.
+No owner configuration or dependencies are read. No publisher authenticity,
+signature, dependency attestation or production readiness is claimed.
+
+Final full check: 727 passed / 258 skipped in 94 files; lint/types/ledger/build
+pass. Focused integrity/bundle: 22/1 skip. The Windows file-symlink fixture lacks
+privilege (EPERM) and is Linux-only; directory-junction refusal is tested locally.
+Initial extracted install found the missing production compiler CLI entrypoint;
+the allowlist was fixed and production rebuilt. Final clean production-only
+installation passes 1/1 (24.59 seconds total), including native verification before
+pnpm, correct/incorrect manifest digests and same-length worker corruption refusal,
+then restored artifact, document/self-test and independent runtime boot/stop.
+Public scan: 441 files. Successor CI pending. No UI changed in this batch; the
+preceding identical frontend is all-green in CI, not a successor full browser claim.
+
+P17-G6 closes using reviewed public distribution inputs, explicit private/source
+exclusion, selected-byte scans and actual archive assertions. Counts are now 12/19
+phases and 94/128 gates. This does not close P17 or certify arbitrary local/private
+files, production signing, live submissions or physical/server/hybrid/soak gates.
+Continue directly into the packaged synthetic crash-recovery/challenge workflow
+and independent deployment verification. Private runtime/data/secrets were untouched;
+no model/mail/employer request or elapsed soak occurred. No background coding exists.

@@ -4,25 +4,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ZipFile } from "yazl";
 import { publicSourceFindings } from "../packages/security/src/public-source.js";
+import { bundleInputPaths } from "./bundle-verification.js";
 
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
-const required = [
-  "package.json",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  ".node-version",
-  ".env.example",
-  "scripts/windows-runtime.ps1",
-  "scripts/windows-startup-host.ps1",
-  "dist/scripts/runtime.js",
-  "dist/scripts/release-smoke.js",
-  "dist/scripts/release-smoke-run.js",
-  "dist/scripts/capacity-fixture.js",
-  "dist/tests/fixtures/document-packets.js",
-  "dist/apps/api/src/main.js",
-  "dist/apps/worker/src/main.js",
-  "dist/web/index.html",
-];
 
 export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..")) {
   root = await realpath(root);
@@ -69,7 +53,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
       await add(path);
     }
   };
-  for (const path of required) await add(path);
+  for (const path of bundleInputPaths) await add(path);
   for (const path of ["dist/apps/api", "dist/apps/worker", "dist/packages", "dist/web"])
     await walk(path);
   const original = JSON.parse(files.get("package.json")?.toString() ?? "{}");
@@ -81,6 +65,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
       "self-test": "node dist/scripts/release-smoke.js",
+      "verify:bundle": "node dist/scripts/verify-bundle.js",
     },
   };
   files.set("package.json", Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));
@@ -98,8 +83,16 @@ detect corruption, not publisher identity; this bundle is not code-signed.
 
 From the extracted directory:
 
+    node dist/scripts/verify-bundle.js
     corepack pnpm install --prod --frozen-lockfile
     corepack pnpm exec playwright install chromium
+
+The native-only verifier runs before dependency installation and never loads
+owner configuration. It checks bounded manifest entries, file bytes/hashes,
+filesystem redirection and unlisted dist artifacts. Optional --manifest-sha256
+<trusted-digest> checks an independently obtained manifest digest. It does not
+authenticate the publisher, verify node_modules, read private local files or
+certify production readiness. A rewritten manifest is not a trusted signature.
 
 Then run node dist/scripts/release-smoke.js. This bounded self-test accepts no
 options, ignores private environment configuration and creates fresh synthetic

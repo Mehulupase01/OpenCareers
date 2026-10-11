@@ -49,6 +49,63 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     } finally {
       archive.close();
     }
+    const verified = await execute(process.execPath, ["dist/scripts/verify-bundle.js"], {
+      cwd: installation,
+      env: environment(),
+      timeout: 30000,
+    });
+    expect(JSON.parse(verified.stdout)).toMatchObject({
+      status: "integrity_verified",
+      dependenciesVerified: false,
+      publisherIdentityVerified: false,
+      productionReleaseAccepted: false,
+    });
+    const installedManifestSha256 = createHash("sha256")
+      .update(await readFile(join(installation, "bundle-manifest.json")))
+      .digest("hex");
+    const verifiedExpected = await execute(
+      process.execPath,
+      ["dist/scripts/verify-bundle.js", "--manifest-sha256", installedManifestSha256],
+      {
+        cwd: installation,
+        env: environment(),
+        timeout: 30000,
+      },
+    );
+    expect(JSON.parse(verifiedExpected.stdout).expectedManifestMatched).toBe(true);
+    const workerArtifact = join(installation, "dist/apps/worker/src/main.js");
+    const originalWorker = await readFile(workerArtifact);
+    const changedWorker = Buffer.from(originalWorker);
+    changedWorker[0] = changedWorker[0] === 120 ? 121 : 120;
+    await writeFile(workerArtifact, changedWorker);
+    try {
+      await expect(
+        execute(process.execPath, ["dist/scripts/verify-bundle.js"], {
+          cwd: installation,
+          env: environment(),
+          timeout: 30000,
+        }),
+      ).rejects.toMatchObject({
+        stdout: "",
+        stderr: expect.stringContaining("Bundle verification failed"),
+      });
+    } finally {
+      await writeFile(workerArtifact, originalWorker);
+    }
+    await expect(
+      execute(
+        process.execPath,
+        ["dist/scripts/verify-bundle.js", "--manifest-sha256", "0".repeat(64)],
+        {
+          cwd: installation,
+          env: environment(),
+          timeout: 30000,
+        },
+      ),
+    ).rejects.toMatchObject({
+      stdout: "",
+      stderr: expect.stringContaining("Bundle verification failed"),
+    });
     await execute(
       process.platform === "win32" ? "powershell.exe" : "corepack",
       process.platform === "win32"

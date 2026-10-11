@@ -5,7 +5,8 @@
     "apps/worker/**/*.ts",
     "packages/**/*.ts",
     "scripts/runtime.ts",
-    "scripts/release-smoke.ts"
+    "scripts/release-smoke.ts",
+    "scripts/verify-bundle.ts"
   ],
   "exclude": ["node_modules", "dist", "tests"]
 }
