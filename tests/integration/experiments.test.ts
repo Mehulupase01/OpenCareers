@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { packetManifestSchema } from "../../packages/contracts/src/documents.js";
 import { experimentInputSchema } from "../../packages/contracts/src/experiment.js";
+import { CohortRepository } from "../../packages/persistence/src/cohort-repository.js";
 import {
   type Database,
   openPostgres,
@@ -52,9 +53,14 @@ for (const engine of ["sqlite", "postgres"] as const) {
         ],
       });
       // Minimal manifest fixture, not an executable or live document packet.
-      const ready = async () => {
+      const ready = async (receiptFixture = false) => {
         const jobId = randomUUID();
-        await repo.putJob({ ...documentJob, id: jobId, requisitionId: jobId });
+        await repo.putJob({
+          ...documentJob,
+          id: jobId,
+          requisitionId: jobId,
+          synthetic: !receiptFixture,
+        });
         const app = await repo.createApplication(jobId, "synthetic-candidate");
         await db.query("UPDATE applications SET state='READY' WHERE owner_id=$1 AND id=$2", [
           owner,
@@ -117,6 +123,169 @@ for (const engine of ["sqlite", "postgres"] as const) {
         db.transaction((tx) =>
           assertExperimentDispatch(tx, owner, applicationId, packetId, now.toISOString()),
         );
+
+      const confirmedFixture = async (
+        item: Awaited<ReturnType<typeof ready>>,
+        assignmentId: string,
+      ) => {
+        const id = randomUUID(),
+          at = now.toISOString();
+        const assignment = (
+          await db.query(
+            "SELECT binding_sha256 FROM experiment_assignments WHERE owner_id=$1 AND id=$2",
+            [owner, assignmentId],
+          )
+        )[0];
+        const snapshot = JSON.stringify({
+          applicationId: item.app.id,
+          packetId: item.input.packetId,
+          experiment: { assignmentId, bindingSha256: assignment?.binding_sha256 },
+        });
+        await db.query(
+          "INSERT INTO authorizations(id,owner_id,revision,data,effective_at,expires_at) VALUES($1,$2,$3,'{}',$4,'2027-01-01T00:00:00.000Z')",
+          [
+            id,
+            owner,
+            (await db.query("SELECT id FROM authorizations WHERE owner_id=$1", [owner])).length + 1,
+            at,
+          ],
+        );
+        await db.query(
+          "INSERT INTO intents(id,owner_id,application_id,packet_id,authorization_id,snapshot,sha256,created_at) VALUES($1,$2,$3,$4,$1,$5,$6,$7)",
+          [
+            id,
+            owner,
+            item.app.id,
+            item.input.packetId,
+            snapshot,
+            createHash("sha256").update(snapshot).digest("hex"),
+            at,
+          ],
+        );
+        await db.query(
+          "INSERT INTO attempts(id,owner_id,application_id,intent_id,fence,state,started_at,dispatch_started_at) VALUES($1,$2,$3,$1,1,'CONFIRMED',$4,$4)",
+          [id, owner, item.app.id, at],
+        );
+        const receipt = JSON.stringify({
+          kind: "greenhouse",
+          receiptId: id,
+          board: "synthetic-fixture",
+          postingId: "1",
+          jobId: item.jobId,
+          receiptUrl: "https://receipt.synthetic.example/fixture",
+          receivedAt: at,
+          emailHash: "a".repeat(64),
+        });
+        await db.query(
+          "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$1,$4,$5,$6)",
+          [id, owner, item.app.id, receipt, createHash("sha256").update(receipt).digest("hex"), at],
+        );
+        await db.query("UPDATE applications SET state='CONFIRMED' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          item.app.id,
+        ]);
+        return id;
+      };
+
+      it("freezes receipt-backed variant attribution across stop and later tampering", async () => {
+        const input = definition();
+        await experiments.create(input);
+        const items = [];
+        for (const variantId of ["baseline", "concise"]) {
+          const item = await ready(true);
+          await experiments.assign({ ...item.input, experimentId: input.id, variantId });
+          await confirmedFixture(item, item.input.id);
+          items.push(item);
+        }
+        await experiments.stop(input.id, { expectedRevision: 1 });
+        now = new Date("2026-11-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const window = {
+          id: randomUUID(),
+          from: "2026-09-01T00:00:00.000Z",
+          through: "2026-09-30T00:00:00.000Z",
+          observationDays: 30,
+        };
+        const report = await cohorts.record(window);
+        expect(report).toMatchObject({ denominator: 2, counts: { UNKNOWN: 2 }, fractions: null });
+        expect(
+          report.groups
+            .filter((group) => group.dimension === "experimentVariant")
+            .map((group) => group.value),
+        ).toEqual([`${input.id}/baseline`, `${input.id}/concise`]);
+        const compare = {
+          leftSnapshotId: window.id,
+          rightSnapshotId: window.id,
+          dimension: "experimentVariant",
+          leftValue: `${input.id}/baseline`,
+          rightValue: `${input.id}/concise`,
+        };
+        expect(await cohorts.compare(compare)).toMatchObject({
+          status: "insufficient_data",
+          declaredMetric: "INTERVIEW",
+          differences: null,
+        });
+        const stored = JSON.parse(
+          String(
+            (
+              await db.query("SELECT data FROM outcome_cohorts WHERE owner_id=$1 AND id=$2", [
+                owner,
+                window.id,
+              ])
+            )[0]?.data,
+          ),
+        );
+        expect(
+          stored.members.every(
+            (member: { experiment: { id: string; metric: string } }) =>
+              member.experiment.id === input.id && member.experiment.metric === "INTERVIEW",
+          ),
+        ).toBe(true);
+        await db.query(
+          "UPDATE experiment_assignments SET binding='{}' WHERE owner_id=$1 AND id=$2",
+          [owner, items[0]?.input.id as string],
+        );
+        expect(await cohorts.record(window)).toEqual(report);
+        expect(await cohorts.report(window.id)).toEqual(report);
+        await expect(cohorts.record({ ...window, id: randomUUID() })).rejects.toMatchObject({
+          code: "STATE_INVALID",
+        });
+      });
+      it("refuses forged or post-intent assignment evidence in cohort capture", async () => {
+        const input = definition();
+        await experiments.create(input);
+        const item = await ready(true);
+        await experiments.assign({ ...item.input, experimentId: input.id });
+        const receiptId = await confirmedFixture(item, item.input.id);
+        now = new Date("2026-11-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const window = () => ({
+          id: randomUUID(),
+          from: "2026-09-01T00:00:00.000Z",
+          through: "2026-09-30T00:00:00.000Z",
+        });
+        await db.query(
+          "UPDATE experiment_assignments SET created_at='2026-09-17T09:01:00.000Z' WHERE owner_id=$1 AND id=$2",
+          [owner, item.input.id],
+        );
+        await expect(cohorts.record(window())).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await db.query(
+          "UPDATE experiment_assignments SET created_at='2026-09-17T09:00:00.000Z' WHERE owner_id=$1 AND id=$2",
+          [owner, item.input.id],
+        );
+        await db.query("UPDATE intents SET sha256=$1 WHERE owner_id=$2 AND id=$3", [
+          "f".repeat(64),
+          owner,
+          receiptId,
+        ]);
+        await expect(cohorts.record(window())).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await db.query("DELETE FROM experiment_assignments WHERE owner_id=$1 AND id=$2", [
+          owner,
+          item.input.id,
+        ]);
+        await expect(cohorts.record(window())).rejects.toMatchObject({ code: "STATE_INVALID" });
+        expect(await cohorts.list()).toEqual([]);
+      });
 
       it("freezes definitions, exact retries and owner isolation without modifying policy", async () => {
         const input = definition();

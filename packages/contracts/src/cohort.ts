@@ -8,6 +8,7 @@ export const cohortDimensionSchema = z.enum([
   "seniority",
   "sponsorship",
   "documentTemplate",
+  "experimentVariant",
 ]);
 export const cohortSnapshotInputSchema = cohortInputSchema
   .omit({ asOf: true })
@@ -37,6 +38,19 @@ export const fixedCohortSchema = z
               .regex(/^[a-f0-9]{64}$/)
               .nullable(),
             metadataSha256: z.string().regex(/^[a-f0-9]{64}$/),
+            experiment: z
+              .object({
+                id: z.uuid(),
+                variantId: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+                metric: z.enum(["SCREENING", "INTERVIEW", "OFFER"]),
+                observationDays: z.number().int().min(1).max(365),
+                definitionSha256: z.string().regex(/^[a-f0-9]{64}$/),
+                assignmentSha256: z.string().regex(/^[a-f0-9]{64}$/),
+                approvalSha256: z.string().regex(/^[a-f0-9]{64}$/),
+                packetSha256: z.string().regex(/^[a-f0-9]{64}$/),
+              })
+              .strict()
+              .optional(),
             groups: z
               .object({
                 source: z.string().min(1).max(100),
@@ -44,6 +58,7 @@ export const fixedCohortSchema = z
                 seniority: z.literal("unknown"),
                 sponsorship: z.literal("unknown"),
                 documentTemplate: z.string().min(1).max(100),
+                experimentVariant: z.string().min(1).max(100).optional(),
               })
               .strict(),
           })

@@ -39,6 +39,89 @@ const fixture = (): FixedCohort => ({
   })),
 });
 describe("fixed horizon cohort reporting", () => {
+  it("compares only variants of one frozen definition at its declared horizon", () => {
+    const snapshot = fixture(),
+      id = randomUUID();
+    snapshot.members = snapshot.members.map((member, index) => {
+      const variantId = index < 20 ? "baseline" : "concise";
+      return {
+        ...member,
+        groups: { ...member.groups, experimentVariant: `${id}/${variantId}` },
+        experiment: {
+          id,
+          variantId,
+          metric: "INTERVIEW",
+          observationDays: 30,
+          definitionSha256: "d".repeat(64),
+          assignmentSha256: "e".repeat(64),
+          approvalSha256: "f".repeat(64),
+          packetSha256: "a".repeat(64),
+        },
+      };
+    });
+    expect(
+      compareFixedCohorts(
+        snapshot,
+        snapshot,
+        "experimentVariant",
+        `${id}/baseline`,
+        `${id}/concise`,
+      ),
+    ).toMatchObject({
+      status: "measured",
+      declaredMetric: "INTERVIEW",
+      differences: { INTERVIEW: 1, UNKNOWN: -1 },
+    });
+    for (const override of [
+      { id: randomUUID() },
+      { definitionSha256: "a".repeat(64) },
+      { metric: "OFFER" as const },
+      { observationDays: 31 },
+    ]) {
+      const changed = {
+        ...snapshot,
+        members: snapshot.members.map((member, index) =>
+          index === 20 && member.experiment
+            ? { ...member, experiment: { ...member.experiment, ...override } }
+            : member,
+        ),
+      };
+      expect(() =>
+        compareFixedCohorts(
+          snapshot,
+          changed,
+          "experimentVariant",
+          `${id}/baseline`,
+          `${id}/concise`,
+        ),
+      ).toThrow(/one definition/);
+    }
+    const legacy = fixture();
+    expect(
+      fixedCohortReport(legacy).groups.find((group) => group.dimension === "experimentVariant"),
+    ).toMatchObject({ value: "unassigned", denominator: 40 });
+    expect(() =>
+      compareFixedCohorts(legacy, snapshot, "experimentVariant", "unassigned", `${id}/concise`),
+    ).toThrow();
+    expect(
+      compareFixedCohorts(
+        { ...snapshot, members: snapshot.members.slice(0, 39) },
+        snapshot,
+        "experimentVariant",
+        `${id}/baseline`,
+        `${id}/concise`,
+      ),
+    ).toMatchObject({ status: "measured" });
+    expect(
+      compareFixedCohorts(
+        snapshot,
+        { ...snapshot, members: snapshot.members.slice(0, 39) },
+        "experimentVariant",
+        `${id}/baseline`,
+        `${id}/concise`,
+      ),
+    ).toMatchObject({ status: "insufficient_data", differences: null });
+  });
   it("states denominators, windows and exclusions without inventing probabilities", () => {
     const snapshot = fixture(),
       report = fixedCohortReport(snapshot);

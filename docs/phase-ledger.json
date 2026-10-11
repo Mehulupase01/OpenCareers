@@ -1900,6 +1900,7 @@
           "evidence": [
             "docs/evidence/P16-outcome-foundation.md",
             "docs/evidence/P16-fixed-cohorts.md",
+            "docs/evidence/P16-experiment-attribution.md",
             "tests/unit/cohort-report.test.ts",
             "tests/integration/outcomes.test.ts",
             "tests/e2e/outcomes.spec.ts"
@@ -1913,6 +1914,7 @@
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-score-calibration.md",
+            "docs/evidence/P16-calibration.md",
             "tests/unit/score-calibration.test.ts",
             "tests/integration/calibration.test.ts",
             "tests/e2e/calibration.spec.ts"
@@ -1938,10 +1940,11 @@
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-controlled-experiments.md",
+            "docs/evidence/P16-experiment-attribution.md",
             "tests/integration/experiments.test.ts",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "Verify experiment dispatch guards across CI, then frozen variant comparison and truthful variant generation."
+          "nextAction": "Verify receipt-backed variant attribution across CI, then truthful variant generation and owner policy adoption workflow."
         }
       ],
       "gates": [
@@ -2011,7 +2014,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "2889dbc930de0a0505e05fef946358220a7dc74f",
+      "lastVerifiedCommit": "b76f513524fb092e8500f4415b13ce351612b21c",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2036,6 +2039,12 @@
           "commit": "2889dbc930de0a0505e05fef946358220a7dc74f",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Fixed-review import/catalog and advisory diagnostics workspace, snapshot isolation/integrity, browser regressions and production-only Windows installation. Closes G4 with Matching source review and no-probability diagnostic contracts; not successor fixed cohorts, live quality or full P16."
+        },
+        {
+          "runId": "38177319128",
+          "commit": "b76f513524fb092e8500f4415b13ce351612b21c",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Immutable reviewed experiment definitions and packet assignments, duplicate/expiry/stop dispatch guards, confirmation after stop, fixed cohorts, owner workflow, full browser and Windows production-only installation. Installer bounded deadline passes; not successor experiment attribution, truthful automatic variant generation or additional gate closure."
         }
       ],
       "acceptanceTests": [],
@@ -2045,7 +2054,10 @@
         "docs/evidence/P16-outcome-foundation.md",
         "docs/evidence/P16-score-calibration.md",
         "docs/evidence/P16-regression-import.md",
-        "docs/evidence/P16-fixed-cohorts.md"
+        "docs/evidence/P16-fixed-cohorts.md",
+        "docs/evidence/P16-controlled-experiments.md",
+        "docs/evidence/P16-experiment-attribution.md",
+        "docs/evidence/P16-calibration.md"
       ]
     },
     {

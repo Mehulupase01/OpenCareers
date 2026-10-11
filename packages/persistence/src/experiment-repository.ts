@@ -42,6 +42,17 @@ function active(row: Row, now: string) {
   return data;
 }
 
+export function experimentAssignmentEvidence(row: Row, experiment: Row) {
+  const assignment = assignmentData(row);
+  const data = definition(experiment);
+  if (
+    assignment.experimentId !== data.id ||
+    !data.variants.some((v) => v.id === assignment.variantId)
+  )
+    throw new DomainError("STATE_INVALID", "Experiment evidence attribution failed.");
+  return { assignment, definition: data };
+}
+
 // This guard runs under the submission engine's owner lock, never in receipt
 // confirmation: a stop must not erase an already-sent outcome.
 export async function assertExperimentDispatch(

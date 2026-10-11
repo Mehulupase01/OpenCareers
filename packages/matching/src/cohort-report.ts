@@ -30,7 +30,7 @@ export function fixedCohortReport(raw: FixedCohort) {
   const groups = cohortDimensions.flatMap((dimension) => {
     const grouped = new Map<string, FixedCohort["members"]>();
     for (const member of snapshot.members) {
-      const value = member.groups[dimension];
+      const value = member.groups[dimension] ?? "unassigned";
       const entries = grouped.get(value) ?? [];
       entries.push(member);
       grouped.set(value, entries);
@@ -56,6 +56,7 @@ export function fixedCohortReport(raw: FixedCohort) {
       "Current recorded outcome at the fixed observation horizon, not cumulative conversion.",
       "Groups use metadata captured at snapshot creation, not reconstructed submission-time metadata.",
       "Unknown metadata is not inferred. Comparisons are descriptive, not causal or hiring probabilities.",
+      "Experiment groups require pre-dispatch assignment evidence; legacy records stay unassigned.",
     ],
   };
 }
@@ -65,6 +66,7 @@ const cohortDimensions: CohortDimension[] = [
   "seniority",
   "sponsorship",
   "documentTemplate",
+  "experimentVariant",
 ];
 
 export function compareFixedCohorts(
@@ -83,9 +85,33 @@ export function compareFixedCohorts(
     throw new DomainError("STATE_INVALID", "Cohort windows or methodology are incompatible.");
   if (leftValue === rightValue)
     throw new DomainError("STATE_INVALID", "Distinct comparison groups are required.");
-  const a = left.members.filter((member) => member.groups[dimension] === leftValue);
-  const b = right.members.filter((member) => member.groups[dimension] === rightValue);
+  const a = left.members.filter(
+    (member) => (member.groups[dimension] ?? "unassigned") === leftValue,
+  );
+  const b = right.members.filter(
+    (member) => (member.groups[dimension] ?? "unassigned") === rightValue,
+  );
   if (!a.length || !b.length) throw new DomainError("NOT_FOUND", "Comparison group not found.");
+  if (dimension === "experimentVariant") {
+    const reference = a[0]?.experiment;
+    if (
+      !reference ||
+      [...a, ...b].some(
+        (member) =>
+          !member.experiment ||
+          member.experiment.id !== reference.id ||
+          member.experiment.definitionSha256 !== reference.definitionSha256 ||
+          member.experiment.metric !== reference.metric ||
+          member.experiment.observationDays !== left.window.observationDays ||
+          member.groups.experimentVariant !==
+            `${member.experiment.id}/${member.experiment.variantId}`,
+      )
+    )
+      throw new DomainError(
+        "STATE_INVALID",
+        "Experiment comparisons require one definition and its declared observation horizon.",
+      );
+  }
   const jobs = new Set(a.map((member) => member.jobId));
   if (b.some((member) => jobs.has(member.jobId)))
     throw new DomainError(
@@ -103,6 +129,7 @@ export function compareFixedCohorts(
     methodology: left.methodology,
     window: left.window,
     dimension,
+    declaredMetric: dimension === "experimentVariant" ? (a[0]?.experiment?.metric ?? null) : null,
     left: { snapshotId: left.id, value: leftValue, ...leftReport, exclusions: left.exclusions },
     right: {
       snapshotId: right.id,

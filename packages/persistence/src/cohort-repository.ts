@@ -12,6 +12,7 @@ import { outcomeKindSchema } from "../../contracts/src/outcome.js";
 import { receiptEvidenceSchema } from "../../contracts/src/submission.js";
 import { compareFixedCohorts, fixedCohortReport } from "../../matching/src/cohort-report.js";
 import type { Row, SqlExecutor } from "./database.js";
+import { experimentAssignmentEvidence } from "./experiment-repository.js";
 import { OwnerScope } from "./owner-scope.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -100,7 +101,7 @@ export class CohortRepository extends OwnerScope {
         [this.ownerId],
       );
       const receipts = await tx.query(
-        "SELECT r.*,i.packet_id,p.manifest,p.sha256 AS packet_sha256 FROM receipts r JOIN attempts t ON t.owner_id=r.owner_id AND t.id=r.attempt_id AND t.application_id=r.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id AND i.application_id=t.application_id LEFT JOIN packets p ON p.owner_id=i.owner_id AND p.id=i.packet_id AND p.application_id=i.application_id WHERE r.owner_id=$1 AND t.state='CONFIRMED' AND r.observed_at<=$2 ORDER BY r.observed_at,r.id LIMIT 100001",
+        "SELECT r.*,i.packet_id,i.snapshot AS intent_snapshot,i.sha256 AS intent_sha256,i.created_at AS intent_created_at,t.dispatch_started_at,p.manifest,p.sha256 AS packet_sha256 FROM receipts r JOIN attempts t ON t.owner_id=r.owner_id AND t.id=r.attempt_id AND t.application_id=r.application_id JOIN intents i ON i.owner_id=t.owner_id AND i.id=t.intent_id AND i.application_id=t.application_id LEFT JOIN packets p ON p.owner_id=i.owner_id AND p.id=i.packet_id AND p.application_id=i.application_id WHERE r.owner_id=$1 AND t.state='CONFIRMED' AND r.observed_at<=$2 ORDER BY r.observed_at,r.id LIMIT 100001",
         [this.ownerId, asOf],
       );
       const events = await tx.query(
@@ -115,12 +116,17 @@ export class CohortRepository extends OwnerScope {
         "SELECT from_job_id,to_job_id FROM identity_resolutions WHERE owner_id=$1 AND reversed_at IS NULL LIMIT 10001",
         [this.ownerId],
       );
+      const assignments = await tx.query(
+        "SELECT a.*,e.id AS definition_id,e.data AS experiment_data,e.sha256 AS experiment_sha256,e.state AS experiment_state FROM experiment_assignments a JOIN experiments e ON e.owner_id=a.owner_id AND e.id=a.experiment_id WHERE a.owner_id=$1 AND a.created_at<=$2 LIMIT 10001",
+        [this.ownerId, asOf],
+      );
       if (
         applications.length > 10000 ||
         receipts.length > 100000 ||
         events.length > 100000 ||
         listings.length > 10000 ||
-        identities.length > 10000
+        identities.length > 10000 ||
+        assignments.length > 10000
       )
         throw new DomainError("STATE_INVALID", "Cohort capture exceeds its bounded read size.");
       const parents = new Map(
@@ -138,6 +144,7 @@ export class CohortRepository extends OwnerScope {
         return id;
       };
       const byReceipt = new Map<string, Row>();
+      const byAssignment = new Map(assignments.map((row) => [String(row.application_id), row]));
       for (const row of receipts)
         if (!byReceipt.has(String(row.application_id)))
           byReceipt.set(String(row.application_id), row);
@@ -240,7 +247,69 @@ export class CohortRepository extends OwnerScope {
           seniority: "unknown" as const,
           sponsorship: "unknown" as const,
           documentTemplate,
+          experimentVariant: "unassigned",
         };
+        let experiment: FixedCohort["members"][number]["experiment"];
+        const assigned = byAssignment.get(String(row.id));
+        if (assigned) {
+          const evidence = experimentAssignmentEvidence(assigned, {
+            id: assigned.definition_id,
+            data: assigned.experiment_data,
+            sha256: assigned.experiment_sha256,
+            state: assigned.experiment_state,
+          });
+          const intent = parseOptional(receipt.intent_snapshot) as {
+            experiment?: { assignmentId?: string; bindingSha256?: string };
+            packetId?: string;
+            applicationId?: string;
+          } | null;
+          const assignedAt = Date.parse(String(assigned.created_at));
+          const intentAt = Date.parse(String(receipt.intent_created_at));
+          const dispatchedAt = Date.parse(String(receipt.dispatch_started_at));
+          if (
+            !manifest.success ||
+            hash(String(receipt.manifest)) !== receipt.packet_sha256 ||
+            hash(String(receipt.intent_snapshot)) !== receipt.intent_sha256 ||
+            intent?.experiment?.assignmentId !== evidence.assignment.id ||
+            intent.experiment.bindingSha256 !== assigned.binding_sha256 ||
+            intent.packetId !== receipt.packet_id ||
+            intent.applicationId !== row.id ||
+            evidence.assignment.packetId !== receipt.packet_id ||
+            evidence.assignment.reviewedPacketSha256 !== receipt.packet_sha256 ||
+            canonical(String(assigned.canonical_job_id)) !== jobId ||
+            !Number.isFinite(assignedAt) ||
+            !Number.isFinite(intentAt) ||
+            !Number.isFinite(dispatchedAt) ||
+            assignedAt > intentAt ||
+            intentAt > dispatchedAt ||
+            dispatchedAt > received
+          )
+            throw new DomainError("STATE_INVALID", "Receipt-backed experiment attribution failed.");
+          const variant = evidence.definition.variants.find(
+            (v) => v.id === evidence.assignment.variantId,
+          );
+          if (!variant)
+            throw new DomainError("STATE_INVALID", "Assigned variant evidence missing.");
+          experiment = {
+            id: evidence.definition.id,
+            variantId: variant.id,
+            metric: evidence.definition.metric,
+            observationDays: evidence.definition.observationDays,
+            definitionSha256: String(assigned.experiment_sha256),
+            assignmentSha256: String(assigned.binding_sha256),
+            approvalSha256: variant.approvalSha256,
+            packetSha256: String(receipt.packet_sha256),
+          };
+          groups.experimentVariant = `${experiment.id}/${experiment.variantId}`;
+        } else if (
+          (parseOptional(receipt.intent_snapshot) as { experiment?: unknown } | null)?.experiment !=
+          null
+        ) {
+          throw new DomainError(
+            "STATE_INVALID",
+            "Dispatched experiment assignment evidence is missing.",
+          );
+        }
         members.push({
           applicationId: String(row.id),
           jobId,
@@ -251,8 +320,9 @@ export class CohortRepository extends OwnerScope {
           outcome: event ? outcomeKindSchema.parse(event.kind) : "UNKNOWN",
           outcomeEventId: event ? String(event.id) : null,
           outcomeEvidenceSha256: event ? String(event.evidence_sha256) : null,
-          metadataSha256: hash(JSON.stringify(groups)),
+          metadataSha256: hash(JSON.stringify(experiment ? { groups, experiment } : groups)),
           groups,
+          ...(experiment ? { experiment } : {}),
         });
       }
       const snapshot = fixedCohortSchema.parse({

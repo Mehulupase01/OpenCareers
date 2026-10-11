@@ -1562,3 +1562,32 @@ not generate wording or measure real improvement. Physical Windows/server drills
 live receipts and real 24/72-hour soaks remain unverified. No private owner runtime,
 credential, mailbox, model call or employer action was touched. Preview remains
 stopped/denied and no background coding continuation exists.
+
+## 2026-10-11: Frozen Experiment Cohort Attribution
+
+Guarded assignment commit b76f513524fb092e8500f4415b13ce351612b21c is green in CI
+38177319128 on Windows, Ubuntu and PostgreSQL, including full browser and extracted
+Windows installation. The earlier installer failure no longer reproduces within
+its bounded successor deadline; its hosted-runner cause remains undiagnosed.
+
+Successor cohort capture freezes reviewed variant/metric/horizon and assignment,
+definition, approval and packet hashes. Matching hashed intent, dispatch record
+and chronological assignment/intent/dispatch/receipt proof are mandatory for
+attribution. Missing/corrupt/post-intent evidence fails rather than silently
+becoming unassigned. Legacy records remain unassigned; comparisons require one
+definition, matching declared horizon, disjoint jobs and per-group minimum 20.
+Stop and later changes do not rewrite frozen evidence. No automatic policy update.
+
+Full local check: 695 passed / 246 skipped in 92 files. Full browser: 66/66 passed
+(4.1 minutes). Extracted production-only Windows installation: 1/1 passed
+(22.96 seconds total). Public scan: 428 files. Successor CI pending. See
+docs/evidence/P16-experiment-attribution.md and the new honest engineering report
+docs/evidence/P16-calibration.md, which distinguishes fixture arithmetic from
+unmeasured live outcomes and does not assert private database population.
+
+Counts remain 12/19 phases and 92/128 gates. Continue directly with automatic
+private owner-correction regression proposals, additional form/adapter cases,
+truthful variant generation and compatibility/history requirements. Installed
+physical Windows/server and genuine live/24/72-hour gates remain separate; the
+existing capacity harness is explicitly non-qualifying. No private owner runtime,
+credentials, model/mailbox call, real action or actual-duration soak was touched.
