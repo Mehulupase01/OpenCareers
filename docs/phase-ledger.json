@@ -1512,7 +1512,11 @@
           "text": "Background runtime. Package a launcher and an owner-approved startup mechanism with graceful shutdown, crash restart, health checks, and configuration migration.",
           "status": "in_progress",
           "acceptanceTests": ["T20", "T25"],
-          "evidence": ["docs/evidence/P13-runtime-foundation.md"],
+          "evidence": [
+            "docs/evidence/P13-runtime-foundation.md",
+            "docs/evidence/P13-windows-startup-host.md",
+            "docs/evidence/P13-windows-bundle.md"
+          ],
           "nextAction": "P13-01"
         },
         {
@@ -1579,7 +1583,7 @@
         {
           "id": "P13-G5",
           "requirement": "Pause and emergency stop behave as documented, including the limitation for already-sent requests.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P13-stop-controls.md",
             "tests/integration/emergency-stop.test.ts",
@@ -1629,6 +1633,12 @@
           "commit": "419ae73e1cfa6ebbd58b1c1ef713a71bb3ded6bf",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Daily live/synthetic throughput, display-only target shortfall, correlated first receipts, inference budget and full operations regressions; closes G6 only, not successor capacity/stop changes or other P13 gates."
+        },
+        {
+          "runId": "38139534828",
+          "commit": "53fb044be18853132739d361362c9ce7b689be46",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Capacity/stop TEMP alias corrections, guarded stop and read-only uncertain-outcome reconciliation, complete desktop/mobile stop/pause sequence and isolated Windows host; closes G5, not clean bundle, installed startup, hardware drills, soak or live ramp."
         }
       ],
       "acceptanceTests": ["T20", "T25"],
@@ -1639,7 +1649,9 @@
         "docs/evidence/P13-day-boundary.md",
         "docs/evidence/P13-operations-readout.md",
         "docs/evidence/P13-capacity-foundation.md",
-        "docs/evidence/P13-stop-controls.md"
+        "docs/evidence/P13-stop-controls.md",
+        "docs/evidence/P13-windows-startup-host.md",
+        "docs/evidence/P13-windows-bundle.md"
       ]
     },
     {
@@ -1954,15 +1966,15 @@
     {
       "id": "P17",
       "title": "Release, portfolio, and autonomous maintenance handoff",
-      "status": "not_started",
+      "status": "in_progress",
       "dependsOn": ["P16"],
       "tickets": [
         {
           "id": "P17-01",
           "text": "Release package. Produce versioned Windows and server artifacts, checksums, release notes, migration instructions, and a rollback plan that preserves the application ledger or disables commits until reconciled.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
+          "evidence": ["docs/evidence/P13-windows-bundle.md"],
           "nextAction": "P17-01"
         },
         {
@@ -2051,7 +2063,7 @@
       "remoteVerification": [],
       "acceptanceTests": [],
       "nextAction": "P17-01",
-      "evidence": ["docs/plans/P17-release-handoff.md"]
+      "evidence": ["docs/plans/P17-release-handoff.md", "docs/evidence/P13-windows-bundle.md"]
     },
     {
       "id": "P18",

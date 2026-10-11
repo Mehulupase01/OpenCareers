@@ -35,3 +35,8 @@ missed the error. The assertion now verifies the intentional submission pause,
 including after resume. Windows also exposed TEMP's short-path alias in the
 new capacity/stop fixtures. Fresh fixture directories are now created under a
 canonical TEMP parent; the production junction/symlink refusal is unchanged.
+
+CI 38139534828 at 53fb044be18853132739d361362c9ce7b689be46 is green on Windows,
+Ubuntu and PostgreSQL. Locally the corrected combined build passes 626 tests
+(216 PostgreSQL skipped), all 62 browser cases and lint/types/ledger/build.
+This closes P13-G5. It does not close installation, hardware drills or soak gates.

@@ -55,6 +55,12 @@ private configuration path and `-NodePath` with the pinned Node executable to
 its exit status. Actual installed-task/reboot verification remains open; see
 [Windows runtime evidence](docs/evidence/P13-windows-startup-host.md).
 
+`corepack pnpm bundle:windows` rebuilds a checksummed, precompiled runtime ZIP
+in a fresh temporary directory. Its `INSTALL.md` describes production-only
+dependency installation and guarded startup. Private data and dependencies are
+not bundled. Clean synthetic boot and packet generation are tested; this is
+not yet an accepted final release. See [bundle evidence](docs/evidence/P13-windows-bundle.md).
+
 Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
 for mobile, and never reuse an existing server. Override them with
 `AUTOPILOT_E2E_API_PORT`, `AUTOPILOT_E2E_WEB_PORT`, `AUTOPILOT_E2E_MOBILE_API_PORT`

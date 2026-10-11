@@ -21,6 +21,7 @@
     "documents:encrypt": "tsx scripts/encrypt-documents.ts",
     "public:scan": "tsx scripts/public-scan.ts",
     "capacity": "tsx scripts/capacity.ts",
+    "bundle:windows": "corepack pnpm build && tsx scripts/bundle-windows.ts",
     "check:ledger": "tsx scripts/validate-ledger.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
     "goldens:p06": "tsx scripts/generate-p06-goldens.ts",
@@ -51,6 +52,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "yauzl": "3.4.0",
+    "yazl": "3.3.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -71,7 +73,6 @@
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.1",
-    "yazl": "3.3.1"
+    "vitest": "5.0.1"
   }
 }

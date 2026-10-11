@@ -1238,3 +1238,40 @@ Public-source scan passed 375 files. Successor CI must verify the combined
 build before P13-G5 closes. Counts remain 12/19 phases and 88/128 gates.
 Docker CLI exists but the Linux engine is unavailable; no server deployment was
 tested. Continue clean Windows packaging and independent deployment engineering.
+
+## 2026-10-11: Clean Windows Bundle And BSOD Recovery
+
+CI 38139534828 at 53fb044be18853132739d361362c9ce7b689be46 passed Windows,
+Ubuntu and PostgreSQL. P13-G5 stop/pause acceptance is now complete: 89/128
+gates and 12/19 phases. P13 still has installation/hardware/soak/live evidence
+remaining. P17-01 is in progress for independent Windows packaging; it is not
+a completed release and its phase dependencies still apply to closure.
+
+pnpm bundle:windows rebuilds a versioned precompiled ZIP with archive and
+per-file SHA-256 checksums. Explicit public inputs exclude repo env, private
+state, browser sessions, test corpora and dependencies. Final archive bytes
+are screened; filesystem redirection, unknown artifacts and stale compiled
+runtime files without TypeScript counterparts fail. The shipped manifest
+declares dependenciesBundled=false and productionReleaseAccepted=false.
+INSTALL.md covers production dependency installation, private config boundaries,
+startup approval and the limits of checksums, migration and rollback.
+
+Actual disposable clean installation installs frozen production-only dependencies,
+with TypeScript absent. Its compiled factory generates valid synthetic CV/letter
+PDF/DOCX, but preserves needs_input for an unreviewed question. Its compiled
+API/scheduler become healthy and serve the built dashboard without Vite;
+authenticated stop exits zero and both captured child PIDs are gone. This
+exposed yazl's development-only declaration; 3.3.1 is now a pinned production
+dependency at unchanged resolution. Windows CI runs this opt-in case after build
+and uploads ZIP/checksum/metadata under test-results/windows-runtime.
+
+The host BSOD interrupted an in-flight local verification. Edits survived, no
+private service was restarted, and no interrupted test was counted as passed.
+Fresh sequential pnpm check: 631 passed / 217 skipped, 80 files,
+lint/types/ledger/build. Final opt-in clean install passed, plus five bundle
+fixture tests; source scan passed 380 files and prod audit found no known
+vulnerabilities. Earlier 53fb044 full browser evidence remains 62/62; no frontend
+behavior changed in this packaging batch. Successor CI must verify the new batch.
+See docs/evidence/P13-windows-bundle.md. No installed logon task, OS fault drill,
+actual 24/72-hour soak, private OpenRouter call or live submission was performed.
+The old demo preview did not survive reboot. Private 4317/4318 remain untouched.
