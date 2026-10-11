@@ -20,6 +20,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "documents:encrypt": "tsx scripts/encrypt-documents.ts",
     "public:scan": "tsx scripts/public-scan.ts",
+    "regression:import": "tsx scripts/import-regression.ts",
     "capacity": "tsx scripts/capacity.ts",
     "bundle:windows": "corepack pnpm build && tsx scripts/bundle-windows.ts",
     "check:ledger": "tsx scripts/validate-ledger.ts",

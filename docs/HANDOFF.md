@@ -1423,3 +1423,34 @@ calibration workspace/import and code-version compatibility, sanitized regressio
 import and controlled pre-dispatch experiments. No private service, live evidence
 or soak touched. Preview remains policy-blocked/stopped; no scheduled coding
 continuation exists. Do not retry the denied launch through another mechanism.
+
+## 2026-10-11: Privacy-Bounded Regression Maintenance
+
+Calibration commit ecd45c17d923488a0c036ad4c5dbe9a639977256 is green on
+Windows, Ubuntu and PostgreSQL in CI 38167896062, including full browser tests
+and extracted production-only Windows installation. P16 remote evidence records
+that bounded scope; no calibration gate or phase closes.
+
+The successor adds reviewed categorical regression compilation, verified local
+workload-correction extraction and a maintainer CLI. Names, facts, provenance,
+employer text, URLs, unknown fields and unreviewed inputs cannot become fixtures.
+Input is bounded; canonical public metadata is exclusively written under the
+unredirected fixture directory, with idempotent exact bytes and generic errors.
+The normal integration suite consumes those JSON declarations through the real
+chronology, truthful-letter and conservative-mail classifiers. See
+docs/evidence/P16-regression-import.md for supported inputs and remaining scope.
+
+Final frozen-code pnpm check: 677 passed / 232 skipped in 90 files; lint/types/
+ledger/build pass. Five focused cases include the actual sanitized CLI, changed
+bytes, oversized input and redirected-folder refusal. No extra production-only
+installation was run for this maintainer-only increment. Successor CI pending.
+P16-04/G6 are in progress, not complete: automatic audited proposal capture,
+broader fact cases, misclassified forms and adapter drift remain. This is not a
+claim that the production application now learns every correction automatically.
+
+Current totals: 12/19 phases, 91/128 gates. Next larger workflow target is fixed
+group-compatible outcome cohorts and pre-dispatch experiment assignment/stop
+guards, plus private regression proposal capture. P15 dependencies, P08 genuine
+receipt, P13/P15 real-duration soaks, server/hybrid and P18 breadth remain open.
+Private services and documents remain untouched; preview stays stopped after
+execution-policy denial, and no automatic follow-up was created.

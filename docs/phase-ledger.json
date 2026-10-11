@@ -1915,9 +1915,13 @@
         {
           "id": "P16-04",
           "text": "Quality regression loop. Turn corrected facts, rejected claims, misclassified forms, and adapter drift into sanitized regression fixtures.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
+          "evidence": [
+            "docs/evidence/P16-regression-import.md",
+            "tests/unit/regression-redaction.test.ts",
+            "tests/integration/regression-loop.test.ts"
+          ],
           "nextAction": "P16-04"
         },
         {
@@ -1970,8 +1974,12 @@
         {
           "id": "P16-G6",
           "requirement": "Owner corrections become regression tests without leaking personal data into Git.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P16-regression-import.md",
+            "tests/unit/regression-redaction.test.ts",
+            "tests/integration/regression-loop.test.ts"
+          ]
         },
         {
           "id": "P16-G7",
@@ -1985,13 +1993,19 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "0d89407d0af245b0d66d7502980b686a15e75696",
+      "lastVerifiedCommit": "ecd45c17d923488a0c036ad4c5dbe9a639977256",
       "remoteVerification": [
         {
           "runId": "38167046432",
           "commit": "0d89407d0af245b0d66d7502980b686a15e75696",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Attributed owner-scoped outcome events, conservative Gmail integration, reversible corrections, cohort exclusions, browser regressions and Windows production-only installation. Closes G1/G2 and outcome-ledger ticket only, not successor calibration or remaining P16 requirements."
+        },
+        {
+          "runId": "38167896062",
+          "commit": "ecd45c17d923488a0c036ad4c5dbe9a639977256",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Fixed owner-reviewed minimized calibration datasets, digest/identity guards, model-route/job compatibility, rank/AUC diagnostics and refusal paths, browser regressions and Windows production-only installation. Not live ranking quality, successor regression import or additional P16 gate closure."
         }
       ],
       "acceptanceTests": [],
@@ -1999,7 +2013,8 @@
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",
-        "docs/evidence/P16-score-calibration.md"
+        "docs/evidence/P16-score-calibration.md",
+        "docs/evidence/P16-regression-import.md"
       ]
     },
     {

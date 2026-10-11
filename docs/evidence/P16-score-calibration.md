@@ -48,6 +48,11 @@ lint, types, ledger and build passing. Rebuilt extracted production-only Windows
 installation passes **1/1 (23.13 seconds)** with the new migration/routes and
 existing compiled guarded workflow. Successor CI is pending at publication.
 
+Subsequent CI 38167896062 at ecd45c17d923488a0c036ad4c5dbe9a639977256
+passes Windows, Ubuntu and PostgreSQL, including full browser regressions and
+extracted production-only Windows installation. This verifies fixed dataset
+parity, not the successor regression importer, live labels or P16 completion.
+
 Unit tests cover sample/synthetic refusal, degenerate labels/scores, perfect and
 reversed tied rankings, band totals and an independent pairwise tie-aware AUC
 oracle. Integration tests cover owner isolation, stored score derivation, refusal
