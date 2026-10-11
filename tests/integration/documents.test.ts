@@ -24,6 +24,7 @@ import {
 import { DocumentRepository } from "../../packages/persistence/src/document-repository.js";
 import { EmailRepository } from "../../packages/persistence/src/email-repository.js";
 import { ExceptionRepository } from "../../packages/persistence/src/exception-repository.js";
+import { ExperimentRepository } from "../../packages/persistence/src/experiment-repository.js";
 import { HandoffRepository } from "../../packages/persistence/src/handoff-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
@@ -1160,6 +1161,144 @@ for (const engine of ["sqlite", "postgres"] as const) {
           offerSlug: "software-engineer",
         });
       });
+
+      it.each(["before-intent", "before-dispatch", "after-dispatch", "expired"] as const)(
+        "guards experiment %s without changing submission authority",
+        async (boundary) => {
+          await seedProfileFacts();
+          let now = new Date("2026-09-17T09:00:00.000Z");
+          const clock = () => now;
+          const queue = new Repository(db, owner, clock);
+          await queue.setControl({ submissionsPaused: false });
+          const packet = await documents.savePacket(
+            await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+          );
+          const preparation = await new BrowserRepository(db, owner, clock).save(
+            readyBrowserResult(packet),
+          );
+          const experiments = new ExperimentRepository(db, owner, clock);
+          const experimentId = randomUUID();
+          await experiments.create({
+            id: experimentId,
+            metric: "INTERVIEW",
+            observationDays: 30,
+            expiresAt: "2026-09-17T09:00:05.000Z",
+            maximumAssignments: 2,
+            variants: [
+              { id: "baseline", kind: "wording", approvalSha256: "a".repeat(64) },
+              { id: "concise", kind: "wording", approvalSha256: "b".repeat(64) },
+            ],
+          });
+          const stored = (
+            await db.query("SELECT sha256 FROM packets WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.id,
+            ])
+          )[0];
+          const assignment = {
+            id: randomUUID(),
+            experimentId,
+            variantId: "baseline",
+            applicationId: packet.manifest.applicationId,
+            packetId: packet.manifest.id,
+            reviewedPacketSha256: String(stored?.sha256),
+            reviewed: true,
+          };
+          await experiments.assign(assignment);
+          await expect(
+            experiments.assign({ ...assignment, id: randomUUID(), variantId: "concise" }),
+          ).rejects.toMatchObject({ code: "DUPLICATE_SUSPECTED" });
+          await queue.enqueue({
+            type: "submit",
+            dedupeKey: `experiment-submit:${packet.manifest.applicationId}`,
+            applicationId: packet.manifest.applicationId,
+            domain: "mock-ats",
+          });
+          const task = await queue.claim("experiment-worker", ["submit"]);
+          if (!task) throw new Error("Expected submit lease.");
+          const app = (
+            await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ])
+          )[0];
+          await approveMockScreening(clock);
+          const submissions = new SubmissionRepository(db, owner, clock);
+          const input = {
+            packetId: packet.manifest.id,
+            preparationId: preparation.id,
+            expectedRevision: Number(app?.revision),
+          };
+          if (boundary === "before-intent") {
+            await experiments.stop(experimentId, { expectedRevision: 1 });
+            await expect(submissions.begin(task, input)).rejects.toMatchObject({
+              code: "POLICY_REVOKED",
+            });
+            expect(await db.query("SELECT id FROM intents WHERE owner_id=$1", [owner])).toEqual([]);
+            return;
+          }
+          const handle = await submissions.begin(task, input);
+          await expect(
+            experiments.assign({ ...assignment, id: randomUUID() }),
+          ).rejects.toMatchObject({ code: "STATE_INVALID" });
+          const snapshot = JSON.parse(
+            String(
+              (
+                await db.query("SELECT snapshot FROM intents WHERE owner_id=$1 AND id=$2", [
+                  owner,
+                  handle.intentId,
+                ])
+              )[0]?.snapshot,
+            ),
+          );
+          expect(snapshot.experiment.assignmentId).toBe(assignment.id);
+          if (boundary === "before-dispatch" || boundary === "expired") {
+            if (boundary === "expired") now = new Date("2026-09-17T09:00:05.000Z");
+            else await experiments.stop(experimentId, { expectedRevision: 1 });
+            await expect(submissions.authorizeDispatch(task, handle)).rejects.toMatchObject({
+              code: "POLICY_REVOKED",
+            });
+            expect(
+              (
+                await db.query(
+                  "SELECT dispatch_started_at FROM attempts WHERE owner_id=$1 AND id=$2",
+                  [owner, handle.attemptId],
+                )
+              )[0]?.dispatch_started_at,
+            ).toBeNull();
+            expect(
+              (
+                await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+                  owner,
+                  handle.applicationId,
+                ])
+              )[0]?.state,
+            ).toBe("IN_FLIGHT");
+            return;
+          }
+          await submissions.authorizeDispatch(task, handle);
+          await experiments.stop(experimentId, { expectedRevision: 1 });
+          const recordId = randomUUID();
+          await submissions.confirmMockReceipt(task, handle, {
+            kind: "mock_ats",
+            recordId,
+            jobId: packet.manifest.jobId,
+            receiptUrl: `http://127.0.0.1:4320/receipts/${recordId}`,
+            receivedAt: clock().toISOString(),
+            emailHash: createHash("sha256").update(packet.content.cv.identity.email).digest("hex"),
+          });
+          expect(
+            (
+              await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+                owner,
+                handle.applicationId,
+              ])
+            )[0]?.state,
+          ).toBe("CONFIRMED");
+          expect(await experiments.assign(assignment)).toMatchObject({ id: assignment.id });
+          expect((await queue.getControl()).submissionsPaused).toBe(false);
+        },
+      );
 
       it("records intent before a single-use fenced dispatch", async () => {
         for (const fact of documentFacts) {

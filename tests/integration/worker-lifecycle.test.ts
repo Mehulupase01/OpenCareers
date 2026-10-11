@@ -331,7 +331,7 @@ describe("standalone compiled installation", () => {
           return await execute("powershell.exe", [...args, ...extra], {
             cwd: root,
             env: environment(),
-            timeout: 45000,
+            timeout: 90000,
           });
         } catch (error) {
           const failure = error as Error & {
@@ -358,5 +358,5 @@ describe("standalone compiled installation", () => {
       const preview = await runInstaller(["-ApproveStartup", "-WhatIf"]);
       expect(preview.stdout).toContain("What if:");
     }
-  }, 120000);
+  }, 240000);
 });

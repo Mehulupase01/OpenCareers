@@ -78,6 +78,53 @@ test("outcome history preserves corrections and synthetic cohorts refuse live fr
   await expect(
     cohorts.getByRole("button", { name: "Compare fixed groups", exact: true }),
   ).toBeDisabled();
+  const experiments = page.getByRole("region", { name: "Controlled experiments" });
+  const experimentId = await page.evaluate(() => crypto.randomUUID());
+  const definition = {
+    id: experimentId,
+    metric: "INTERVIEW",
+    observationDays: 30,
+    maximumAssignments: 2,
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    variants: [
+      { id: "baseline", kind: "wording", approvalSha256: "a".repeat(64) },
+      { id: "concise", kind: "wording", approvalSha256: "b".repeat(64) },
+    ],
+  };
+  await experiments.getByLabel("Experiment definition", { exact: true }).setInputFiles({
+    name: "synthetic-experiment.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(definition)),
+  });
+  await expect(
+    experiments.getByRole("button", { name: "Record experiment", exact: true }),
+  ).toBeDisabled();
+  await experiments
+    .getByLabel("Owner-approved variants and stop conditions", { exact: true })
+    .check();
+  await experiments.getByRole("button", { name: "Record experiment", exact: true }).click();
+  await expect(experiments.getByLabel("Saved experiment", { exact: true })).toHaveValue(
+    experimentId,
+  );
+  await expect(
+    experiments.getByRole("button", { name: "Stop experiment", exact: true }),
+  ).toBeEnabled();
+  await experiments.getByRole("button", { name: "Open assignments", exact: true }).click();
+  await expect(
+    experiments.getByRole("columnheader", { name: "Variant", exact: true }),
+  ).toBeVisible();
+  await experiments.getByRole("button", { name: "Stop experiment", exact: true }).click();
+  await expect(experiments.getByText("stopped / revision 2", { exact: true })).toBeVisible();
+  await expect(
+    experiments.getByRole("button", { name: "Assign reviewed packet", exact: true }),
+  ).toBeDisabled();
+  await page.reload();
+  await page.getByRole("button", { name: "Outcomes", exact: true }).click();
+  await experiments.getByLabel("Saved experiment", { exact: true }).selectOption(experimentId);
+  await expect(experiments.getByText("stopped / revision 2", { exact: true })).toBeVisible();
+  await expect(
+    experiments.getByRole("button", { name: "Stop experiment", exact: true }),
+  ).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

@@ -1529,3 +1529,36 @@ after stop. The plan's contradictory dispatch sentence is corrected: assignment
 must precede dispatch, never follow it. Then complete private regression proposal
 capture/broader correction cases, authoritative metadata/version history and the
 honest final calibration report. External production drills remain separate.
+
+## 2026-10-11: Controlled Experiment Assignment And Dispatch Guards
+
+Owner-audited immutable experiment definitions and exact reviewed packet
+assignments now live in the authoritative database. One canonical job receives
+one variant; READY state, no prior intent/attempt/outcome, packet integrity and
+assignment caps are checked under the owner lock. No application is created.
+The existing final engine checks binding, stop and expiry before intent and again
+before dispatch; stopping after dispatch still permits receipt confirmation.
+Definitions cannot patch standing policy or authorize submission. Owner routes
+and Outcomes review/create/assign/history/stop controls are implemented.
+
+Full local check: 692 passed / 244 skipped in 92 files, lint/types/build pass.
+Initial browser suite: 64/66 passed; new selectors needed explicit labels after
+options loaded. Fixed affected desktop/mobile workflows: 2/2 passed, page errors
+and page-width overflow absent; mobile screenshot inspected. Production rebuild
+and extracted Windows install 1/1 pass (25.54 seconds total). Public scan: 426
+files. See docs/evidence/P16-controlled-experiments.md. PostgreSQL awaits CI.
+
+Prior fixed-cohort CI 38174100947 failed only its Windows synthetic installer
+subprocess after 45 seconds with no output. Its precise delay remains undiagnosed.
+The test now allows 90 seconds per subprocess/240 seconds enclosing it, retaining
+consent/configuration checks and cleanup; local full suite passes. Do not describe
+02db6eb as all-green CI. No gate closed here: still 12/19 phases and 92/128 gates.
+P16-05/G5/G7 are in progress, not complete.
+
+Continue directly into receipt/intent-backed immutable experiment-variant cohort
+attribution and comparison refusal, then truthful variant generation and private
+regression proposals. Definitions currently describe reviewed variants; they do
+not generate wording or measure real improvement. Physical Windows/server drills,
+live receipts and real 24/72-hour soaks remain unverified. No private owner runtime,
+credential, mailbox, model call or employer action was touched. Preview remains
+stopped/denied and no background coding continuation exists.

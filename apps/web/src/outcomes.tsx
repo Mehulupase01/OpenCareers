@@ -10,6 +10,7 @@ import {
 import { request } from "./api.js";
 import { CalibrationWorkspace } from "./calibration.js";
 import { CohortsWorkspace } from "./cohorts.js";
+import { ExperimentsWorkspace } from "./experiments.js";
 
 export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
   const [applicationId, setApplicationId] = useState("");
@@ -348,6 +349,7 @@ export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
       )}
       <CalibrationWorkspace />
       <CohortsWorkspace />
+      <ExperimentsWorkspace />
     </section>
   );
 }

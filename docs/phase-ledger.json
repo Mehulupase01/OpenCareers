@@ -1934,10 +1934,14 @@
         {
           "id": "P16-05",
           "text": "Controlled experiments. Compare approved wording or ordering variants without applying twice to the same job or weakening truthfulness, recording experiment assignments before outcomes are known.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": [],
-          "nextAction": "P16-05"
+          "evidence": [
+            "docs/evidence/P16-controlled-experiments.md",
+            "tests/integration/experiments.test.ts",
+            "tests/integration/documents.test.ts"
+          ],
+          "nextAction": "Verify experiment dispatch guards across CI, then frozen variant comparison and truthful variant generation."
         }
       ],
       "gates": [
@@ -1975,8 +1979,12 @@
         {
           "id": "P16-G5",
           "requirement": "Experiments cannot create duplicate applications or unsupported claims.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P16-controlled-experiments.md",
+            "tests/integration/experiments.test.ts",
+            "tests/integration/documents.test.ts"
+          ]
         },
         {
           "id": "P16-G6",
@@ -1991,8 +1999,11 @@
         {
           "id": "P16-G7",
           "requirement": "A recommendation to change policy requires a new recorded owner policy revision before it affects commits.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P16-controlled-experiments.md",
+            "tests/integration/experiments.test.ts"
+          ]
         }
       ],
       "externalPrerequisites": [],

@@ -45,6 +45,73 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("authenticates experiment definitions, assignments and stops", async () => {
+    const { app, headers } = await setup("local");
+    const id = randomUUID();
+    for (const [method, url] of [
+      ["GET", "/v1/outcomes/experiments"],
+      ["POST", "/v1/outcomes/experiments"],
+      ["GET", "/v1/outcomes/experiments/packets"],
+      ["POST", "/v1/outcomes/experiments/assignments"],
+      ["GET", `/v1/outcomes/experiments/${id}/assignments`],
+      ["POST", `/v1/outcomes/experiments/${id}/stop`],
+    ] as const) {
+      expect(
+        (await app.inject({ method, url, headers, ...(method === "POST" ? { payload: {} } : {}) }))
+          .statusCode,
+      ).toBe(401);
+    }
+    const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const input = {
+      id,
+      metric: "INTERVIEW",
+      observationDays: 30,
+      maximumAssignments: 2,
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      variants: [
+        { id: "baseline", kind: "wording", approvalSha256: "a".repeat(64) },
+        { id: "concise", kind: "wording", approvalSha256: "b".repeat(64) },
+      ],
+    };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes/experiments",
+          headers: authenticated,
+          payload: { ...input, policy: {} },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/outcomes/experiments",
+          headers: authenticated,
+          payload: input,
+        })
+      ).json(),
+    ).toMatchObject({ id, revision: 1, state: "active" });
+    expect(
+      (await app.inject({ url: "/v1/outcomes/experiments", headers: authenticated })).json(),
+    ).toHaveLength(1);
+    expect(
+      (
+        await app.inject({ url: "/v1/outcomes/experiments/packets", headers: authenticated })
+      ).json(),
+    ).toEqual([]);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/outcomes/experiments/${id}/stop`,
+          headers: authenticated,
+          payload: { expectedRevision: 1 },
+        })
+      ).json(),
+    ).toMatchObject({ revision: 2, state: "stopped" });
+  });
   it("guards outcome evidence, corrections and read-only cohort reports", async () => {
     const { app, repository, headers } = await setup("local");
     const job = documentGenerationInput().job;

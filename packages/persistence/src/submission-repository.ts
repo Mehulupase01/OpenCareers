@@ -21,6 +21,7 @@ import {
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, SqlExecutor } from "./database.js";
+import { assertExperimentDispatch } from "./experiment-repository.js";
 import { Repository } from "./repository.js";
 import { assertNoRestoreReplay } from "./restore-repository.js";
 
@@ -171,7 +172,15 @@ export class SubmissionRepository extends Repository {
       });
       if (policy.revision !== manifest.authorizationRevision)
         throw new DomainError("POLICY_REVOKED", "Packet authorization revision changed.");
+      const experiment = await assertExperimentDispatch(
+        tx,
+        this.ownerId,
+        applicationId,
+        input.packetId,
+        this.now(),
+      );
       const snapshot = {
+        experiment,
         applicationId,
         taskId: task.id,
         adapter: task.domain,
@@ -309,6 +318,7 @@ export class SubmissionRepository extends Repository {
       if (Number(row.commit_fence) !== handle.fence || row.dispatch_started_at)
         throw new DomainError("LEASE_STALE", "Dispatch capability is stale or already used.");
       const snapshot = JSON.parse(String(row.snapshot)) as {
+        experiment?: { assignmentId: string; bindingSha256: string } | null;
         taskId: string;
         packetId: string;
         preparationId: string;
@@ -380,6 +390,15 @@ export class SubmissionRepository extends Repository {
             "Prepared answers are no longer canonically approved.",
           );
       }
+      const experiment = await assertExperimentDispatch(
+        tx,
+        this.ownerId,
+        handle.applicationId,
+        handle.packetId,
+        this.now(),
+      );
+      if (JSON.stringify(experiment) !== JSON.stringify(snapshot.experiment ?? null))
+        throw new DomainError("STATE_INVALID", "Experiment assignment changed after intent.");
       const updated = await tx.query(
         "UPDATE attempts SET dispatch_started_at=$1 WHERE owner_id=$2 AND id=$3 AND dispatch_started_at IS NULL RETURNING id",
         [this.now(), this.ownerId, handle.attemptId],
