@@ -97,3 +97,10 @@ export function localDayStart(instant: Date): Date {
   start = target - offsetAt(start);
   return new Date(start);
 }
+
+export function localDayWindow(instant: Date): { day: string; start: string; end: string } {
+  const start = localDayStart(instant);
+  // 36 hours after midnight lies in the following local day, including 23/25-hour days.
+  const next = localDayStart(new Date(start.getTime() + 36 * 3600000));
+  return { day: localDay(instant), start: start.toISOString(), end: next.toISOString() };
+}

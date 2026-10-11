@@ -1518,9 +1518,9 @@
         {
           "id": "P13-02",
           "text": "Scheduling. Implement source-specific polling, queue priorities, daily targets, browser concurrency limits, quiet hours for notifications, and Europe/Amsterdam day boundaries.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T20", "T25"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P13-day-boundary.md"],
           "nextAction": "P13-02"
         },
         {
@@ -1613,7 +1613,8 @@
       "nextAction": "P13-01",
       "evidence": [
         "docs/plans/P13-unattended-windows.md",
-        "docs/evidence/P13-runtime-foundation.md"
+        "docs/evidence/P13-runtime-foundation.md",
+        "docs/evidence/P13-day-boundary.md"
       ]
     },
     {

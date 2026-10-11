@@ -20,7 +20,7 @@ import {
   type RouteDecision,
   routeDecisionSchema,
 } from "../../contracts/src/matching.js";
-import { localDay, localDayStart } from "../../domain/src/state.js";
+import { localDayStart, localDayWindow } from "../../domain/src/state.js";
 import type { Row } from "./database.js";
 import { Repository } from "./repository.js";
 
@@ -126,16 +126,18 @@ export class MatchingRepository extends Repository {
     allocationClassSchema.parse(allocationClass);
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
-      const day = localDay(this.clock());
+      const instant = this.clock();
+      const now = instant.toISOString();
+      const { day, start, end } = localDayWindow(instant);
       await tx.query(
-        "UPDATE inference_reservations SET state='released',completed_at=$1 WHERE owner_id=$2 AND day=$3 AND state='reserved' AND expires_at <= $1",
-        [this.now(), this.ownerId, day],
+        "UPDATE inference_reservations SET state='released',completed_at=$1 WHERE owner_id=$2 AND created_at >= $3 AND created_at < $4 AND state='reserved' AND expires_at <= $1",
+        [now, this.ownerId, start, end],
       );
       const count = Number(
         (
           await tx.query(
-            "SELECT COUNT(*) AS count FROM inference_reservations WHERE owner_id=$1 AND day=$2 AND state <> 'released'",
-            [this.ownerId, day],
+            "SELECT COUNT(*) AS count FROM inference_reservations WHERE owner_id=$1 AND created_at >= $2 AND created_at < $3 AND state <> 'released'",
+            [this.ownerId, start, end],
           )
         )[0]?.count,
       );
@@ -150,8 +152,8 @@ export class MatchingRepository extends Repository {
       const usedInClass = Number(
         (
           await tx.query(
-            "SELECT COUNT(*) AS count FROM inference_reservations WHERE owner_id=$1 AND day=$2 AND allocation_class=$3 AND state <> 'released'",
-            [this.ownerId, day, allocationClass],
+            "SELECT COUNT(*) AS count FROM inference_reservations WHERE owner_id=$1 AND created_at >= $2 AND created_at < $3 AND allocation_class=$4 AND state <> 'released'",
+            [this.ownerId, start, end, allocationClass],
           )
         )[0]?.count,
       );
@@ -170,7 +172,7 @@ export class MatchingRepository extends Repository {
           "MODEL_ROUTE_INELIGIBLE",
           "No eligible free inference route is ready.",
         );
-      if (state.backoff_until && String(state.backoff_until) > this.now())
+      if (state.backoff_until && String(state.backoff_until) > now)
         throw new DomainError("RATE_LIMITED", "Free inference route is in bounded backoff.", true);
       if (expectedPrivacyBinding) {
         const route = json<{ modelId: string; provider: string; privacyBinding?: string }>(state);
@@ -194,8 +196,8 @@ export class MatchingRepository extends Repository {
           applicationId,
           modelId,
           provider,
-          this.now(),
-          new Date(this.clock().getTime() + 60000).toISOString(),
+          now,
+          new Date(instant.getTime() + 60000).toISOString(),
           allocationClass,
         ],
       );
@@ -471,10 +473,10 @@ export class MatchingRepository extends Repository {
             allocationClass?: AllocationClass;
           }>(state)
         : { modelId: null, provider: null, reason: "Inference is not configured." };
-      const day = localDay(this.clock());
+      const { day, start, end } = localDayWindow(this.clock());
       const reservations = await tx.query(
-        "SELECT state FROM inference_reservations WHERE owner_id=$1 AND day=$2",
-        [this.ownerId, day],
+        "SELECT state FROM inference_reservations WHERE owner_id=$1 AND created_at >= $2 AND created_at < $3",
+        [this.ownerId, start, end],
       );
       const used = reservations.filter((row) =>
         ["sent", "completed", "failed"].includes(String(row.state)),

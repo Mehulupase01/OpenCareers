@@ -1073,3 +1073,25 @@ lint/types/ledger/build passing. All 58 desktop/mobile browser cases passed.
 Public-source scan passed 359 files. Successor CI still needs recording after
 push. Counts remain 12/19 phases, 87/128 gates. No catalog
 row closes an operational coverage gate; no genuine submission or soak occurred.
+
+## 2026-10-11: P13 UTC-Evidence Day Boundaries
+
+Daily inference quota, task-class accounting and dashboard usage now derive
+Amsterdam day windows from UTC creation timestamps rather than trusting the
+legacy day label. Submission policy uses the same half-open midnight window.
+One captured clock instant binds a reservation's quota check and timestamps.
+No private DB migration or historical timestamp rewrite is needed; the legacy
+column stays for compatibility but is non-authoritative for quota reads.
+
+New SQLite/PostgreSQL clock regressions cover ordinary rollover, 23/25-hour
+days, skipped/repeated clock hours, repository reconstruction, stale day labels
+and byte-identical UTC history. Counter fixtures are not a dispatched workflow
+or receipt. Full local check passed 609 tests / 212 PostgreSQL skipped, 74 files;
+lint/types/ledger/build passed. All 58 desktop/mobile browser cases passed;
+public-source scan passed 361 files. Successor CI still needs recording after
+push. See `docs/evidence/P13-day-boundary.md`. P13-02 is in progress, not
+complete; all remaining scheduling/capacity/installation/ramp gates stay open.
+
+The supported heartbeat creation call again returned tool-unavailable on this
+host. No coding continuation was scheduled, and the unrelated paused overnight
+pipeline automation was not changed. No real applications or duration soaks ran.

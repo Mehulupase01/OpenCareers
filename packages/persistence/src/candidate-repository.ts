@@ -25,7 +25,7 @@ import {
 } from "../../contracts/src/candidate.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
-import { localDay } from "../../domain/src/state.js";
+import { localDayWindow } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { assertDiscoveryEligibility } from "./job-identity.js";
 import { PreparationRecovery } from "./preparation-recovery.js";
@@ -573,15 +573,16 @@ export class CandidateRepository extends Repository {
           "Required application answers are missing, changed or expired.",
         );
     }
-    const since = new Date(this.clock().getTime() - 48 * 3600000).toISOString();
-    const attempts = await tx.query(
-      "SELECT started_at FROM attempts WHERE owner_id=$1 AND started_at >= $2",
-      [this.ownerId, since],
+    const { start, end } = localDayWindow(this.clock());
+    const count = Number(
+      (
+        await tx.query(
+          "SELECT COUNT(*) AS count FROM attempts WHERE owner_id=$1 AND started_at >= $2 AND started_at < $3",
+          [this.ownerId, start, end],
+        )
+      )[0]?.count,
     );
-    if (
-      attempts.filter((a) => localDay(new Date(String(a.started_at))) === localDay(this.clock()))
-        .length >= policy.dailyLimit
-    )
+    if (count >= policy.dailyLimit)
       throw new DomainError("RATE_LIMITED", "Daily submission limit reached.");
     return policy;
   }

@@ -4,10 +4,21 @@ import {
   assertTransition,
   localDay,
   localDayStart,
+  localDayWindow,
   retryDelay,
 } from "../../packages/domain/src/state.js";
 
 describe("application state and recovery", () => {
+  it.each([
+    ["2026-03-29", "2026-03-28T23:00:00.000Z", "2026-03-29T22:00:00.000Z"],
+    ["2026-10-25", "2026-10-24T22:00:00.000Z", "2026-10-25T23:00:00.000Z"],
+    ["2026-09-16", "2026-09-15T22:00:00.000Z", "2026-09-16T22:00:00.000Z"],
+  ])("bounds the entire %s local day with UTC instants", (day, start, end) => {
+    expect(localDayWindow(new Date(`${day}T12:00:00.000Z`))).toEqual({ day, start, end });
+    expect(localDayWindow(new Date(start))).toEqual({ day, start, end });
+    expect(localDayWindow(new Date(Date.parse(end) - 1))).toEqual({ day, start, end });
+    expect(localDayWindow(new Date(end)).start).toBe(end);
+  });
   it("cannot relaunch an uncertain application or reopen a confirmed one", () => {
     for (const from of ["IN_FLIGHT", "UNKNOWN", "RECONCILING", "CONFIRMED"] as const) {
       expect(() => assertTransition(from, "READY")).toThrow();
