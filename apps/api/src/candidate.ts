@@ -11,6 +11,7 @@ import {
   policyInputSchema,
 } from "../../../packages/contracts/src/candidate.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
+import { localDay } from "../../../packages/domain/src/state.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
@@ -34,7 +35,7 @@ export async function candidateRoutes(
     const snapshot = await candidates.snapshot();
     return {
       ...snapshot,
-      chronology: chronology(snapshot.facts, new Date().toISOString().slice(0, 10)),
+      chronology: chronology(snapshot.facts, localDay(new Date())),
     };
   });
   app.post("/v1/candidate/sources", { bodyLimit: MAX_SOURCE_BYTES + 65536 }, async (request) => {

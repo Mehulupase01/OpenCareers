@@ -30,7 +30,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await db?.close();
       });
 
-      async function budgets(instant: string) {
+      async function budgets(instant: string, identityExpiresOn: string | null = null) {
         db =
           engine === "sqlite"
             ? await openSqlite(":memory:")
@@ -42,7 +42,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const candidate = new CandidateRepository(db, owner, clock);
         const matching = new MatchingRepository(db, owner, clock);
         await candidate.initialize();
-        await candidate.saveFact(identity);
+        await candidate.saveFact({ ...identity, expiresOn: identityExpiresOn });
         const profile = await candidate.publishProfile((await candidate.snapshot()).revision);
         const authorization = await candidate.saveAuthorization({
           ...policy(profile.id),
@@ -113,6 +113,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         });
         const baseline = await timestamps();
         return {
+          owner,
           gate,
           timestamps,
           baseline,
@@ -182,6 +183,69 @@ for (const engine of ["sqlite", "postgres"] as const) {
         ).rejects.toMatchObject({ code: "MODEL_QUOTA_EXHAUSTED" });
         expect(await fixture.timestamps()).toEqual(fixture.baseline);
       });
+
+      it.each(boundaries)(
+        "uses the Amsterdam day for answer validity at %s",
+        async (_, before, after) => {
+          const fixture = await budgets(before);
+          const owner = fixture.owner;
+          let now = new Date(before);
+          const candidate = new CandidateRepository(db, owner, () => now);
+          const fact = (await candidate.snapshot()).facts.find(
+            (item) => item.value.kind === "identity",
+          );
+          if (!fact) throw new Error("Missing synthetic identity.");
+          const day = localDay(new Date(after));
+          const answer = await candidate.saveAnswer({
+            semanticKey: "terms",
+            meaning: "Reviewed terms",
+            answer: true,
+            validFrom: day,
+            validUntil: day,
+            employerIds: ["synthetic-employer"],
+            countries: ["NL"],
+            evidenceFactIds: [fact.id],
+          });
+          const match = () =>
+            candidate.matchingAnswer(db, "terms", "Reviewed terms", "synthetic-employer", "NL");
+          expect(await match()).toBeNull();
+          now = new Date(after);
+          expect(now.toISOString().slice(0, 10)).not.toBe(day);
+          expect(await match()).toMatchObject({ id: answer.id });
+          now = new Date(new Date(after).getTime() + 26 * 3600000);
+          expect(await match()).toBeNull();
+          expect(await fixture.timestamps()).toEqual(fixture.baseline);
+        },
+      );
+
+      it.each(boundaries)(
+        "expires reviewed facts on the Amsterdam day at %s",
+        async (_, before, after) => {
+          const fixture = await budgets(before, localDay(new Date(before)));
+          fixture.advance(after);
+          await expect(fixture.gate()).rejects.toMatchObject({ code: "PROFILE_STALE" });
+          const candidate = new CandidateRepository(db, fixture.owner, () => new Date(after));
+          const snapshot = await candidate.snapshot();
+          await expect(candidate.publishProfile(snapshot.revision)).rejects.toMatchObject({
+            code: "CLAIM_UNSUPPORTED",
+          });
+          const fact = snapshot.facts.find((item) => item.value.kind === "identity");
+          if (!fact) throw new Error("Missing synthetic identity.");
+          await expect(
+            candidate.saveAnswer({
+              semanticKey: "terms",
+              meaning: "Reviewed terms",
+              answer: true,
+              validFrom: localDay(new Date(after)),
+              validUntil: localDay(new Date(after)),
+              employerIds: [],
+              countries: [],
+              evidenceFactIds: [fact.id],
+            }),
+          ).rejects.toMatchObject({ code: "CLAIM_UNSUPPORTED" });
+          expect(await fixture.timestamps()).toEqual(fixture.baseline);
+        },
+      );
     },
   );
 }

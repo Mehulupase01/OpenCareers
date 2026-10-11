@@ -73,3 +73,10 @@ export function parseRegressionFixture(raw: unknown) {
   z.literal(1).parse(schemaVersion);
   return compileRegressionFixture(correction).fixture;
 }
+
+export function compileRegressionInput(raw: unknown) {
+  const record = z.record(z.string(), z.unknown()).parse(raw);
+  if (!Object.hasOwn(record, "schemaVersion")) return compileRegressionFixture(record);
+  const { schemaVersion: _, ...correction } = parseRegressionFixture(record);
+  return compileRegressionFixture(correction);
+}

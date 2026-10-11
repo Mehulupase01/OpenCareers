@@ -25,10 +25,11 @@ import {
 } from "../../contracts/src/candidate.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
-import { localDayWindow } from "../../domain/src/state.js";
+import { localDay, localDayWindow } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { assertDiscoveryEligibility } from "./job-identity.js";
 import { PreparationRecovery } from "./preparation-recovery.js";
+import { RegressionRepository } from "./regression-repository.js";
 import { Repository, taskFromRow } from "./repository.js";
 
 const json = <T>(row: Row, field = "data"): T => JSON.parse(String(row[field])) as T;
@@ -291,6 +292,27 @@ export class CandidateRepository extends Repository {
         reviewedAt: this.now(),
       });
       await this.writeFact(tx, String(candidate.id), fact);
+      if (
+        status === "verified" &&
+        fact.value.kind === "employment" &&
+        existing.status !== "verified"
+      ) {
+        const history = await tx.query(
+          "SELECT data FROM fact_versions WHERE owner_id=$1 AND candidate_id=$2 AND id=$3 AND revision<$4 ORDER BY revision DESC LIMIT 1001",
+          [this.ownerId, String(candidate.id), id, fact.revision],
+        );
+        if (history.length > 1000)
+          throw new DomainError("STATE_INVALID", "Correction history exceeds its bound.");
+        const before = history
+          .map((row) => factSchema.parse(json(row)))
+          .find((item) => item.status === "verified" && item.reviewedAt);
+        if (before)
+          await new RegressionRepository(this.db, this.ownerId, this.clock).captureFact(
+            tx,
+            before,
+            fact,
+          );
+      }
       return fact;
     });
   }
@@ -300,11 +322,12 @@ export class CandidateRepository extends Repository {
       const candidate = await this.candidate(tx);
       if (Number(candidate.revision) !== expectedRevision)
         throw new DomainError("REVISION_STALE", "Candidate changed; review the latest facts.");
-      const facts = (await this.facts(tx)).filter((f) => usableFact(f, this.now().slice(0, 10)));
+      const today = localDay(this.clock());
+      const facts = (await this.facts(tx)).filter((f) => usableFact(f, today));
       if (
         facts.filter((f) => f.value.kind === "identity").length !== 1 ||
         conflictingFacts(facts).length ||
-        chronology(facts, this.now().slice(0, 10)).issues.length
+        chronology(facts, today).issues.length
       )
         throw new DomainError(
           "CLAIM_UNSUPPORTED",
@@ -527,12 +550,12 @@ export class CandidateRepository extends Repository {
     if (
       this.profile(profileRow).facts.some(
         (f) =>
-          !usableFact(f, this.now().slice(0, 10)) ||
+          !usableFact(f, localDay(this.clock())) ||
           !currentFacts.some(
             (current) =>
               current.id === f.id &&
               current.revision === f.revision &&
-              usableFact(current, this.now().slice(0, 10)),
+              usableFact(current, localDay(this.clock())),
           ),
       )
     )
@@ -593,6 +616,7 @@ export class CandidateRepository extends Repository {
     employerId: string,
     country: string,
   ): Promise<ApprovedAnswer | null> {
+    const today = localDay(this.clock());
     const facts = await this.facts(tx);
     const rows = await tx.query(
       "SELECT * FROM approved_answers WHERE owner_id=$1 AND semantic_key=$2 ORDER BY revision DESC",
@@ -607,15 +631,12 @@ export class CandidateRepository extends Repository {
       )
         continue;
       if (
-        a.validFrom > this.now().slice(0, 10) ||
-        a.validUntil < this.now().slice(0, 10) ||
+        a.validFrom > today ||
+        a.validUntil < today ||
         a.evidenceFactIds.some(
           (id) =>
             !facts.some(
-              (f) =>
-                f.id === id &&
-                f.revision === a.evidenceRevisions[id] &&
-                usableFact(f, this.now().slice(0, 10)),
+              (f) => f.id === id && f.revision === a.evidenceRevisions[id] && usableFact(f, today),
             ),
         )
       )
@@ -740,7 +761,7 @@ export class CandidateRepository extends Repository {
       throw new DomainError("POLICY_REVOKED", "Current controls prohibit this browser action.");
     const currentFacts = await this.facts(tx);
     const profile = json<ProfileSnapshot>(row, "profile_data");
-    const today = this.now().slice(0, 10);
+    const today = localDay(this.clock());
     if (
       profile.facts.some(
         (fact) =>
@@ -944,7 +965,7 @@ export class CandidateRepository extends Repository {
     const facts = await this.facts(tx);
     if (
       input.evidenceFactIds.some(
-        (id) => !facts.some((f) => f.id === id && usableFact(f, this.now().slice(0, 10))),
+        (id) => !facts.some((f) => f.id === id && usableFact(f, localDay(this.clock()))),
       )
     )
       throw new DomainError("CLAIM_UNSUPPORTED", "Answers require usable reviewed facts.");

@@ -12,6 +12,7 @@ import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
 import { createArtifactStore } from "../../../packages/documents/src/s3-artifact-store.js";
+import { localDay } from "../../../packages/domain/src/state.js";
 import { GmailService } from "../../../packages/email/src/service.js";
 import { MatchingRunner } from "../../../packages/inference/src/gateway.js";
 import { OpenRouterTransport } from "../../../packages/inference/src/transport.js";
@@ -177,7 +178,7 @@ try {
                   maxCharacters: null,
                 }))
                 .filter((question) => /^[A-Z]{2}$/.test(question.country)),
-              new Date().toISOString().slice(0, 10),
+              localDay(new Date()),
             );
             const letterDraft = await draftWorkerLetter(config, input, letterDraftRunner);
             if (config.profile !== "demo" && !letterDraft)

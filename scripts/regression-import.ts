@@ -1,6 +1,6 @@
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { compileRegressionFixture } from "../packages/security/src/regression-fixture.js";
+import { compileRegressionInput } from "../packages/security/src/regression-fixture.js";
 
 const inside = (root: string, path: string) => {
   const rel = relative(root, path);
@@ -18,7 +18,7 @@ export async function importRegressionFixture(root: string, input: string, revie
   if (!inside(repo, parent) || parent !== join(repo, "tests", "fixtures"))
     throw new Error("Fixture parent escaped its approved directory.");
   const handle = await open(resolve(input), "r");
-  let compiled: ReturnType<typeof compileRegressionFixture>;
+  let compiled: ReturnType<typeof compileRegressionInput>;
   try {
     if (!(await handle.stat()).isFile())
       throw new Error("Correction input must be a regular file.");
@@ -30,7 +30,7 @@ export async function importRegressionFixture(root: string, input: string, revie
       total += bytesRead;
     }
     if (total > 16384) throw new Error("Correction input exceeds its bound.");
-    compiled = compileRegressionFixture(JSON.parse(buffer.subarray(0, total).toString("utf8")));
+    compiled = compileRegressionInput(JSON.parse(buffer.subarray(0, total).toString("utf8")));
   } finally {
     await handle.close();
   }

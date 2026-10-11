@@ -1591,3 +1591,36 @@ truthful variant generation and compatibility/history requirements. Installed
 physical Windows/server and genuine live/24/72-hour gates remain separate; the
 existing capacity harness is explicitly non-qualifying. No private owner runtime,
 credentials, model/mailbox call, real action or actual-duration soak was touched.
+
+## 2026-10-12: Private Correction Review And Calendar Guard Fix
+
+Attribution commit b9c7410e4169212ffcb56187a24edec10ccbbf57 is all-green in CI
+38178099734 on Windows, Ubuntu and PostgreSQL. The successor adds transactional
+verified-workload correction proposals in the authoritative private database,
+bounded owner review with acknowledgement/CAS, immutable approval/dismissal and
+approved-only categorical fixture download. Private source facts and event hashes
+are never exported. The maintainer importer accepts strict versioned exports
+without weakening its publication acknowledgement or filesystem protections.
+
+Initial browser verification was 67/68: the mobile checkbox was obstructed by a
+missing table scroll wrapper. Fixed regression/outcome workflows passed 4/4, and
+the final full suite passes 68/68 (4.4 minutes), with compact table screenshots
+inspected. Extracted Windows self-test initially failed twice at preparation.
+Direct fresh synthetic diagnostics identified Amsterdam-vs-UTC calendar mismatch,
+not a proven mixed-build problem. Shared fact/profile/answer validation, worker
+generation, inference preparation, chronology display and question resolution
+now use the existing Amsterdam day. UTC authorization instants stay unchanged.
+Boundary tests cover ordinary/spring/autumn validity and expiry blocking commit.
+
+Full local check: 705 passed / 255 skipped in 93 files; lint/types/ledger/build
+pass. Focused boundary/preparation integration: 22 passed / 22 PostgreSQL skips.
+Final extracted production-only Windows install: 1/1 passed (23.33 seconds total).
+Public scan: 433 files. Successor CI pending. No private owner runtime, secret,
+mailbox/model call, real employer action or actual-duration soak was touched.
+The synthetic preview remains stopped/denied; no background coding task exists.
+
+No gate/phase closes: 12/19 phases and 92/128 gates. Automatic proposals cover
+verified workload corrections only. Continue directly with scoring pipeline
+compatibility/history, broader executable form/adapter regression cases and
+truthful variants, then independent release/deployment engineering. Real receipts,
+physical installation/drills and qualifying 24/72-hour soaks remain separate.

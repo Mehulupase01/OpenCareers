@@ -2,6 +2,7 @@ import { usableFact } from "../../candidate/src/domain.js";
 import { nodeInputSchema } from "../../contracts/src/agents.js";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
 import { DomainError } from "../../contracts/src/index.js";
+import { localDay } from "../../domain/src/state.js";
 import { careerTextMinimizer, type PrivacyRevision } from "./privacy.js";
 
 export function minimizedPreparationNode(
@@ -21,7 +22,7 @@ export function minimizedPreparationNode(
     );
     if (
       !fact ||
-      !usableFact(fact, new Date().toISOString().slice(0, 10)) ||
+      !usableFact(fact, localDay(new Date())) ||
       ["identity", "work_authorization", "availability"].includes(fact.value.kind) ||
       !JSON.stringify(fact.value).includes(supplied.text)
     )

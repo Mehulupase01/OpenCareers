@@ -7,8 +7,10 @@ import { buildServer } from "../../apps/api/src/server.js";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { type Config, loadConfig } from "../../packages/config/src/index.js";
 import { dryRunResultSchema } from "../../packages/contracts/src/browser.js";
+import type { FactInput } from "../../packages/contracts/src/candidate.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
+import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
@@ -45,6 +47,76 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("keeps regression review and export owner-authenticated and byte-minimized", async () => {
+    const { app, headers, repository } = await setup("local");
+    const id = randomUUID();
+    for (const [method, url] of [
+      ["GET", "/v1/outcomes/regressions"],
+      ["POST", `/v1/outcomes/regressions/${id}/review`],
+      ["GET", `/v1/outcomes/regressions/${id}/export`],
+    ] as const)
+      expect(
+        (await app.inject({ method, url, headers, ...(method === "POST" ? { payload: {} } : {}) }))
+          .statusCode,
+      ).toBe(401);
+    const candidate = new CandidateRepository(repository.db, repository.ownerId);
+    const input = {
+      key: "employment.synthetic",
+      expectedRevision: 0,
+      value: {
+        kind: "employment",
+        employer: "Synthetic Private Sentinel",
+        title: "Synthetic Private Role",
+        start: "2025-01",
+        end: "2025-12",
+        workload: "full_time",
+        description: "Synthetic Private Text",
+      },
+      provenance: { kind: "owner", statement: "Synthetic assertion" },
+      expiresOn: null,
+    } satisfies FactInput;
+    const original = await candidate.saveFact(input);
+    const verified = await candidate.reviewFact(original.id, original.revision, "verified");
+    const edited = await candidate.saveFact({
+      ...input,
+      id: original.id,
+      expectedRevision: verified.revision,
+      value: { ...input.value, workload: "part_time" },
+    });
+    await candidate.reviewFact(edited.id, edited.revision, "verified");
+    const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const catalog = await app.inject({ url: "/v1/outcomes/regressions", headers: authenticated });
+    expect(catalog.statusCode).toBe(200);
+    const proposal = catalog.json()[0];
+    expect(catalog.body).not.toContain("Synthetic Private");
+    expect(
+      (
+        await app.inject({
+          url: `/v1/outcomes/regressions/${proposal.id}/export`,
+          headers: authenticated,
+        })
+      ).statusCode,
+    ).toBe(409);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/outcomes/regressions/${proposal.id}/review`,
+          headers: authenticated,
+          payload: { expectedRevision: 1, decision: "approved", reviewed: true },
+        })
+      ).statusCode,
+    ).toBe(200);
+    const exported = await app.inject({
+      url: `/v1/outcomes/regressions/${proposal.id}/export`,
+      headers: authenticated,
+    });
+    expect(exported.statusCode).toBe(200);
+    expect(exported.headers["content-disposition"]).toContain("attachment");
+    expect(createHash("sha256").update(exported.body).digest("hex")).toBe(proposal.sha256);
+    expect(exported.json()).toEqual(proposal.fixture);
+    expect(exported.body).not.toContain(original.id);
+  });
   it("authenticates experiment definitions, assignments and stops", async () => {
     const { app, headers } = await setup("local");
     const id = randomUUID();

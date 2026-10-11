@@ -153,6 +153,16 @@ describe("correction to executable synthetic regression", () => {
       expect(bytes).not.toContain(fact.value.employer);
       expect(bytes).not.toContain(fact.id);
       verify(JSON.parse(bytes));
+      await writeFile(input, bytes);
+      expect(await importRegressionFixture(root, input, true)).toEqual(exported);
+      await writeFile(
+        input,
+        JSON.stringify({ ...JSON.parse(bytes), candidateName: "Synthetic Private Sentinel" }),
+      );
+      await expect(importRegressionFixture(root, input, true)).rejects.toThrow();
+      await writeFile(input, JSON.stringify({ ...JSON.parse(bytes), schemaVersion: 2 }));
+      await expect(importRegressionFixture(root, input, true)).rejects.toThrow();
+      await writeFile(input, bytes);
       await writeFile(path, "tampered");
       await expect(importRegressionFixture(root, input, true)).rejects.toThrow("do not match");
       await writeFile(input, "x".repeat(16385));

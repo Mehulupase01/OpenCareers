@@ -1928,6 +1928,9 @@
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-regression-import.md",
+            "docs/evidence/P16-private-regression-proposals.md",
+            "tests/integration/regression-proposals.test.ts",
+            "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
             "tests/integration/regression-loop.test.ts"
           ],
@@ -2014,7 +2017,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "b76f513524fb092e8500f4415b13ce351612b21c",
+      "lastVerifiedCommit": "b9c7410e4169212ffcb56187a24edec10ccbbf57",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2045,6 +2048,12 @@
           "commit": "b76f513524fb092e8500f4415b13ce351612b21c",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Immutable reviewed experiment definitions and packet assignments, duplicate/expiry/stop dispatch guards, confirmation after stop, fixed cohorts, owner workflow, full browser and Windows production-only installation. Installer bounded deadline passes; not successor experiment attribution, truthful automatic variant generation or additional gate closure."
+        },
+        {
+          "runId": "38178099734",
+          "commit": "b9c7410e4169212ffcb56187a24edec10ccbbf57",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Frozen variant cohort attribution backed by immutable definition, assignment, packet, intent, dispatch and receipt evidence; corruption and chronological refusal, full browser and Windows production-only installation. Not successor private proposals, live effectiveness or additional phase closure."
         }
       ],
       "acceptanceTests": [],

@@ -61,7 +61,8 @@ and physical Windows/server operation are tracked independently.
 - Authoritative seniority and sponsorship grouping; current unknowns stay unknown.
 - Truthful automatic wording/ordering variant generation and independent approval.
 - Selection bias, assignment effects and sample volumes sufficient for inference.
-- Automatic private correction proposals and broader form/adapter regression cases.
+- Broader private correction proposals and form/adapter regression cases; verified
+  workload corrections now have owner-gated proposal/export capture, not full breadth.
 
 Any recommendation is advisory. Existing owner authorization remains the sole
 policy source. An experiment definition, report, fixture or inferred preference

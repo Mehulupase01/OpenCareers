@@ -18,6 +18,7 @@ import {
   type JobInput,
   jobInputSchema,
 } from "../../contracts/src/index.js";
+import { localDay } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, Row, SqlExecutor } from "./database.js";
 import { HandoffRepository } from "./handoff-repository.js";
@@ -413,7 +414,7 @@ export class ExceptionRepository extends Repository {
         "ANSWER_UNKNOWN",
         "The resolved meaning must be the exact question that was asked.",
       );
-    const today = this.now().slice(0, 10);
+    const today = localDay(this.clock());
     if (input.answer === undefined)
       throw new DomainError("ANSWER_UNKNOWN", "Resolving a question requires the owner's answer.");
     const job = await this.job(tx, String(block.application_id));
@@ -425,7 +426,7 @@ export class ExceptionRepository extends Repository {
         meaning,
         answer: input.answer,
         validFrom: today,
-        validUntil: new Date(this.clock().getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
+        validUntil: localDay(new Date(this.clock().getTime() + 30 * 86_400_000)),
         employerIds: [job.employerId],
         countries: country ? [country] : [],
         evidenceFactIds: input.factIds ?? [],

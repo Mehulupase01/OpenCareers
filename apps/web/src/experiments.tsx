@@ -302,7 +302,7 @@ export function ExperimentsWorkspace() {
         </div>
       </div>
       {selected && (
-        <div className="calibration-table-wrap">
+        <div className="table-scroll">
           <table className="outcome-table">
             <thead>
               <tr>

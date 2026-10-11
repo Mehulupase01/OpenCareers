@@ -6,6 +6,7 @@ import { CalibrationRepository } from "../../../packages/persistence/src/calibra
 import { CohortRepository } from "../../../packages/persistence/src/cohort-repository.js";
 import { ExperimentRepository } from "../../../packages/persistence/src/experiment-repository.js";
 import { OutcomeRepository } from "../../../packages/persistence/src/outcome-repository.js";
+import { RegressionRepository } from "../../../packages/persistence/src/regression-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 
 export async function outcomeRoutes(app: FastifyInstance, repository: Repository) {
@@ -13,6 +14,19 @@ export async function outcomeRoutes(app: FastifyInstance, repository: Repository
   const calibration = new CalibrationRepository(repository.db, repository.ownerId);
   const cohorts = new CohortRepository(repository.db, repository.ownerId);
   const experiments = new ExperimentRepository(repository.db, repository.ownerId);
+  const regressions = new RegressionRepository(repository.db, repository.ownerId);
+  app.get("/v1/outcomes/regressions", () => regressions.list());
+  app.post("/v1/outcomes/regressions/:id/review", (request) =>
+    regressions.review(z.object({ id: z.uuid() }).parse(request.params).id, request.body),
+  );
+  app.get("/v1/outcomes/regressions/:id/export", async (request, reply) =>
+    reply
+      .type("application/json")
+      .header("Content-Disposition", 'attachment; filename="reviewed-regression.json"')
+      .send(
+        `${JSON.stringify(await regressions.export(z.object({ id: z.uuid() }).parse(request.params).id), null, 2)}\n`,
+      ),
+  );
   app.get("/v1/outcomes/experiments/packets", () => experiments.packets());
   app.get("/v1/outcomes/experiments", () => experiments.list());
   app.post("/v1/outcomes/experiments", (request) => experiments.create(request.body));

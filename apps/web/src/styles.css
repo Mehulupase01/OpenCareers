@@ -1163,6 +1163,12 @@ td:last-child {
   padding-top: 12px;
   border-top: 1px solid #e0e6e2;
 }
+.regression-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 118px;
+}
 .consent {
   padding: 16px 0;
   border-top: 1px solid #dfdad0;
