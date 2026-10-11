@@ -51,6 +51,14 @@ not gate this engineering.
 
 ## Implementation Order
 
+2026-10-11 implementation note: migration 16 (not the originally planned 11)
+adds graph storage. Allocation classes extend the existing inference ledger;
+no separate `agent_allocations` quota source is created. Strict privacy remains
+the default; the explicitly approved reviewed-career-facts revision is also
+eligible without relaxing its pinned provider, minimization or expiry rules.
+See `docs/evidence/P12-preparation-foundations.md` for implemented work and
+remaining integration. Historical acceptance requirements below remain intact.
+
 1. Define node contracts and migration v11. New `packages/contracts/src/agents.ts`
    for node kinds (extractor, match analyst, drafter, form-answer planner,
    critic, bounded repair), typed inputs and outputs, capability sets and a

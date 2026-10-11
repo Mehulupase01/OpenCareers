@@ -1,4 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
+import {
+  type AllocationClass,
+  allocationClassSchema,
+  allocationLimits,
+} from "../../contracts/src/agents.js";
 import type {
   Authorization,
   CandidateFact,
@@ -113,9 +118,11 @@ export class MatchingRepository extends Repository {
     dailyLimit: number,
     applicationId: string | null = null,
     expectedPrivacyBinding?: string,
+    allocationClass: AllocationClass = "semantic_triage",
   ): Promise<Reservation> {
     if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 50)
       throw new DomainError("CONFIG_INVALID", "Invalid inference daily limit.");
+    allocationClassSchema.parse(allocationClass);
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const day = localDay(this.clock());
@@ -133,6 +140,27 @@ export class MatchingRepository extends Repository {
       );
       if (count >= dailyLimit)
         throw new DomainError("MODEL_QUOTA_EXHAUSTED", "Daily free inference budget is exhausted.");
+      const reserve = Math.floor((dailyLimit * allocationLimits.unallocated_reserve) / 50);
+      if (allocationClass !== "unallocated_reserve" && count >= dailyLimit - reserve)
+        throw new DomainError(
+          "MODEL_QUOTA_EXHAUSTED",
+          "Protected inference reserve cannot fund routine work.",
+        );
+      const usedInClass = Number(
+        (
+          await tx.query(
+            "SELECT COUNT(*) AS count FROM inference_reservations WHERE owner_id=$1 AND day=$2 AND allocation_class=$3 AND state <> 'released'",
+            [this.ownerId, day, allocationClass],
+          )
+        )[0]?.count,
+      );
+      const classLimit =
+        allocationClass === "unallocated_reserve" ? reserve : allocationLimits[allocationClass];
+      if (usedInClass >= classLimit)
+        throw new DomainError(
+          "MODEL_QUOTA_EXHAUSTED",
+          "Inference task-class allocation is exhausted.",
+        );
       const state = (
         await tx.query("SELECT * FROM inference_state WHERE owner_id=$1", [this.ownerId])
       )[0];
@@ -157,7 +185,7 @@ export class MatchingRepository extends Repository {
       }
       const id = randomUUID();
       await tx.query(
-        "INSERT INTO inference_reservations(owner_id,id,day,state,application_id,model_id,provider,created_at,expires_at) VALUES($1,$2,$3,'reserved',$4,$5,$6,$7,$8)",
+        "INSERT INTO inference_reservations(owner_id,id,day,state,application_id,model_id,provider,created_at,expires_at,allocation_class) VALUES($1,$2,$3,'reserved',$4,$5,$6,$7,$8,$9)",
         [
           this.ownerId,
           id,
@@ -167,6 +195,7 @@ export class MatchingRepository extends Repository {
           provider,
           this.now(),
           new Date(this.clock().getTime() + 60000).toISOString(),
+          allocationClass,
         ],
       );
       return { id, day, modelId, provider, state: "reserved" };
@@ -205,8 +234,8 @@ export class MatchingRepository extends Repository {
           );
       }
       const rows = await tx.query(
-        "UPDATE inference_reservations SET state='sent',request_hash=$1 WHERE owner_id=$2 AND id=$3 AND state='reserved' RETURNING id",
-        [requestHash, this.ownerId, id],
+        "UPDATE inference_reservations SET state='sent',request_hash=$1 WHERE owner_id=$2 AND id=$3 AND state='reserved' AND expires_at > $4 RETURNING id",
+        [requestHash, this.ownerId, id, this.now()],
       );
       if (!rows.length) throw new DomainError("REVISION_STALE", "Inference reservation is stale.");
       if (expectedPrivacyBinding)

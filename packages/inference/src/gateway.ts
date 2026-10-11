@@ -192,7 +192,18 @@ export class MatchingRunner {
     this.transport =
       transport ??
       (config.inference.apiKey
-        ? new OpenRouterTransport(config.inference.apiKey, fetch, config.inference.privacyRevision)
+        ? new OpenRouterTransport(
+            config.inference.apiKey,
+            fetch,
+            config.inference.privacyRevision,
+            {
+              modelAllowlist: config.inference.modelAllowlist,
+              providerAllowlist: config.inference.providerAllowlist,
+              minimumContext: 8192,
+              catalogueMaxAgeSeconds: 21600,
+              dailyLimit: config.inference.dailyLimit,
+            },
+          )
         : null);
   }
 

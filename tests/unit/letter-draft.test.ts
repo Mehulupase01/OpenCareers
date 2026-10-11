@@ -185,6 +185,8 @@ describe("LLM letter proposal boundary", () => {
       "synthetic",
       10,
       input.assessment.applicationId,
+      undefined,
+      "packet_drafting",
     );
     expect(ledger.markSent).toHaveBeenCalledOnce();
     expect(ledger.finish).toHaveBeenCalledWith("reservation-1", {

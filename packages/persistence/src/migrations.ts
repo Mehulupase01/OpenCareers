@@ -129,6 +129,13 @@ export const migrations = [
   [
     "CREATE TABLE owner_source_sessions (owner_id TEXT NOT NULL REFERENCES owners(id), source_id TEXT NOT NULL, adapter_id TEXT NOT NULL, origin TEXT NOT NULL, revision INTEGER NOT NULL, state TEXT NOT NULL, secret_id TEXT, permission_sha256 TEXT NOT NULL, expires_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,source_id), FOREIGN KEY(owner_id,secret_id) REFERENCES vault_secrets(owner_id,id))",
   ],
+  [
+    "ALTER TABLE inference_reservations ADD COLUMN allocation_class TEXT NOT NULL DEFAULT 'legacy'",
+    "CREATE INDEX inference_allocation ON inference_reservations(owner_id,day,allocation_class,state)",
+    "CREATE TABLE graph_runs (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, binding TEXT NOT NULL, budget TEXT NOT NULL, state TEXT NOT NULL, steps INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, requests INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL, ended_at TEXT, PRIMARY KEY(owner_id,id))",
+    "CREATE TABLE graph_nodes (owner_id TEXT NOT NULL, run_id TEXT NOT NULL, ordinal INTEGER NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, token_cap INTEGER NOT NULL, request_cap INTEGER NOT NULL, output_sha256 TEXT, PRIMARY KEY(owner_id,run_id,ordinal), FOREIGN KEY(owner_id,run_id) REFERENCES graph_runs(owner_id,id))",
+    "CREATE TABLE graph_checkpoints (owner_id TEXT NOT NULL REFERENCES owners(id), cache_key TEXT NOT NULL, kind TEXT NOT NULL, binding TEXT NOT NULL, output TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,cache_key))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

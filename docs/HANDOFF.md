@@ -845,3 +845,23 @@ preparation/exception UI integration remains. No new submission adapter is
 enabled. Counts remain 11/19 phases, 80/128 gates. Source-session consumption,
 resumable large scans, 20-source operational coverage, five gated families and
 P12-P17 remain. No private profile, key, CV, OAuth grant or real application used.
+
+## 2026-10-11: P12 Preparation Foundations
+
+Both preceding milestone CI runs are green: 38094756123 (failed Windows lane
+rerun) and 38095275316. P12 now has fixed typed contracts, migration 16,
+owner-isolated checkpoints, bounded pure graph/batch execution and task-class
+allocations in the existing inference ledger. Mandatory letters are charged
+to drafting, not triage. Production transports revalidate current free prices
+and reviewed endpoint evidence for every completion; no policy means no call.
+Actual killed-worker recovery preserves an existing UNKNOWN attempt.
+
+See `docs/evidence/P12-preparation-foundations.md`: full check 531 passed /
+165 PostgreSQL skipped across 64 files; final focused checks
+74 passed / 18 skipped. P12 stays open, no graph/batch production registration
+or live quality claim. Next: actual minimized node/packet integration, bounded
+critic/repair, measured routing, held-out ablation and retention. Counts remain
+11/19 phases, 80/128 gates until CI-backed gate evidence is recorded. Private
+services and secrets untouched. No overnight follow-up was created: host
+automation tooling was unavailable; do not assume coding continues after the
+active session ends. Owned synthetic preview remains at 127.0.0.1:14324.

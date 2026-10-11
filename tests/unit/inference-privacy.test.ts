@@ -14,6 +14,7 @@ import {
 import { OpenRouterTransport } from "../../packages/inference/src/transport.js";
 import { documentGenerationInput } from "../fixtures/document-packets.js";
 import { matchingEvaluationCases } from "../fixtures/matching-evaluation.js";
+import { syntheticCatalogue, syntheticRoutePolicy } from "../helpers/route-fixtures.js";
 
 const model = reviewedCareerPolicy.models[0];
 const revision = "reviewed-career-facts-v1";
@@ -146,11 +147,21 @@ describe("explicit reviewed career-facts inference policy", () => {
     const input = matchingEvaluationCases[0]?.input;
     if (!input) throw new Error("Missing fixture.");
     const request = buildRequest(input, model, "novita", revision);
-    const fetcher = vi.fn(async () => new Response("{}", { status: 404 }));
+    const fetcher = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith("/models")) return Response.json(syntheticCatalogue(model));
+      if (String(url).endsWith("/endpoints"))
+        return Response.json({ data: { endpoints: [endpoint] } });
+      return new Response("{}", { status: 404 });
+    });
     const strict = new OpenRouterTransport("synthetic-key", fetcher);
     await expect(strict.complete(request)).rejects.toThrow("privacy controls");
     expect(fetcher).not.toHaveBeenCalled();
-    const reviewed = new OpenRouterTransport("synthetic-key", fetcher, revision);
+    const reviewed = new OpenRouterTransport(
+      "synthetic-key",
+      fetcher,
+      revision,
+      syntheticRoutePolicy(model, "novita"),
+    );
     await expect(
       reviewed.complete({
         ...request,
@@ -159,6 +170,6 @@ describe("explicit reviewed career-facts inference policy", () => {
     ).rejects.toThrow("privacy controls");
     expect(fetcher).not.toHaveBeenCalled();
     await expect(reviewed.complete(request)).rejects.toThrow("privacy requirements");
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 });

@@ -7,6 +7,7 @@ import {
 } from "../../packages/inference/src/gateway.js";
 import { OpenRouterTransport } from "../../packages/inference/src/transport.js";
 import { matchingEvaluationCases } from "../fixtures/matching-evaluation.js";
+import { syntheticCatalogue, syntheticRoutePolicy } from "../helpers/route-fixtures.js";
 
 describe("bounded inference gateway", () => {
   it("minimizes facts and fixes the free provider route without tools", () => {
@@ -52,16 +53,23 @@ describe("bounded inference gateway", () => {
   });
 
   it("identifies a missing privacy-compatible endpoint without relaxing the request", async () => {
-    const transport = new OpenRouterTransport("synthetic-not-a-real-key", async (_url, init) => {
-      expect(JSON.parse(String(init?.body)).provider).toEqual({
-        only: ["nvidia"],
-        allow_fallbacks: false,
-        require_parameters: true,
-        data_collection: "deny",
-        zdr: true,
-      });
-      return new Response("{}", { status: 404 });
-    });
+    const model = "nvidia/nemotron-3-super-120b-a12b:free";
+    const transport = new OpenRouterTransport(
+      "synthetic-not-a-real-key",
+      async (url, init) => {
+        if (String(url).endsWith("/models")) return Response.json(syntheticCatalogue(model));
+        expect(JSON.parse(String(init?.body)).provider).toEqual({
+          only: ["nvidia"],
+          allow_fallbacks: false,
+          require_parameters: true,
+          data_collection: "deny",
+          zdr: true,
+        });
+        return new Response("{}", { status: 404 });
+      },
+      "strict-zdr-v1",
+      syntheticRoutePolicy(model, "nvidia"),
+    );
     const request = buildRequest(
       matchingEvaluationCases[0]?.input as MatchingInput,
       "nvidia/nemotron-3-super-120b-a12b:free",
@@ -89,9 +97,25 @@ describe("bounded inference gateway", () => {
         }),
         { status: 200 },
       );
-    const matching = new OpenRouterTransport("synthetic-key", async () => response("Nvidia"));
+    const fetcher =
+      (provider: string): typeof fetch =>
+      async (url) =>
+        String(url).endsWith("/models")
+          ? Response.json(syntheticCatalogue(request.model))
+          : response(provider);
+    const matching = new OpenRouterTransport(
+      "synthetic-key",
+      fetcher("Nvidia"),
+      "strict-zdr-v1",
+      syntheticRoutePolicy(request.model, "nvidia"),
+    );
     expect((await matching.complete(request)).provider).toBe("nvidia");
-    const changed = new OpenRouterTransport("synthetic-key", async () => response("Other"));
+    const changed = new OpenRouterTransport(
+      "synthetic-key",
+      fetcher("Other"),
+      "strict-zdr-v1",
+      syntheticRoutePolicy(request.model, "nvidia"),
+    );
     await expect(changed.complete(request)).rejects.toThrow("provider differed");
   });
 });

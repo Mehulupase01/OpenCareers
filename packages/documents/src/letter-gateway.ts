@@ -41,9 +41,10 @@ export class LetterDraftRunner {
       route.provider,
       this.dailyLimit,
       input.assessment.applicationId ?? undefined,
-      ...(this.privacyRevision === "reviewed-career-facts-v1"
-        ? ([privacyBinding(this.privacyRevision)] as const)
-        : []),
+      this.privacyRevision === "reviewed-career-facts-v1"
+        ? privacyBinding(this.privacyRevision)
+        : undefined,
+      "packet_drafting",
     );
     let sent = false;
     try {

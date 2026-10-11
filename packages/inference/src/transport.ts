@@ -1,5 +1,7 @@
 import { DomainError } from "../../contracts/src/index.js";
+import type { RoutePolicy } from "../../contracts/src/matching.js";
 import { type PrivacyRevision, providerPrivacy } from "./privacy.js";
+import { verifyRequestRoute } from "./router.js";
 
 export interface CompletionRequest {
   model: string;
@@ -62,6 +64,7 @@ export class OpenRouterTransport {
     private readonly apiKey: string,
     private readonly fetcher: typeof fetch = fetch,
     private readonly privacyRevision: PrivacyRevision = "strict-zdr-v1",
+    private readonly routePolicy?: RoutePolicy,
   ) {}
 
   private async call(path: string, init?: RequestInit) {
@@ -118,13 +121,19 @@ export class OpenRouterTransport {
         "MODEL_ROUTE_INELIGIBLE",
         "Inference privacy controls differed from the recorded revision.",
       );
+    if (!this.routePolicy)
+      throw new DomainError(
+        "MODEL_ROUTE_INELIGIBLE",
+        "Completion requires an explicit route policy.",
+      );
+    await verifyRequestRoute(request, this.routePolicy, this.privacyRevision, this);
     const raw = (await this.call("/chat/completions", {
       method: "POST",
       body: JSON.stringify(request),
     })) as {
       model?: unknown;
       provider?: unknown;
-      choices?: Array<{ message?: { content?: unknown } }>;
+      choices?: Array<{ finish_reason?: unknown; message?: { content?: unknown } }>;
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
     };
     if (
@@ -133,6 +142,20 @@ export class OpenRouterTransport {
       typeof raw.choices?.[0]?.message?.content !== "string"
     )
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference response shape was invalid.");
+    const promptTokens = raw.usage?.prompt_tokens;
+    const completionTokens = raw.usage?.completion_tokens;
+    if (
+      !Number.isSafeInteger(promptTokens) ||
+      Number(promptTokens) < 0 ||
+      !Number.isSafeInteger(completionTokens) ||
+      Number(completionTokens) < 0 ||
+      Number(completionTokens) > request.max_tokens ||
+      (raw.choices[0].finish_reason !== undefined && raw.choices[0].finish_reason !== "stop")
+    )
+      throw new DomainError(
+        "MODEL_ROUTE_INELIGIBLE",
+        "Inference usage or finish status was invalid.",
+      );
     const pinnedProvider = request.provider.only[0];
     if (!pinnedProvider || raw.provider.toLowerCase() !== pinnedProvider.toLowerCase())
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference provider differed from the pin.");
@@ -141,8 +164,8 @@ export class OpenRouterTransport {
       provider: pinnedProvider,
       content: raw.choices[0].message.content,
       usage: {
-        promptTokens: Number(raw.usage?.prompt_tokens ?? 0),
-        completionTokens: Number(raw.usage?.completion_tokens ?? 0),
+        promptTokens: Number(promptTokens),
+        completionTokens: Number(completionTokens),
       },
     };
   }

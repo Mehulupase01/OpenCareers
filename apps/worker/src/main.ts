@@ -63,7 +63,13 @@ const letterDraftRunner = config.inference.apiKey
   ? new LetterDraftRunner(
       matchingRepository,
       config.inference.dailyLimit,
-      new OpenRouterTransport(config.inference.apiKey, fetch, config.inference.privacyRevision),
+      new OpenRouterTransport(config.inference.apiKey, fetch, config.inference.privacyRevision, {
+        modelAllowlist: config.inference.modelAllowlist,
+        providerAllowlist: config.inference.providerAllowlist,
+        minimumContext: 8192,
+        catalogueMaxAgeSeconds: 21600,
+        dailyLimit: config.inference.dailyLimit,
+      }),
       config.inference.privacyRevision,
     )
   : null;

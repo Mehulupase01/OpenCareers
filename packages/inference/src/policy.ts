@@ -32,7 +32,11 @@ export function modelReasons(model: CatalogueModel, policy: RoutePolicy): string
       reasons.push(`Unknown price dimension: ${dimension}.`);
       continue;
     }
-    if ((typeof raw !== "string" && typeof raw !== "number") || !Number.isFinite(Number(raw))) {
+    if (
+      (typeof raw !== "string" && typeof raw !== "number") ||
+      (typeof raw === "string" && !/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(raw)) ||
+      !Number.isFinite(Number(raw))
+    ) {
       reasons.push(`Unknown ${dimension} price.`);
       continue;
     }
