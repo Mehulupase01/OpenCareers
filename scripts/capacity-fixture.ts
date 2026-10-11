@@ -62,7 +62,11 @@ const definitions = [
   },
 ];
 
-export async function createCapacityFixture(repository: Repository, directory: string) {
+export async function createCapacityFixture(
+  repository: Repository,
+  directory: string,
+  hooks: { afterAcceptedResponseLoss?: () => Promise<never> } = {},
+) {
   const physical = await realpath(directory);
   const canonical = resolve(directory);
   if (
@@ -366,6 +370,7 @@ export async function createCapacityFixture(repository: Repository, directory: s
         ])
       )[0];
       if (!attempt?.dispatch_started_at) throw error;
+      await hooks.afterAcceptedResponseLoss?.();
       stageMs.commit = performance.now() - commitStarted;
       const reconcileStarted = performance.now();
       await repository.fail(

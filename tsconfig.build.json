@@ -6,7 +6,9 @@
     "packages/**/*.ts",
     "scripts/runtime.ts",
     "scripts/release-smoke.ts",
-    "scripts/verify-bundle.ts"
+    "scripts/verify-bundle.ts",
+    "scripts/release-recovery.ts",
+    "scripts/release-recovery-worker.ts"
   ],
   "exclude": ["node_modules", "dist", "tests"]
 }

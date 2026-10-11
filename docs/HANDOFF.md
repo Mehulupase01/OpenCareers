@@ -1686,3 +1686,29 @@ files, production signing, live submissions or physical/server/hybrid/soak gates
 Continue directly into the packaged synthetic crash-recovery/challenge workflow
 and independent deployment verification. Private runtime/data/secrets were untouched;
 no model/mail/employer request or elapsed soak occurred. No background coding exists.
+
+## 2026-10-12: Packaged Crash Recovery And Handoff
+
+Native-integrity commit 9aa8ca3c15753d4aa3e81403aa3cf3ed579e73a0 is all-green in
+CI 38181899971 (Windows, Ubuntu, PostgreSQL). The successor compiled recovery
+self-test kills its owned mock worker after acceptance, waits for the real task
+lease expiry, and uses canonical read-only receipt reconciliation. Two distinct
+accepted applications and two confirmed attempts prove no second final action.
+A blocked mock challenge verifies the existing encrypted checkpoint contract,
+using an ephemeral test key and zero challenge attempts; not real CAPTCHA
+handling, persistent private handoff or resumed challenge submission.
+
+See docs/evidence/P17-packaged-recovery.md. Focused source test passes; frozen
+full check passes 728 / 258 skips in 95 files; extracted production-only Windows
+installation passes 1/1 (62.94 seconds), including compiled recovery with no tsx
+and injected private settings ignored. Public scan passed 446 selected files
+before independent server-context engineering. Initial failure was corrected:
+resource snapshots contain nonzero historical counters, so only active/opening
+resources determine release; preparation IDs belong to the nested result.
+
+No new phase/gate closes: 12/19 phases, 94/128 gates. Recovery successor CI is
+pending. Continue into screened non-root server images/private topology and
+hybrid engineering. Docker CLI registry inspection works but the local engine
+is unavailable; do not claim local image/Compose execution. Private ports,
+data/secrets and live model/mail/employer operations were untouched. Qualifying
+actual-duration soaks, hardware drills and genuine receipt gates remain open.

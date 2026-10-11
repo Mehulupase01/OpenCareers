@@ -65,6 +65,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
       "self-test": "node dist/scripts/release-smoke.js",
+      "self-test:recovery": "node dist/scripts/release-recovery.js",
       "verify:bundle": "node dist/scripts/verify-bundle.js",
     },
   };
@@ -100,6 +101,14 @@ storage. It verifies two guarded mock receipts, lost-response reconciliation,
 ambiguous-form blocking and browser cleanup. It does not call an LLM, discover
 live jobs, apply to employers or qualify as a production soak. Its matching and
 letters are explicitly synthetic fixtures, not live inference evidence.
+
+Run node dist/scripts/release-recovery.js for an additional bounded synthetic
+crash drill. It kills its owned worker after mock acceptance, waits for the
+actual task lease to expire, then reconciles the existing receipt without a
+second final action. It also checks an encrypted, test-only challenge handoff
+checkpoint; it does not solve real challenges or submit the challenge fixture.
+It accepts no options and ignores private configuration. This is not a physical
+reboot, production deployment, live application or qualifying soak.
 
 The default start is synthetic demo mode; it cannot apply to real employers.
 Use node dist/scripts/runtime.js start with a clean environment and no private

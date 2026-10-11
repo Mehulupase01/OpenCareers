@@ -25,6 +25,9 @@ describe("Windows runtime bundle", () => {
       "dist/scripts/bundle-verification.js",
       "dist/scripts/release-smoke.js",
       "dist/scripts/release-smoke-run.js",
+      "dist/scripts/release-recovery.js",
+      "dist/scripts/release-recovery-run.js",
+      "dist/scripts/release-recovery-worker.js",
       "dist/scripts/capacity-fixture.js",
       "dist/tests/fixtures/document-packets.js",
       "dist/apps/api/src/main.js",
@@ -100,6 +103,7 @@ describe("Windows runtime bundle", () => {
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
       "self-test": "node dist/scripts/release-smoke.js",
+      "self-test:recovery": "node dist/scripts/release-recovery.js",
       "verify:bundle": "node dist/scripts/verify-bundle.js",
     });
     const again = await buildWindowsBundle(root);

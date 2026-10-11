@@ -175,6 +175,38 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
         timeout: 10000,
       }),
     ).rejects.toMatchObject({ code: 1 });
+    const recovered = await execute(process.execPath, ["dist/scripts/release-recovery.js"], {
+      cwd: installation,
+      env: {
+        ...environment(),
+        AUTOPILOT_PROFILE: "local",
+        AUTOPILOT_DATA_DIR: "must-not-open-this-existing-private-path",
+        AUTOPILOT_DATABASE_URL: "must-not-connect-to-this-private-database",
+        AUTOPILOT_EXTERNAL_SUBMISSION: "true",
+      },
+      timeout: 120000,
+      maxBuffer: 1024 * 1024,
+    });
+    expect(JSON.parse(recovered.stdout)).toMatchObject({
+      status: "passed",
+      workerKilledAfterAcceptance: true,
+      leaseRecovery: "actual_elapsed_lease",
+      confirmedWithReceipt: 2,
+      attempts: 2,
+      acceptedMockApplications: 2,
+      challengeHandoff: "verified_encrypted_checkpoint",
+      challengeFinalActions: 0,
+      realSubmissions: false,
+      realModelCalls: false,
+      productionReleaseAccepted: false,
+    });
+    await expect(
+      execute(process.execPath, ["dist/scripts/release-recovery.js", "--target", "external"], {
+        cwd: installation,
+        env: environment(),
+        timeout: 10000,
+      }),
+    ).rejects.toMatchObject({ code: 1 });
     const socket = createServer();
     await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
     const address = socket.address();
