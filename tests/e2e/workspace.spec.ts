@@ -21,6 +21,11 @@ test("synthetic workspace, queue worker and persistent controls", async ({ page 
   await pipeline.locator("summary").click();
   await expect(pipeline.getByText("All tracked applications", { exact: true })).toBeVisible();
   await expect(pipeline.getByText("Missing confirmation evidence", { exact: true })).toBeVisible();
+  await expect(pipeline.getByText("Target remaining (synthetic)", { exact: true })).toBeVisible();
+  await expect(pipeline.getByText("Inference budget", { exact: true })).toBeVisible();
+  await expect(
+    pipeline.getByRole("table", { name: "Daily pipeline throughput" }).getByRole("row"),
+  ).toHaveCount(6);
   expect(
     await pipeline
       .getByRole("table", { name: "All application stage counts" })

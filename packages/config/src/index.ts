@@ -26,6 +26,7 @@ const envSchema = z.object({
   AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: z.string().optional(),
   AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: z.string().optional(),
   AUTOPILOT_INFERENCE_DAILY_LIMIT: z.coerce.number().int().min(1).max(50).default(40),
+  AUTOPILOT_DAILY_TARGET: z.coerce.number().int().min(1).max(50).default(50),
   AUTOPILOT_INFERENCE_PRIVACY_REVISION: z
     .enum(["strict-zdr-v1", "reviewed-career-facts-v1"])
     .default("strict-zdr-v1"),
@@ -45,6 +46,7 @@ export interface Config {
   restoreSnapshotSha256?: string | undefined;
   databaseUrl: string | undefined;
   allowedOrigins: string[];
+  dailyTarget: number;
   inference: {
     enabled: boolean;
     apiKey: string | undefined;
@@ -213,6 +215,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     restoreSnapshotSha256: e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
+    dailyTarget: e.AUTOPILOT_DAILY_TARGET,
     inference: {
       enabled: Boolean(e.AUTOPILOT_OPENROUTER_API_KEY),
       apiKey: e.AUTOPILOT_OPENROUTER_API_KEY,

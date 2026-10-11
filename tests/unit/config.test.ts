@@ -4,6 +4,14 @@ import { loadConfig } from "../../packages/config/src/index.js";
 import { sqliteVersionSafe } from "../../packages/persistence/src/database.js";
 
 describe("configuration fails closed", () => {
+  it("bounds the display target without enabling submission", () => {
+    expect(loadConfig({ AUTOPILOT_DAILY_TARGET: "12" })).toMatchObject({
+      dailyTarget: 12,
+      externalSubmissionEnabled: false,
+    });
+    for (const value of ["0", "51", "1.5", "invalid"])
+      expect(() => loadConfig({ AUTOPILOT_DAILY_TARGET: value })).toThrow();
+  });
   it("defaults to synthetic data with external submission disabled", () => {
     expect(loadConfig({})).toMatchObject({
       profile: "demo",

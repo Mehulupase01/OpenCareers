@@ -186,6 +186,23 @@ export interface OperationsSummary {
   jobs: Job[];
   tasks: Task[];
   asOf: string;
+  daily: {
+    day: string;
+    start: string;
+    end: string;
+    target: number;
+    cohorts: Record<
+      "live" | "synthetic",
+      {
+        discoveredJobs: number;
+        createdApplications: number;
+        attemptsStarted: number;
+        dispatchesStarted: number;
+        confirmedApplications: number;
+      }
+    >;
+  };
+  inferenceBudget: { day: string; limit: number; used: number; reserved: number } | null;
   flow: {
     scope: "all_tracked_applications";
     states: Array<{ state: ApplicationState; count: number }>;

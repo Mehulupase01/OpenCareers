@@ -155,10 +155,22 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await db.query(
           "INSERT INTO applications(id,owner_id,candidate_id,job_id,state,created_at,updated_at) VALUES('legacy-app','migration-owner','candidate','job','DISCOVERED','2026-09-16T00:00:00Z','2026-09-16T00:00:00Z')",
         );
-        const app = (await repository.summary("demo")).applications[0];
+        const app = (
+          await db.query("SELECT * FROM applications WHERE owner_id='migration-owner'")
+        )[0];
         const before = await db.query("SELECT * FROM audit_events");
         await migrate(db);
-        expect((await repository.summary("demo")).applications[0]).toEqual(app);
+        expect(
+          (await db.query("SELECT * FROM applications WHERE owner_id='migration-owner'"))[0],
+        ).toEqual(app);
+        expect((await repository.summary("demo")).applications[0]).toMatchObject({
+          id: "legacy-app",
+          jobId: "job",
+          candidateId: "candidate",
+          state: "DISCOVERED",
+          createdAt: "2026-09-16T00:00:00Z",
+          updatedAt: "2026-09-16T00:00:00Z",
+        });
         expect(await db.query("SELECT * FROM audit_events")).toEqual(before);
         // Derived from the migration list so adding a migration does not require
         // editing an unrelated assertion.

@@ -414,6 +414,18 @@ td:first-child {
 td:last-child {
   text-align: right;
 }
+.daily-throughput {
+  table-layout: fixed;
+}
+.daily-throughput th:first-child {
+  width: 56%;
+}
+.daily-throughput th,
+.daily-throughput td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 14px 10px;
+}
 .table-scroll strong {
   color: #36483c;
   font-weight: 500;

@@ -365,6 +365,66 @@ function App() {
                     </summary>
                     <dl className="discovery-facts">
                       <div>
+                        <dt>Amsterdam day</dt>
+                        <dd>{summary.daily.day}</dd>
+                      </div>
+                      <div>
+                        <dt>Daily target</dt>
+                        <dd>{summary.daily.target}</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          Target remaining ({summary.profile === "demo" ? "synthetic" : "live"})
+                        </dt>
+                        <dd>
+                          {Math.max(
+                            0,
+                            summary.daily.target -
+                              summary.daily.cohorts[
+                                summary.profile === "demo" ? "synthetic" : "live"
+                              ].confirmedApplications,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Inference budget</dt>
+                        <dd>
+                          {summary.inferenceBudget
+                            ? `${summary.inferenceBudget.used} used / ${summary.inferenceBudget.reserved} reserved / ${summary.inferenceBudget.limit} limit (${summary.inferenceBudget.day})`
+                            : "Unavailable"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="table-scroll">
+                      <table className="daily-throughput" aria-label="Daily pipeline throughput">
+                        <thead>
+                          <tr>
+                            <th>Today</th>
+                            <th>Live</th>
+                            <th>Synthetic</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(
+                            [
+                              ["discoveredJobs", "New jobs"],
+                              ["createdApplications", "Applications created"],
+                              ["attemptsStarted", "Attempts started"],
+                              ["dispatchesStarted", "Final dispatches"],
+                              ["confirmedApplications", "Receipt-backed confirmations"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <tr key={field}>
+                              <td>{label}</td>
+                              <td>{summary.daily.cohorts.live[field]}</td>
+                              <td>{summary.daily.cohorts.synthetic[field]}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <dl className="discovery-facts">
+                      <div>
                         <dt>Scope</dt>
                         <dd>All tracked applications</dd>
                       </div>

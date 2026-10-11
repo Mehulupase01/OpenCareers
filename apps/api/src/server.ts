@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { HandoffBrokerPort } from "../../../packages/browser/src/handoff-broker.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, VERSION } from "../../../packages/contracts/src/index.js";
+import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 import { accountRoutes } from "./account.js";
 import { browserRoutes } from "./browser.js";
@@ -199,7 +200,13 @@ export async function buildServer(
     reply.clearCookie("opencareers", { path: "/" });
     return { status: "signed_out" };
   });
-  app.get("/v1/operations/summary", () => repository.summary(config.profile));
+  app.get("/v1/operations/summary", async () => {
+    const summary = await repository.summary(config.profile, config.dailyTarget);
+    const matching = await new MatchingRepository(repository.db, repository.ownerId).snapshot(
+      config.inference.dailyLimit,
+    );
+    return { ...summary, inferenceBudget: matching.budget };
+  });
   app.post("/v1/control/pause", async (request) => {
     const body = z
       .object({ stage: z.enum(["discovery", "preparation", "submissions"]), paused: z.boolean() })

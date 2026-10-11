@@ -1585,8 +1585,8 @@
         {
           "id": "P13-G6",
           "requirement": "The dashboard can explain the target shortfall using measured counts.",
-          "status": "not_started",
-          "evidence": []
+          "status": "code_complete_verification_pending",
+          "evidence": ["docs/evidence/P13-operations-readout.md", "tests/e2e/operations.spec.ts"]
         },
         {
           "id": "P13-G7",
@@ -1613,6 +1613,12 @@
           "commit": "b8f792016d59958746a0e7d6b538c1b318a53d5f",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "UTC-evidence Amsterdam quota windows, ordinary and DST rollovers, unchanged historical timestamps and stale legacy day labels; not complete scheduling, installation, real-duration soak or live ramp."
+        },
+        {
+          "runId": "38135135228",
+          "commit": "92b5be1037617b0653a918e3c68a5c89835cac73",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Full-corpus state and correlated receipt counts, owner isolation, queue observations and document control fixtures; not the successor daily target/cohort extension, installation, real-duration soak or live ramp."
         }
       ],
       "acceptanceTests": ["T20", "T25"],

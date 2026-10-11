@@ -546,6 +546,14 @@ describe("API trust boundary", () => {
     expect(login.statusCode).toBe(200);
     expect(login.cookies[0]).toMatchObject({ name: "opencareers", httpOnly: true });
     const cookie = `opencareers=${login.cookies[0]?.value}`;
+    const operations = (
+      await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } })
+    ).json();
+    expect(operations.daily).toMatchObject({
+      target: 50,
+      cohorts: { live: { confirmedApplications: 0 }, synthetic: { confirmedApplications: 0 } },
+    });
+    expect(operations.inferenceBudget).toMatchObject({ limit: 40, used: 0, reserved: 0 });
     expect(
       (await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } })).json()
         .flow,

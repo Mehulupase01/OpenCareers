@@ -1131,3 +1131,37 @@ is ready. It is not a production install or qualifying soak. Private 4317/4318
 services and all private credentials, facts, authorizations and OAuth remain
 untouched. Counts remain 12/19 phases and 87/128 gates; no overnight coding
 continuation exists on this host.
+
+## 2026-10-11: Daily Throughput And Target Shortfall
+
+Prior operations CI 38135135228 is green on Windows, Ubuntu and PostgreSQL at
+`92b5be1037617b0653a918e3c68a5c89835cac73`. The successor readout adds measured
+Amsterdam-day job/application creation, attempt starts, final dispatch starts
+and first correlated confirmation receipts, with separate live/synthetic job
+cohorts. Later duplicate receipts do not inflate another day's confirmations.
+The bounded display-only daily target never changes authorization or limits.
+The operations route reuses the matching snapshot's inference budget without
+making model calls. See `docs/evidence/P13-operations-readout.md`.
+
+Full local check passed 614 tests / 216 PostgreSQL skipped in 74 files, plus
+lint/types/ledger/build. All 60 desktop/mobile browser cases passed, including
+the new UNKNOWN summary-fixture/shortfall test. Positive receipt and lost-response
+counts use the existing guarded synthetic repository. Screenshots were inspected;
+all daily columns fit mobile. The first full run found that the populated-schema
+migration fixture called the new summary before dispatch timestamps existed.
+It now compares legacy application/audit rows directly through migration and
+checks the modern summary after migration; the final full run is green.
+Public-source scan passed 363 files before this handoff update.
+
+P13-G6 is code-complete/verification-pending for successor cross-engine CI,
+not closed. P13-03 remains in progress until that evidence is recorded. Counts
+remain 12/19 phases and 87/128 gates. Next independent milestone is P13 capacity
+instrumentation and synthetic workload preparation, alongside remaining Windows
+installation/scheduling and shared portal preparation integration. Actual 24/72-hour
+soaks, hardware reboot/sleep/network drills and genuine live ramp remain open.
+
+Fresh isolated synthetic preview: http://127.0.0.1:14332 (API 14331), manager
+PID 3540, run ID `34f3228f-6558-4f0c-ab51-b1b0cbaa25f3`. Runtime health is ready;
+repository .env is skipped and only OS essentials are inherited. Private services,
+credentials, authorizations, Gmail consent and all private data remain untouched.
+No genuine applications, model calls, soaks or overnight coding automation ran.

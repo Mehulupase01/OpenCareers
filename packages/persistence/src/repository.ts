@@ -18,7 +18,7 @@ import {
   taskTypeSchema,
   VERSION,
 } from "../../contracts/src/index.js";
-import { assertTransition, retryDelay } from "../../domain/src/state.js";
+import { assertTransition, localDayWindow, retryDelay } from "../../domain/src/state.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { jobIdentity } from "./job-identity.js";
 import { OwnerScope } from "./owner-scope.js";
@@ -562,9 +562,65 @@ export class Repository extends OwnerScope {
     });
   }
 
-  async summary(profile: OperationsSummary["profile"]): Promise<OperationsSummary> {
+  async summary(
+    profile: OperationsSummary["profile"],
+    dailyTarget = 50,
+  ): Promise<OperationsSummary> {
+    if (!Number.isInteger(dailyTarget) || dailyTarget < 1 || dailyTarget > 50)
+      throw new DomainError("CONFIG_INVALID", "Daily display target must be between 1 and 50.");
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
+      const instant = this.clock();
+      const window = localDayWindow(instant);
+      const cohorts: OperationsSummary["daily"]["cohorts"] = {
+        live: {
+          discoveredJobs: 0,
+          createdApplications: 0,
+          attemptsStarted: 0,
+          dispatchesStarted: 0,
+          confirmedApplications: 0,
+        },
+        synthetic: {
+          discoveredJobs: 0,
+          createdApplications: 0,
+          attemptsStarted: 0,
+          dispatchesStarted: 0,
+          confirmedApplications: 0,
+        },
+      };
+      const cohort =
+        tx.dialect === "postgres"
+          ? "CASE WHEN COALESCE((j.data::jsonb->>'synthetic')::boolean,FALSE) THEN 'synthetic' ELSE 'live' END"
+          : "CASE WHEN json_extract(j.data,'$.synthetic')=1 THEN 'synthetic' ELSE 'live' END";
+      const dailyCount = async (
+        field: keyof OperationsSummary["daily"]["cohorts"]["live"],
+        from: string,
+        timestamp: string,
+      ) => {
+        const rows = await tx.query(
+          `SELECT ${cohort} AS cohort,COUNT(*) AS count FROM ${from} WHERE j.owner_id=$1 AND ${timestamp}>=$2 AND ${timestamp}<$3 GROUP BY ${cohort}`,
+          [this.ownerId, window.start, window.end],
+        );
+        for (const row of rows) {
+          if (row.cohort !== "live" && row.cohort !== "synthetic")
+            throw new DomainError("CONFIG_INVALID", "Invalid throughput cohort.");
+          cohorts[row.cohort][field] = Number(row.count);
+        }
+      };
+      await dailyCount("discoveredJobs", "jobs j", "j.created_at");
+      const applicationJobs =
+        "applications a JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id";
+      await dailyCount("createdApplications", applicationJobs, "a.created_at");
+      const attemptJobs =
+        "attempts t JOIN applications a ON a.owner_id=t.owner_id AND a.id=t.application_id JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id";
+      await dailyCount("attemptsStarted", attemptJobs, "t.started_at");
+      await dailyCount("dispatchesStarted", attemptJobs, "t.dispatch_started_at");
+      // The first correlated receipt counts once, even if later reconciliation adds another receipt.
+      await dailyCount(
+        "confirmedApplications",
+        "(SELECT r.owner_id,r.application_id,MIN(r.observed_at) AS first_observed FROM receipts r JOIN attempts t ON t.owner_id=r.owner_id AND t.id=r.attempt_id AND t.application_id=r.application_id WHERE r.owner_id=$1 AND t.state='CONFIRMED' GROUP BY r.owner_id,r.application_id) confirmed JOIN applications a ON a.owner_id=confirmed.owner_id AND a.id=confirmed.application_id AND a.state='CONFIRMED' JOIN jobs j ON j.owner_id=a.owner_id AND j.id=a.job_id",
+        "confirmed.first_observed",
+      );
       const jobs = (
         await tx.query(
           "SELECT * FROM jobs WHERE owner_id=$1 ORDER BY last_seen_at DESC LIMIT 100",
@@ -643,7 +699,9 @@ export class Repository extends OwnerScope {
         version: VERSION,
         profile,
         control: await this.readControl(tx),
-        asOf: this.now(),
+        asOf: instant.toISOString(),
+        daily: { ...window, target: dailyTarget, cohorts },
+        inferenceBudget: null,
         jobs,
         applications: apps.map((app) => {
           const driftReason = driftReasons.get(String(app.id));

@@ -1271,6 +1271,21 @@ for (const engine of ["sqlite", "postgres"] as const) {
           confirmedWithReceipt: 1,
           confirmedWithoutReceipt: 0,
         });
+        expect((await queue.summary("demo")).daily.cohorts.synthetic).toMatchObject({
+          attemptsStarted: 1,
+          dispatchesStarted: 1,
+          confirmedApplications: 1,
+        });
+        const tomorrow = new Repository(db, owner, () => new Date("2026-09-18T09:00:00.000Z"));
+        await db.query(
+          "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) SELECT $1,owner_id,application_id,attempt_id,evidence,$2,$3 FROM receipts WHERE owner_id=$4 AND id=$5",
+          [randomUUID(), "b".repeat(64), "2026-09-18T09:00:00.000Z", owner, receiptId],
+        );
+        expect((await tomorrow.summary("demo")).daily.cohorts.synthetic).toMatchObject({
+          attemptsStarted: 0,
+          dispatchesStarted: 0,
+          confirmedApplications: 0,
+        });
         expect(
           await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
             owner,
@@ -1282,7 +1297,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             owner,
             packet.manifest.applicationId,
           ]),
-        ).toEqual([{ id: receiptId }]);
+        ).toContainEqual({ id: receiptId });
         await queue.complete(task);
       });
 
@@ -1844,6 +1859,11 @@ for (const engine of ["sqlite", "postgres"] as const) {
           });
           await submissions.authorizeDispatch(task, handle);
           await queue.fail(task, new DomainError("COMMIT_UNKNOWN", "Response was lost."));
+          expect((await queue.summary("demo")).daily.cohorts.synthetic).toMatchObject({
+            attemptsStarted: 1,
+            dispatchesStarted: 1,
+            confirmedApplications: 0,
+          });
           const reconcile = await queue.claim("synthetic-reconciler", ["reconcile"]);
           if (!reconcile) throw new Error("Expected a reconciliation task.");
           const recordId = randomUUID();

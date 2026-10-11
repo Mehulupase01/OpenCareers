@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DomainError, type JobInput } from "../../packages/contracts/src/index.js";
+import { localDayWindow } from "../../packages/domain/src/state.js";
 import {
   type Database,
   openPostgres,
@@ -61,6 +62,61 @@ for (const engine of ["sqlite", "postgres"] as const) {
       if (dir) await rm(dir, { recursive: true, force: true });
     });
 
+    it.each(["2026-09-16T10:00:00.000Z", "2026-03-29T10:00:00.000Z", "2026-10-25T10:00:00.000Z"])(
+      "separates daily cohorts within the Amsterdam half-open day at %s",
+      async (instant) => {
+        now = Date.parse(instant);
+        const window = localDayWindow(new Date(now));
+        for (const [index, timestamp] of [
+          new Date(Date.parse(window.start) - 1).toISOString(),
+          window.start,
+          new Date(Date.parse(window.end) - 1).toISOString(),
+          window.end,
+        ].entries()) {
+          now = Date.parse(timestamp);
+          await repository.putJob({
+            ...job,
+            id: `synthetic-${index}`,
+            requisitionId: `synthetic-${index}`,
+          });
+          await repository.createApplication(`synthetic-${index}`, "synthetic-candidate");
+          await repository.putJob({
+            ...job,
+            id: `live-${index}`,
+            requisitionId: `live-${index}`,
+            synthetic: false,
+          });
+          await repository.createApplication(`live-${index}`, "synthetic-candidate");
+        }
+        now = Date.parse(instant);
+        const summary = await repository.summary("demo", 12);
+        expect(summary.daily).toEqual({
+          ...window,
+          target: 12,
+          cohorts: {
+            live: {
+              discoveredJobs: 2,
+              createdApplications: 2,
+              attemptsStarted: 0,
+              dispatchesStarted: 0,
+              confirmedApplications: 0,
+            },
+            synthetic: {
+              discoveredJobs: 2,
+              createdApplications: 2,
+              attemptsStarted: 0,
+              dispatchesStarted: 0,
+              confirmedApplications: 0,
+            },
+          },
+        });
+        expect(summary.control.submissionsPaused).toBe(true);
+        await expect(repository.summary("demo", 51)).rejects.toMatchObject({
+          code: "CONFIG_INVALID",
+        });
+      },
+    );
+
     it("counts the whole owner pipeline and never treats UNKNOWN or missing receipts as confirmed evidence", async () => {
       await repository.putJob(job);
       for (let index = 0; index < 105; index++) {
@@ -98,6 +154,12 @@ for (const engine of ["sqlite", "postgres"] as const) {
       const summary = await repository.summary("demo");
       expect(summary.applications).toHaveLength(100);
       expect(summary.counts).toMatchObject({ applications: 105, confirmed: 1, unknown: 1 });
+      expect(summary.daily.cohorts.synthetic).toMatchObject({
+        discoveredJobs: 1,
+        createdApplications: 105,
+        confirmedApplications: 0,
+      });
+      expect(summary.daily.cohorts.live.createdApplications).toBe(0);
       expect(summary.flow).toMatchObject({
         scope: "all_tracked_applications",
         states: [
