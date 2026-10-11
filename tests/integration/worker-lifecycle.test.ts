@@ -326,14 +326,36 @@ describe("standalone compiled installation", () => {
         "-ConfigFile",
         file,
       ];
-      await expect(
-        execute("powershell.exe", args, { cwd: root, env: environment(), timeout: 10000 }),
-      ).rejects.toBeDefined();
-      const preview = await execute("powershell.exe", [...args, "-ApproveStartup", "-WhatIf"], {
-        cwd: root,
-        env: environment(),
-        timeout: 10000,
-      });
+      const runInstaller = async (extra: string[]) => {
+        try {
+          return await execute("powershell.exe", [...args, ...extra], {
+            cwd: root,
+            env: environment(),
+            timeout: 10000,
+          });
+        } catch (error) {
+          const failure = error as Error & {
+            code?: string | number;
+            signal?: string;
+            killed?: boolean;
+            stdout?: string;
+            stderr?: string;
+          };
+          throw new Error(
+            `Synthetic installer failed: ${JSON.stringify({
+              code: failure.code,
+              signal: failure.signal,
+              killed: failure.killed,
+              stdout: failure.stdout,
+              stderr: failure.stderr,
+            })}`,
+          );
+        }
+      };
+      await expect(runInstaller([])).rejects.toThrow(
+        "Startup installation requires the explicit -ApproveStartup switch.",
+      );
+      const preview = await runInstaller(["-ApproveStartup", "-WhatIf"]);
       expect(preview.stdout).toContain("What if:");
     }
   }, 30000);
