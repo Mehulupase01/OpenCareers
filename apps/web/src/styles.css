@@ -323,6 +323,12 @@ h2 {
 .pipeline-overview {
   margin-bottom: 18px;
 }
+.stop-notice {
+  color: #8d3c35;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
 .pipeline-overview summary {
   cursor: pointer;
   padding: 12px 0;

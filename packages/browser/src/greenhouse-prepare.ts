@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { type BrowserContext, chromium, type Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import {
   type DryRunResult,
   dryRunResultSchema,
@@ -18,6 +18,7 @@ import {
   inspectGreenhouseForm,
 } from "./greenhouse-inspect.js";
 import { planGreenhouseFields } from "./greenhouse-plan.js";
+import { browserResources } from "./resources.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
@@ -261,10 +262,10 @@ export async function prepareGreenhousePacket(
 ): Promise<DryRunResult> {
   packetCv(target, packet, cvPdf);
   const url = greenhouseUrl(target);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await browserResources.launch({ headless: true });
   try {
     let blockedWriteCount = 0;
-    const context = await browser.newContext({
+    const context = await browserResources.context(browser, {
       acceptDownloads: false,
       serviceWorkers: "block",
       permissions: [],

@@ -20,6 +20,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "documents:encrypt": "tsx scripts/encrypt-documents.ts",
     "public:scan": "tsx scripts/public-scan.ts",
+    "capacity": "tsx scripts/capacity.ts",
     "check:ledger": "tsx scripts/validate-ledger.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
     "goldens:p06": "tsx scripts/generate-p06-goldens.ts",

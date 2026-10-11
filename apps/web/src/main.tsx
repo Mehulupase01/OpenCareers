@@ -268,6 +268,11 @@ function App() {
               )}
             </div>
           </div>
+          {summary?.control.stopped && (
+            <p className="stop-notice" role="status">
+              Already-sent requests cannot be recalled.
+            </p>
+          )}
           {error && (
             <div className="error-banner" role="alert">
               <CircleAlert size={18} />

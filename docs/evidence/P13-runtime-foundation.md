@@ -67,7 +67,9 @@ engine tests, not represented as a genuine employer submission.
 ## Remaining
 
 Owner-approved actual startup installation, clean Windows packaging, scheduling,
-operational target readout, varied capacity workloads and actual 24-hour soak,
+complete capacity and actual 24-hour soak,
 sleep/wake and network-loss verification, whole-application bounded retention,
 and genuine receipt-backed ramp are still required. P14 server/hybrid and P15
 restore/security/72-hour soak remain. No background Codex continuation was set up.
+The operational target readout is now complete; the synthetic capacity foundation
+and stop-control acceptance are recorded separately in their P13 evidence files.

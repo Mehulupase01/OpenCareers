@@ -1526,17 +1526,17 @@
         {
           "id": "P13-03",
           "text": "Operations dashboard. Show actual stage counts, confirmed evidence, unresolved ambiguity, the needs-help queue, next work, the model quota estimate, and stop controls.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T20", "T25"],
           "evidence": ["docs/evidence/P13-operations-readout.md"],
-          "nextAction": "P13-03"
+          "nextAction": null
         },
         {
           "id": "P13-04",
           "text": "Capacity testing. Run synthetic day workloads with varied fit, model latency, account friction, portal errors, and challenges, measuring bottlenecks and memory growth.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T20", "T25"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P13-capacity-foundation.md"],
           "nextAction": "P13-04"
         },
         {
@@ -1579,13 +1579,17 @@
         {
           "id": "P13-G5",
           "requirement": "Pause and emergency stop behave as documented, including the limitation for already-sent requests.",
-          "status": "not_started",
-          "evidence": []
+          "status": "code_complete_verification_pending",
+          "evidence": [
+            "docs/evidence/P13-stop-controls.md",
+            "tests/integration/emergency-stop.test.ts",
+            "tests/e2e/operations.spec.ts"
+          ]
         },
         {
           "id": "P13-G6",
           "requirement": "The dashboard can explain the target shortfall using measured counts.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": ["docs/evidence/P13-operations-readout.md", "tests/e2e/operations.spec.ts"]
         },
         {
@@ -1619,6 +1623,12 @@
           "commit": "92b5be1037617b0653a918e3c68a5c89835cac73",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Full-corpus state and correlated receipt counts, owner isolation, queue observations and document control fixtures; not the successor daily target/cohort extension, installation, real-duration soak or live ramp."
+        },
+        {
+          "runId": "38136577373",
+          "commit": "419ae73e1cfa6ebbd58b1c1ef713a71bb3ded6bf",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Daily live/synthetic throughput, display-only target shortfall, correlated first receipts, inference budget and full operations regressions; closes G6 only, not successor capacity/stop changes or other P13 gates."
         }
       ],
       "acceptanceTests": ["T20", "T25"],
@@ -1627,7 +1637,9 @@
         "docs/plans/P13-unattended-windows.md",
         "docs/evidence/P13-runtime-foundation.md",
         "docs/evidence/P13-day-boundary.md",
-        "docs/evidence/P13-operations-readout.md"
+        "docs/evidence/P13-operations-readout.md",
+        "docs/evidence/P13-capacity-foundation.md",
+        "docs/evidence/P13-stop-controls.md"
       ]
     },
     {

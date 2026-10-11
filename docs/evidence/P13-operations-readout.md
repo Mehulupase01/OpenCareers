@@ -54,8 +54,9 @@ directly before/after migration, then checks the modern summary after migration;
 serving the modern summary on schema v1 is not a supported runtime path.
 
 Prior readout CI 38135135228 is green on Windows, Ubuntu and PostgreSQL at
-`92b5be1037617b0653a918e3c68a5c89835cac73`. Successor daily-readout verification
-is recorded in the handoff after completion. P13-03 and P13-G6 remain pending
-cross-engine CI for this extension. Next work remains a queued-task observation,
+`92b5be1037617b0653a918e3c68a5c89835cac73`. Daily-readout CI 38136577373 is
+green on Windows, Ubuntu and PostgreSQL at
+`419ae73e1cfa6ebbd58b1c1ef713a71bb3ded6bf`, including all 60 browser cases.
+P13-03 and P13-G6 are complete for this readout. Next work remains a queued-task observation,
 not an eligibility promise. Installation, hardware power/network drills, actual
 soaks and live ramp are not satisfied by this dashboard milestone.

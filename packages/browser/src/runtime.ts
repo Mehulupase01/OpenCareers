@@ -1,5 +1,6 @@
-import { type Browser, type BrowserContext, chromium, type Page } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { classifyHandoffRequest, type HandoffPolicy } from "./handoff-policy.js";
+import { browserResources } from "./resources.js";
 
 export interface OwnedBrowser {
   browser: Browser;
@@ -17,10 +18,10 @@ async function launchOwnedBrowser(
   const allowed = new URL(origin);
   if (allowed.protocol !== "http:" || allowed.hostname !== "127.0.0.1")
     throw new Error("Dry-run browser requires a loopback mock ATS origin.");
-  const browser = await chromium.launch({ headless: !visible });
+  const browser = await browserResources.launch({ headless: !visible });
   try {
     let blockedCommitCount = 0;
-    const context = await browser.newContext({
+    const context = await browserResources.context(browser, {
       acceptDownloads: false,
       serviceWorkers: "block",
       permissions: [],
@@ -90,10 +91,10 @@ async function launchPolicyBrowser(
   visible: boolean,
   contextOptions: Parameters<Browser["newContext"]>[0],
 ): Promise<OwnedBrowser> {
-  const browser = await chromium.launch({ headless: !visible });
+  const browser = await browserResources.launch({ headless: !visible });
   try {
     let blockedCommitCount = 0;
-    const context = await browser.newContext({
+    const context = await browserResources.context(browser, {
       ...contextOptions,
       viewport: { width: 1280, height: 900 },
     });

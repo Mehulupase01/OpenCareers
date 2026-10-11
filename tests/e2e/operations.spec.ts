@@ -1,4 +1,44 @@
 import { expect, test } from "@playwright/test";
+import { makeJson } from "../helpers/browser-setup.js";
+
+test.afterEach(async ({ page }) => {
+  if (page.url() !== "about:blank") await makeJson(page)("/v1/control/resume", {});
+});
+
+test("emergency stop persists across reload without replacing the stage pause controls", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Stop processing", exact: true })).toBeVisible();
+  const json = makeJson(page);
+  const before = (await json("/v1/operations/summary")).control;
+  await page.getByRole("button", { name: "Stop processing", exact: true }).click();
+  await expect(
+    page.getByText("Already-sent requests cannot be recalled.", { exact: true }),
+  ).toBeVisible();
+  const stopped = (await json("/v1/operations/summary")).control;
+  expect(stopped).toMatchObject({ ...before, stopped: true });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Already-sent requests cannot be recalled.", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `test-results/emergency-stop-${info.project.name}.png`,
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(
+    page.getByText("Already-sent requests cannot be recalled.", { exact: true }),
+  ).toHaveCount(0);
+  expect((await json("/v1/operations/summary")).control).toMatchObject({
+    ...before,
+    stopped: false,
+  });
+});
 
 test("daily shortfall keeps uncertain attempts out of confirmations", async ({ page }) => {
   // Inject only the readout fixture; no application, intent or submission is created.

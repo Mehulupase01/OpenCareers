@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { type BrowserContext, chromium } from "playwright";
+import type { BrowserContext } from "playwright";
 import type { BrowserPreparation } from "../../contracts/src/browser.js";
 import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
@@ -15,6 +15,7 @@ import {
   inspectGreenhouseForm,
 } from "./greenhouse-inspect.js";
 import { fillGreenhouseForm } from "./greenhouse-prepare.js";
+import { browserResources } from "./resources.js";
 
 export class GreenhouseDefinitiveRejection extends Error {
   constructor(public readonly status: number) {
@@ -54,9 +55,9 @@ export async function commitGreenhousePacket(
   )
     throw new Error("A fingerprint-pinned ready Greenhouse preparation is required.");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await browserResources.launch({ headless: true });
   try {
-    const context = await browser.newContext({
+    const context = await browserResources.context(browser, {
       acceptDownloads: false,
       serviceWorkers: "block",
       permissions: [],

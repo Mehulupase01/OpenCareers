@@ -1165,3 +1165,50 @@ PID 3540, run ID `34f3228f-6558-4f0c-ab51-b1b0cbaa25f3`. Runtime health is ready
 repository .env is skipped and only OS essentials are inherited. Private services,
 credentials, authorizations, Gmail consent and all private data remain untouched.
 No genuine applications, model calls, soaks or overnight coding automation ran.
+
+## 2026-10-11: Capacity Foundation And Stop-Control Acceptance
+
+Daily-readout CI 38136577373 is green on all Windows/Ubuntu/PostgreSQL lanes at
+`419ae73e1cfa6ebbd58b1c1ef713a71bb3ded6bf`. P13-03 and P13-G6 are complete.
+Counts are now 12/19 phases and 88/128 gates; the whole P13 phase remains open.
+
+The owned-mock capacity CLI now runs nine exact-outcome scenarios through actual
+packet rendering, local artifacts, canonical answers, browser preparation,
+queue leases, guarded permits and correlated confirmation/reconciliation. It
+rejects external targets/private paths, existing candidate corpora and directory
+redirection. Source fingerprint changes, sampling gaps, duplicate attempts,
+unexpected server records and resource leaks fail measurement. Reports have
+bounded records/bytes, full-corpus task groups, stage timings, disk and Node
+memory. Two nine-cycle smoke runs completed in 60.144 and 30.152 seconds, each
+with three receipt-backed confirmations and one definitive rejection. No
+challenge was solved. See `docs/evidence/P13-capacity-foundation.md` and README.
+
+Mock/handoff/Greenhouse browser entry points share a per-process cap of four
+browsers and four contexts, including openings, and release on actual
+close/disconnect. Chromium inherits only OS/display essentials, not arbitrary
+app secrets. This is not a host-wide cap or browser-child memory measurement.
+Matching/letters are clearly synthetic fixture replays and model delay is
+simulated. P13-04 is in progress; no actual 24/72-hour soak or live ramp ran.
+
+Stop-control tests prove that stop fences a leased task before permit minting
+(LEASE_STALE, no dispatch or server record), and that accepted/lost responses
+remain uncertain until read-only reconciliation without another click. The UI
+shows the already-sent recall limitation, persists stop across reload and keeps
+stage pauses independent through resume. See `docs/evidence/P13-stop-controls.md`.
+P13-G5 is code-complete/verification-pending for successor CI, not closed.
+
+Verification: full capacity checkpoint 622 tests / 216 PostgreSQL skipped in
+76 files, lint/types/ledger/build and all 60 browser cases passed. Later stop
+additions passed both focused integration tests and all four desktop/mobile
+operations cases, final typecheck/lint/build and public-source scan (370 files).
+The first stop browser fixture raced demo authentication; it now waits for the
+authenticated stop button. Screenshots were inspected. Production guards were
+not relaxed. Successor CI must verify the combined final build after push.
+
+Preview remains http://127.0.0.1:14332; frontend updates via Vite, while the prior
+preview API/worker do not hot reload browser-resource code. Capacity runs are
+separate isolated processes and databases. Private 4317/4318 services, facts,
+credentials, authorizations and Gmail consent remain untouched. No background
+coding continuation exists. Continue independent installation, capacity/whole-host
+measurement and server/hybrid engineering; hardware drills, real-duration evidence
+and genuine receipts are still required before the affected phases close.

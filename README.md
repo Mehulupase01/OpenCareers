@@ -40,6 +40,13 @@ Commands: `dev`, `build`, `lint`, `typecheck`, `test:unit`, `test:integration`,
 `test:e2e`, `doctor`, `demo:reset`. Commands still under development must not be
 reported as verified; see the handoff for actual results.
 
+`corepack pnpm capacity --duration 30 --interval 1 --sample 10 --cycles 9`
+runs the isolated owned-mock capacity driver and prints its bounded JSONL report
+location. It accepts no private profile or external target. Matching/model delay
+are fixture simulations and memory covers the Node driver, not Chromium children;
+short runs do not satisfy production soak gates. See
+[capacity evidence](docs/evidence/P13-capacity-foundation.md).
+
 Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
 for mobile, and never reuse an existing server. Override them with
 `AUTOPILOT_E2E_API_PORT`, `AUTOPILOT_E2E_WEB_PORT`, `AUTOPILOT_E2E_MOBILE_API_PORT`
