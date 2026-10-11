@@ -548,6 +548,14 @@ describe("API trust boundary", () => {
     const cookie = `opencareers=${login.cookies[0]?.value}`;
     expect(
       (await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } })).json()
+        .flow,
+    ).toMatchObject({
+      scope: "all_tracked_applications",
+      confirmedWithReceipt: 0,
+      confirmedWithoutReceipt: 0,
+    });
+    expect(
+      (await app.inject({ url: "/v1/operations/summary", headers: { ...headers, cookie } })).json()
         .counts.confirmed,
     ).toBe(0);
     expect(

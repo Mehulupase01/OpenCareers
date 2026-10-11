@@ -186,4 +186,11 @@ export interface OperationsSummary {
   jobs: Job[];
   tasks: Task[];
   asOf: string;
+  flow: {
+    scope: "all_tracked_applications";
+    states: Array<{ state: ApplicationState; count: number }>;
+    confirmedWithReceipt: number;
+    confirmedWithoutReceipt: number;
+    nextQueuedTask: Task | null;
+  };
 }

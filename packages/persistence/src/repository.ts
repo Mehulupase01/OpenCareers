@@ -564,6 +564,7 @@ export class Repository extends OwnerScope {
 
   async summary(profile: OperationsSummary["profile"]): Promise<OperationsSummary> {
     return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
       const jobs = (
         await tx.query(
           "SELECT * FROM jobs WHERE owner_id=$1 ORDER BY last_seen_at DESC LIMIT 100",
@@ -615,6 +616,29 @@ export class Repository extends OwnerScope {
         "SELECT * FROM workers WHERE owner_id=$1 ORDER BY last_seen_at DESC",
         [this.ownerId],
       );
+      const states = (
+        await tx.query(
+          "SELECT state,COUNT(*) AS count FROM applications WHERE owner_id=$1 GROUP BY state ORDER BY state",
+          [this.ownerId],
+        )
+      ).map((row) => ({
+        state: applicationStateSchema.parse(row.state),
+        count: Number(row.count),
+      }));
+      const confirmedWithReceipt = Number(
+        (
+          await tx.query(
+            "SELECT COUNT(*) AS count FROM applications a WHERE a.owner_id=$1 AND a.state='CONFIRMED' AND EXISTS (SELECT 1 FROM receipts r JOIN attempts t ON t.owner_id=r.owner_id AND t.id=r.attempt_id AND t.application_id=r.application_id WHERE r.owner_id=a.owner_id AND r.application_id=a.id AND t.state='CONFIRMED')",
+            [this.ownerId],
+          )
+        )[0]?.count ?? 0,
+      );
+      const nextQueued = (
+        await tx.query(
+          "SELECT * FROM tasks WHERE owner_id=$1 AND state IN ('ready','retry_wait') ORDER BY CASE WHEN run_after <= $2 THEN 0 ELSE 1 END,CASE WHEN run_after <= $2 THEN priority ELSE 0 END DESC,run_after,created_at,id LIMIT 1",
+          [this.ownerId, this.now()],
+        )
+      )[0];
       return {
         version: VERSION,
         profile,
@@ -644,6 +668,14 @@ export class Repository extends OwnerScope {
           lastSeenAt: String(r.last_seen_at),
           version: String(r.version),
         })),
+        flow: {
+          scope: "all_tracked_applications",
+          states,
+          confirmedWithReceipt,
+          confirmedWithoutReceipt:
+            (states.find((row) => row.state === "CONFIRMED")?.count ?? 0) - confirmedWithReceipt,
+          nextQueuedTask: nextQueued ? taskFromRow(nextQueued) : null,
+        },
       };
     });
   }

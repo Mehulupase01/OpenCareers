@@ -1267,6 +1267,10 @@ for (const engine of ["sqlite", "postgres"] as const) {
         ).rejects.toMatchObject({ code: "RECEIPT_UNCORRELATED" });
         const receiptId = await submissions.confirmMockReceipt(task, handle, receipt);
         expect(receiptId).toBeTruthy();
+        expect((await queue.summary("demo")).flow).toMatchObject({
+          confirmedWithReceipt: 1,
+          confirmedWithoutReceipt: 0,
+        });
         expect(
           await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
             owner,

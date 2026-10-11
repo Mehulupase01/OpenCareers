@@ -1095,3 +1095,39 @@ complete; all remaining scheduling/capacity/installation/ramp gates stay open.
 The supported heartbeat creation call again returned tool-unavailable on this
 host. No coding continuation was scheduled, and the unrelated paused overnight
 pipeline automation was not changed. No real applications or duration soaks ran.
+
+## 2026-10-11: Green Discovery/Clock CI And Operations Development
+
+Source-catalog/control-fixture CI 38133826235 is green on Windows, Ubuntu and
+PostgreSQL at `b87ead007ea3c68563e82f7b944afcecb3b5e8e1`. Day-boundary CI
+38134321167 is green on all three lanes at
+`b8f792016d59958746a0e7d6b538c1b318a53d5f`; both OS lanes passed all 58 browser
+cases. T25 clock-counter coverage is now verified, not an OS power transition.
+
+Operations now exposes full-corpus state counts independently of the latest
+100 display rows, a receipt/attempt-correlated confirmation count, missing
+confirmation evidence and next queued work. Scope is explicitly all-time/all
+tracked applications; no daily live target progress is claimed. Positive receipt
+coverage uses the existing guarded synthetic confirmation engine. See
+`docs/evidence/P13-operations-readout.md`; P13-03 is in progress, not complete.
+
+Full local check passed 610 tests / 213 PostgreSQL skipped, 74 files, with
+lint/types/ledger/build passing. The full local browser run passed 57/58: the
+desktop document fixture published auto-submit authorization, which resumes
+submissions and invalidated its earlier pause. That fixture now reapplies the
+submission pause immediately after publishing policy. Production behavior is
+unchanged. An intermediate focused run passed both document cases but caught a
+desktop queue-navigation accessible name changing with its pending-count badge.
+Navigation now has stable names and separate pending-task descriptions. Final
+focused document/workspace verification passed all four desktop/mobile cases;
+screenshots were inspected for overflow/overlap. Final lint/types/ledger/build
+passed. Successor CI still needs recording after push. Public-source scan passed
+362 files before this addition.
+
+A fresh isolated synthetic preview runs at http://127.0.0.1:14330 (API 14329),
+manager PID 11968, run ID `1d0434eb-acf4-41ac-98cd-f29b4ded26e2`. It explicitly
+skips repository .env and inherits only OS runtime essentials. Runtime health
+is ready. It is not a production install or qualifying soak. Private 4317/4318
+services and all private credentials, facts, authorizations and OAuth remain
+untouched. Counts remain 12/19 phases and 87/128 gates; no overnight coding
+continuation exists on this host.

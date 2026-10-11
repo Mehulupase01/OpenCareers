@@ -17,6 +17,16 @@ test("synthetic workspace, queue worker and persistent controls", async ({ page 
     0,
   );
   await page.getByRole("searchbox").clear();
+  const pipeline = page.getByRole("region", { name: "Pipeline overview" });
+  await pipeline.locator("summary").click();
+  await expect(pipeline.getByText("All tracked applications", { exact: true })).toBeVisible();
+  await expect(pipeline.getByText("Missing confirmation evidence", { exact: true })).toBeVisible();
+  expect(
+    await pipeline
+      .getByRole("table", { name: "All application stage counts" })
+      .getByRole("row")
+      .count(),
+  ).toBeGreaterThan(1);
   await page.getByRole("button", { name: "Applied AI Engineer", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

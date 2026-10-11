@@ -61,6 +61,56 @@ for (const engine of ["sqlite", "postgres"] as const) {
       if (dir) await rm(dir, { recursive: true, force: true });
     });
 
+    it("counts the whole owner pipeline and never treats UNKNOWN or missing receipts as confirmed evidence", async () => {
+      await repository.putJob(job);
+      for (let index = 0; index < 105; index++) {
+        const app = await repository.createApplication(job.id, `synthetic-candidate-${index}`);
+        await db.query("UPDATE applications SET state=$1 WHERE owner_id=$2 AND id=$3", [
+          index === 0 ? "UNKNOWN" : index === 1 ? "CONFIRMED" : "NEEDS_INPUT",
+          owner,
+          app.id,
+        ]);
+      }
+      const foreign = new Repository(db, `foreign-${randomUUID()}`, () => new Date(now));
+      await foreign.initialize();
+      await foreign.putJob(job);
+      await foreign.createApplication(job.id, "foreign-candidate");
+      await foreign.enqueue({
+        type: "reconcile",
+        domain: "foreign",
+        dedupeKey: "foreign",
+        priority: 999,
+      });
+      await repository.enqueue({
+        type: "prepare",
+        domain: "future",
+        dedupeKey: "future",
+        priority: 999,
+        runAfter: new Date(now + 60000).toISOString(),
+      });
+      await repository.enqueue({ type: "prepare", domain: "due", dedupeKey: "due", priority: 1 });
+      const next = await repository.enqueue({
+        type: "reconcile",
+        domain: "reconcile",
+        dedupeKey: "reconcile",
+        priority: 100,
+      });
+      const summary = await repository.summary("demo");
+      expect(summary.applications).toHaveLength(100);
+      expect(summary.counts).toMatchObject({ applications: 105, confirmed: 1, unknown: 1 });
+      expect(summary.flow).toMatchObject({
+        scope: "all_tracked_applications",
+        states: [
+          { state: "CONFIRMED", count: 1 },
+          { state: "NEEDS_INPUT", count: 103 },
+          { state: "UNKNOWN", count: 1 },
+        ],
+        confirmedWithReceipt: 0,
+        confirmedWithoutReceipt: 1,
+        nextQueuedTask: { id: next.id },
+      });
+    });
+
     it("deduplicates requisitions and application identities without merging distinct roles", async () => {
       const id = await repository.putJob(job);
       expect(await repository.putJob({ ...job, id: "cross-posting", source: "second" })).toBe(id);

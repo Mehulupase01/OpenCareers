@@ -154,6 +154,8 @@ test("immutable document packet review and downloads remain inspectable", async 
     { projectName: info.project.name, guaranteed: guaranteed },
   );
   expect(result.authorization).toBeTruthy();
+  // Publishing auto-submit authorization resumes submissions; freeze review again.
+  await json("/v1/control/pause", { stage: "submissions", paused: true });
   await page.reload();
   await page.getByRole("button", { name: "Documents", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Documents", exact: true })).toBeVisible();

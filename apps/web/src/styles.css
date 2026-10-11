@@ -320,6 +320,21 @@ h2 {
 .data-section {
   min-width: 0;
 }
+.pipeline-overview {
+  margin-bottom: 18px;
+}
+.pipeline-overview summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 600;
+}
+.pipeline-count-total {
+  display: inline-block;
+  margin-left: 12px;
+  color: #748179;
+  font-weight: 400;
+  font-size: 12px;
+}
 .section-toolbar {
   display: flex;
   justify-content: space-between;

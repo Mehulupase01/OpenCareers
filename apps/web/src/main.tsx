@@ -193,6 +193,10 @@ function App() {
             <button
               type="button"
               key={id}
+              aria-label={label}
+              aria-description={
+                id === "queue" ? `${summary?.counts.pendingTasks ?? 0} pending tasks` : undefined
+              }
               aria-current={view === id ? "page" : undefined}
               onClick={() => setView(id)}
             >
@@ -318,10 +322,10 @@ function App() {
                   <div className="metric">
                     <span>Confirmed</span>
                     <strong>
-                      {summary.counts.confirmed}
+                      {summary.flow.confirmedWithReceipt}
                       <CheckCircle2 size={20} />
                     </strong>
-                    <small>Receipt verified</small>
+                    <small>Correlated receipt</small>
                   </div>
                   <div className="metric">
                     <span>Prepared</span>
@@ -350,6 +354,58 @@ function App() {
                 </section>
               )}
               {(view === "applications" || view === "queue") && <ExceptionsPanel />}
+              {(view === "applications" || view === "queue") && (
+                <section className="data-section" aria-label="Pipeline overview">
+                  <details className="pipeline-overview">
+                    <summary>
+                      Pipeline counts{" "}
+                      <span className="pipeline-count-total">
+                        {summary.counts.applications} tracked applications
+                      </span>
+                    </summary>
+                    <dl className="discovery-facts">
+                      <div>
+                        <dt>Scope</dt>
+                        <dd>All tracked applications</dd>
+                      </div>
+                      <div>
+                        <dt>Receipt-backed confirmations</dt>
+                        <dd>{summary.flow.confirmedWithReceipt}</dd>
+                      </div>
+                      <div>
+                        <dt>Missing confirmation evidence</dt>
+                        <dd>{summary.flow.confirmedWithoutReceipt}</dd>
+                      </div>
+                      <div>
+                        <dt>Next queued task</dt>
+                        <dd>
+                          {summary.flow.nextQueuedTask
+                            ? `${summary.flow.nextQueuedTask.type} / ${summary.flow.nextQueuedTask.state}`
+                            : "None"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="table-scroll">
+                      <table aria-label="All application stage counts">
+                        <thead>
+                          <tr>
+                            <th>State</th>
+                            <th>Applications</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.flow.states.map((row) => (
+                            <tr key={row.state}>
+                              <td>{row.state.replaceAll("_", " ").toLowerCase()}</td>
+                              <td>{row.count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </section>
+              )}
               {view === "candidate" && candidate && (
                 <CandidateWorkspace snapshot={candidate} refresh={refresh} />
               )}

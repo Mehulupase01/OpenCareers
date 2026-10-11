@@ -1526,9 +1526,9 @@
         {
           "id": "P13-03",
           "text": "Operations dashboard. Show actual stage counts, confirmed evidence, unresolved ambiguity, the needs-help queue, next work, the model quota estimate, and stop controls.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T20", "T25"],
-          "evidence": [],
+          "evidence": ["docs/evidence/P13-operations-readout.md"],
           "nextAction": "P13-03"
         },
         {
@@ -1607,6 +1607,12 @@
           "commit": "370e584c60a0bc5d66e5fbacb82f344230a196c3",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Compiled API/scheduler outlive their detached parent and recover from a killed scheduler; G1 runtime independence only, not installed startup, OS reboot, sleep/network drills, soak or live ramp."
+        },
+        {
+          "runId": "38134321167",
+          "commit": "b8f792016d59958746a0e7d6b538c1b318a53d5f",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "UTC-evidence Amsterdam quota windows, ordinary and DST rollovers, unchanged historical timestamps and stale legacy day labels; not complete scheduling, installation, real-duration soak or live ramp."
         }
       ],
       "acceptanceTests": ["T20", "T25"],
@@ -1614,7 +1620,8 @@
       "evidence": [
         "docs/plans/P13-unattended-windows.md",
         "docs/evidence/P13-runtime-foundation.md",
-        "docs/evidence/P13-day-boundary.md"
+        "docs/evidence/P13-day-boundary.md",
+        "docs/evidence/P13-operations-readout.md"
       ]
     },
     {
