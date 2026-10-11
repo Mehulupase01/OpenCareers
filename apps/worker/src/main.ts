@@ -28,6 +28,7 @@ import { SubmissionRepository } from "../../../packages/persistence/src/submissi
 import { VerificationRepository } from "../../../packages/persistence/src/verification-repository.js";
 import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 import { runInspectionTask } from "./inspection.js";
+import { startPeriodicWork } from "./periodic-work.js";
 import { draftWorkerLetter } from "./preparation.js";
 
 const logger = createLogger();
@@ -85,20 +86,13 @@ const letterDraftRunner = config.inference.apiKey
     )
   : null;
 const workerId = `scheduler-${config.runtimeInstance ? `${config.runtimeInstance}-` : ""}${randomUUID().slice(0, 8)}`;
-let heartbeatPending: Promise<void> = Promise.resolve();
-let heartbeatRunning = false;
-const heartbeatTimer = setInterval(() => {
-  if (heartbeatRunning) return;
-  heartbeatRunning = true;
-  heartbeatPending = repository
-    .heartbeat(workerId, "scheduler")
-    .catch(() => {
-      logger.warn("Worker heartbeat deferred.");
-    })
-    .finally(() => {
-      heartbeatRunning = false;
-    });
-}, 15000);
+const heartbeat = startPeriodicWork(
+  15000,
+  () => repository.heartbeat(workerId, "scheduler"),
+  () => {
+    logger.warn("Worker heartbeat deferred.");
+  },
+);
 try {
   while (!controller.signal.aborted) {
     try {
@@ -136,14 +130,13 @@ try {
               : [];
       const task = await repository.claim(workerId, taskTypes);
       if (task) {
-        let renewPending: Promise<void> = Promise.resolve();
-        const renewTimer = setInterval(() => {
-          renewPending = renewPending
-            .then(() => repository.renew(task))
-            .catch((error: unknown) => {
-              logger.warn({ taskId: task.id, err: error }, "Task lease renewal failed");
-            });
-        }, 10_000);
+        const renewal = startPeriodicWork(
+          10000,
+          () => repository.renew(task),
+          (error) => {
+            logger.warn({ taskId: task.id, err: error }, "Task lease renewal failed");
+          },
+        );
         try {
           if (task.type === "prepare") {
             if (!task.applicationId || typeof task.payload.assessmentId !== "string")
@@ -353,8 +346,7 @@ try {
           await repository.fail(task, domain);
           logger.warn({ err: error, taskId: task.id }, "Worker task failed");
         } finally {
-          clearInterval(renewTimer);
-          await renewPending;
+          await renewal.stop();
         }
       }
       await runDiscovery(discovery, config.profile);
@@ -365,8 +357,7 @@ try {
     }
   }
 } finally {
-  clearInterval(heartbeatTimer);
-  await heartbeatPending;
+  await heartbeat.stop();
   await mailSync;
   await gmail.close();
   await repository.db.close();

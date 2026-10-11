@@ -76,3 +76,6 @@ and stop-control acceptance are recorded separately in their P13 evidence files.
 The isolated hidden startup host and disposable process verification are described
 in `docs/evidence/P13-windows-startup-host.md`; actual task installation is still
 unverified.
+Periodic heartbeat/renewal writes are now single-flight; see
+`docs/evidence/P13-periodic-work.md` for the bounded backlog proof and remaining
+database/hardware/soak limitations.

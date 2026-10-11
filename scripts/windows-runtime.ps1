@@ -24,7 +24,7 @@ $node = (Resolve-Path -LiteralPath $NodePath).Path
 if (-not $ConfigFile) { $ConfigFile = Join-Path $root '.env' }
 $config = (Resolve-Path -LiteralPath $ConfigFile).Path
 if ($root.Contains('"') -or $config.Contains('"') -or $runtime.Contains('"') -or $node.Contains('"') -or $startupHost.Contains('"')) { throw 'Paths must not contain quote characters.' }
-$versionText = & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version
+$versionText = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version
 if (-not $versionText -or $LASTEXITCODE -ne 0) { throw 'The Node executable did not return its version.' }
 $version = [Version]($versionText.Trim().TrimStart('v'))
 if ($version -lt [Version]'24.14.0' -or $version -ge [Version]'25.0.0') { throw 'Use the pinned Node 24 runtime.' }
@@ -32,7 +32,7 @@ $previous = Get-Location
 try {
     Set-Location -LiteralPath $root
     $hostArguments = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-File', "`"$startupHost`"", '-InstallRoot', "`"$root`"", '-ConfigFile', "`"$config`"", '-NodePath', "`"$node`"")
-    $validated = & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate
+    $validated = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate
     if ($LASTEXITCODE -ne 0) { throw 'Private runtime configuration is invalid.' }
     $settings = $validated | ConvertFrom-Json
     if ($settings.profile -ne 'local') { throw 'Windows startup is restricted to the local private profile.' }
@@ -42,8 +42,8 @@ try {
     $suffix = ([BitConverter]::ToString($digest)).Replace('-', '').Substring(0, 12)
     $taskName = "OpenCareers-$suffix"
     switch ($Mode) {
-        'Status' { & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status }
-        'Stop' { & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop }
+        'Status' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status }
+        'Stop' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop }
         'Start' {
             if ($PSCmdlet.ShouldProcess($root, 'Start hidden application runtime')) {
                 Start-Process -FilePath $powershell -ArgumentList $hostArguments -WorkingDirectory $root -WindowStyle Hidden

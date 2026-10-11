@@ -1275,3 +1275,37 @@ behavior changed in this packaging batch. Successor CI must verify the new batch
 See docs/evidence/P13-windows-bundle.md. No installed logon task, OS fault drill,
 actual 24/72-hour soak, private OpenRouter call or live submission was performed.
 The old demo preview did not survive reboot. Private 4317/4318 remain untouched.
+
+## 2026-10-11: Bounded Worker Timers And Windows CI Correction
+
+CI 38141281221 at 1d8f194 passed Ubuntu/PostgreSQL, but Windows timed out at
+the installer preflight before reaching clean-install verification. Do not
+describe that run as a verified Windows bundle. The launcher now invokes its
+isolated host in script scope for version/validation/control instead of spawning
+redundant nested PowerShell processes. Scheduled startup remains hidden and
+separate. The 45-second test bound was not raised; the exact runner timeout
+cause is not proven. Focused approval/WhatIf and host exit/filter tests pass.
+
+Worker renewal previously queued a promise on every timer tick, allowing backlog
+growth behind slow SQL. Heartbeat/renewal now share a single-flight periodic
+primitive: busy ticks are skipped, stop disables scheduling and drains the one
+pending write. Error handling releases the slot. No lease, authority, dispatch
+or reconciliation check is changed. A blocked DB write still needs the existing
+supervisor's bounded shutdown; this is not a database timeout guarantee.
+See docs/evidence/P13-periodic-work.md. Four unit cases test 1,000 blocked ticks,
+retry/failure/stop behavior; this fake clock is not soak evidence.
+
+Verified 13 focused periodic/lifecycle/host tests and guarded stop workflows.
+Final sequential pnpm check passes 635 tests / 217 skipped in 81 files,
+lint/types/ledger/build. The rebuilt bundle passes the actual production-only
+clean install, semantic packet checks, unknown-answer refusal, compiled API/web
+readiness and parent/child drain checks. Scan: 383 files. Successor CI must
+verify the combined build. Counts remain 89/128 gates and 12/19 phases.
+
+The owned synthetic preview was healthy at 14334 (run
+e7ecc73f-c907-4398-9c6b-ea244624e86c, manager PID 25424). It was gracefully
+stopped through its scoped runtime control to load the rebuilt worker, but the
+subsequent relaunch was rejected by execution policy. It is currently stopped;
+do not claim a live preview or retry a blocked launch through another mechanism.
+The synthetic DB remains available; private 4317/4318 and owner configs remain
+untouched. No logon task, live application, private model call or long soak ran.
