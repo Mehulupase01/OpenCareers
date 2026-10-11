@@ -20,6 +20,11 @@ test("Breezy public source shows structured evidence and discovery-only support"
     page.locator(".source-health-list article").filter({ hasText: "synthetic-breezy-e2e" }),
   ).toContainText("3 postings", { timeout: 25000 });
   await page.getByRole("tab", { name: "Coverage", exact: true }).click();
+  const boardCatalog = page.getByRole("table", { name: "Job-board target catalog" });
+  await expect(boardCatalog.locator("tbody tr")).toHaveCount(20);
+  await expect(boardCatalog.locator("tbody tr").nth(0)).toContainText("LinkedIn");
+  await expect(boardCatalog.locator("tbody tr").nth(1)).toContainText("Indeed");
+  await expect(page.getByTestId("operational-board-count")).toContainText("0 / 20 operational");
   await expect(
     page
       .locator(".coverage-table tbody tr")

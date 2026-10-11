@@ -6,6 +6,7 @@ import type {
 } from "../../contracts/src/coverage.js";
 import { sourceInputSchema } from "../../contracts/src/discovery.js";
 import { assessmentSchema, type MatchAssessment } from "../../contracts/src/matching.js";
+import { jobBoardCatalog } from "../../discovery/src/source-catalog.js";
 import { Repository } from "./repository.js";
 
 type Family = PortalCoverageRow["family"];
@@ -165,6 +166,11 @@ const outcomes = (): Record<Outcome, number> => ({
   inference_paused: 0,
   unassessed: 0,
 });
+const publicFeedFamilies = new Set(
+  Object.entries(support)
+    .filter(([, family]) => family.support.discovery !== "planned")
+    .map(([family]) => family),
+);
 
 const levelWeight: Record<CoverageLevel, number> = {
   planned: 0,
@@ -317,6 +323,22 @@ export class CoverageRepository extends Repository {
         await tx.query("SELECT active_profile_id FROM candidates WHERE owner_id=$1", [this.ownerId])
       )[0];
       const activeProfileId = (candidate?.active_profile_id as string | null) ?? null;
+      const sources = await tx.query(
+        "SELECT policy,state,last_success_at FROM sources WHERE owner_id=$1",
+        [this.ownerId],
+      );
+      let configuredLiveFeeds = 0;
+      let freshHealthyLiveFeeds = 0;
+      for (const row of sources) {
+        const source = sourceInputSchema.parse(JSON.parse(String(row.policy)));
+        if (!source.enabled || source.mode !== "live" || !publicFeedFamilies.has(source.connector))
+          continue;
+        configuredLiveFeeds++;
+        const age = this.clock().getTime() - Date.parse(String(row.last_success_at));
+        if (row.state === "healthy" && age >= 0 && age <= source.intervalSeconds * 2000)
+          freshHealthyLiveFeeds++;
+      }
+      const boards = jobBoardCatalog();
       const listings = await tx.query(
         "SELECT l.job_id,s.connector,s.policy FROM discovery_listings l JOIN sources s ON s.owner_id=l.owner_id AND s.id=l.source_id WHERE l.owner_id=$1 AND l.state='open' ORDER BY s.connector,l.source_id,l.job_id",
         [this.ownerId],
@@ -391,6 +413,14 @@ export class CoverageRepository extends Repository {
         recommendedNextFamily,
         rows,
         supportMatrix,
+        sourceCoverage: {
+          boardTarget: 20,
+          operationalBoards: boards.filter((board) => board.operational).length,
+          readerFamilies: publicFeedFamilies.size,
+          configuredLiveFeeds,
+          freshHealthyLiveFeeds,
+          boards,
+        },
       };
     });
   }

@@ -793,6 +793,22 @@ td:last-child {
   font-size: 12px;
   font-weight: 600;
 }
+.source-catalog-table {
+  min-width: 560px;
+}
+.source-catalog-table th:first-child,
+.source-catalog-table td:first-child {
+  width: 72px;
+  min-width: 72px;
+}
+.source-catalog-table th:nth-child(3),
+.source-catalog-table th:nth-child(4) {
+  width: 140px;
+}
+.source-catalog-table th,
+.source-catalog-table td {
+  padding: 8px 12px;
+}
 .coverage-variant {
   display: block;
   white-space: nowrap;

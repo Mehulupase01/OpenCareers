@@ -1054,3 +1054,22 @@ final-submission readiness. Then extend supported family adapters and coverage
 catalog without counting permission-blocked/planned entries as operational.
 Continue independent P13 scheduling/capacity/installation work; genuine P08
 receipt, Gmail consent, P13 live ramp and real 24/72-hour soaks remain open.
+
+## 2026-10-11: Honest Source Coverage And Browser Control Regression
+
+The discovery workspace and coverage API expose all 20 target boards, LinkedIn
+then Indeed first, without counting targets as operational connectors. All 20
+remain planned/access-unreviewed; operational boards are zero. Nine implemented
+public employer-feed families, configured enabled live feeds and fresh healthy
+feeds have separate counts. See `docs/evidence/P18-source-catalog.md`.
+
+Hardening CI 38132799076 failed the document browser fixture on both Windows and
+Ubuntu; PostgreSQL passed. The fixture tried to fill while preparation was
+paused. It now asserts that rejection, resumes preparation, and retains the
+submission pause through review. Production control enforcement was not relaxed.
+
+Full local check passed: 600 tests / 206 PostgreSQL skipped, 73 files, with
+lint/types/ledger/build passing. All 58 desktop/mobile browser cases passed.
+Public-source scan passed 359 files. Successor CI still needs recording after
+push. Counts remain 12/19 phases, 87/128 gates. No catalog
+row closes an operational coverage gate; no genuine submission or soak occurred.

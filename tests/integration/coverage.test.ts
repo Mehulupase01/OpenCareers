@@ -46,6 +46,67 @@ for (const engine of ["sqlite", "postgres"] as const) {
 
       afterEach(async () => db.close());
 
+      it("separates the twenty planned board targets from real public reader coverage", async () => {
+        const sourceCoverage = (await coverage.report()).sourceCoverage;
+        expect(sourceCoverage.boardTarget).toBe(20);
+        expect(sourceCoverage.boards).toHaveLength(20);
+        expect(new Set(sourceCoverage.boards.map((board) => board.id)).size).toBe(20);
+        expect(sourceCoverage.boards.slice(0, 2).map((board) => board.name)).toEqual([
+          "LinkedIn",
+          "Indeed",
+        ]);
+        expect(
+          sourceCoverage.boards.every(
+            (board) =>
+              !board.operational &&
+              board.implementation === "planned" &&
+              board.access === "unreviewed",
+          ),
+        ).toBe(true);
+        expect(sourceCoverage.operationalBoards).toBe(0);
+        expect(sourceCoverage.readerFamilies).toBe(9);
+        expect(sourceCoverage.configuredLiveFeeds).toBe(0);
+        expect(sourceCoverage.freshHealthyLiveFeeds).toBe(0);
+      });
+
+      it("counts only owner-scoped enabled live feeds and fresh successful evidence", async () => {
+        const live = await discovery.saveSource({
+          ...sourceInputSchema.strip().parse(sourceFixture),
+          id: undefined,
+          expectedRevision: 0,
+          mode: "live",
+        });
+        await discovery.saveSource({
+          ...sourceInputSchema.strip().parse(sourceFixture),
+          id: undefined,
+          expectedRevision: 0,
+          board: "synthetic-fixture",
+        });
+        await db.query(
+          "UPDATE sources SET state='healthy',last_success_at=$1 WHERE owner_id=$2 AND id=$3",
+          [new Date(now).toISOString(), owner, live.id],
+        );
+        let stats = (await coverage.report()).sourceCoverage;
+        expect(stats.configuredLiveFeeds).toBe(1);
+        expect(stats.freshHealthyLiveFeeds).toBe(1);
+        now += 600001;
+        expect((await coverage.report()).sourceCoverage.freshHealthyLiveFeeds).toBe(0);
+        await db.query("UPDATE sources SET last_success_at=$1 WHERE owner_id=$2 AND id=$3", [
+          new Date(now + 1).toISOString(),
+          owner,
+          live.id,
+        ]);
+        expect((await coverage.report()).sourceCoverage.freshHealthyLiveFeeds).toBe(0);
+        await discovery.saveSource({
+          ...sourceInputSchema.strip().parse(live),
+          expectedRevision: live.revision,
+          enabled: false,
+        });
+        stats = (await coverage.report()).sourceCoverage;
+        expect(stats.configuredLiveFeeds).toBe(0);
+        expect(stats.operationalBoards).toBe(0);
+      });
+
       it("ranks complete open-corpus coverage using the active profile's latest assessment", async () => {
         await candidate.saveFact(identity);
         await candidate.saveFact({

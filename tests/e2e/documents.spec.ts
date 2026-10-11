@@ -231,6 +231,12 @@ test("immutable document packet review and downloads remain inspectable", async 
     { employerId: guaranteed.job.employerId },
   );
   await dryRun.getByRole("button", { name: "Run dry run" }).click();
+  await expect(dryRun.getByRole("alert")).toContainText(
+    "Current controls prohibit this browser action.",
+  );
+  await expect(dryRun.locator(".browser-result .packet-state")).toHaveCount(0);
+  await json("/v1/control/pause", { stage: "preparation", paused: false });
+  await dryRun.getByRole("button", { name: "Run dry run" }).click();
   await expect(dryRun.locator(".browser-result .packet-state")).toHaveText("ready", {
     timeout: 30000,
   });

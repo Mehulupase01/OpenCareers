@@ -758,6 +758,56 @@ export function DiscoveryWorkspace({ demo }: { demo: boolean }) {
               </div>
               {!coverage.rows.length && <div className="empty-state">No open portal coverage</div>}
               <div className="section-toolbar">
+                <h3>Job-board targets</h3>
+                <span className="muted" data-testid="operational-board-count">
+                  {coverage.sourceCoverage.operationalBoards} /{" "}
+                  {coverage.sourceCoverage.boardTarget} operational
+                </span>
+              </div>
+              <div className="table-scroll">
+                <table
+                  className="coverage-table source-catalog-table"
+                  aria-label="Job-board target catalog"
+                >
+                  <thead>
+                    <tr>
+                      <th>Priority</th>
+                      <th>Board</th>
+                      <th>Reader</th>
+                      <th>Access review</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.sourceCoverage.boards.map((board) => (
+                      <tr key={board.id}>
+                        <td>{board.priority}</td>
+                        <td>
+                          <strong>{board.name}</strong>
+                        </td>
+                        <td>{words(board.implementation)}</td>
+                        <td>{words(board.access)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="section-toolbar">
+                <h3>Employer feeds</h3>
+                <span className="muted">
+                  {coverage.sourceCoverage.readerFamilies} reader families
+                </span>
+              </div>
+              <dl className="discovery-facts">
+                <div>
+                  <dt>Configured live feeds</dt>
+                  <dd>{coverage.sourceCoverage.configuredLiveFeeds}</dd>
+                </div>
+                <div>
+                  <dt>Fresh healthy live feeds</dt>
+                  <dd>{coverage.sourceCoverage.freshHealthyLiveFeeds}</dd>
+                </div>
+              </dl>
+              <div className="section-toolbar">
                 <h3>Variant support</h3>
               </div>
               <div className="table-scroll">

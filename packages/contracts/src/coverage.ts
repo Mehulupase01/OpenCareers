@@ -41,6 +41,21 @@ export interface PortalCoverageReport {
   recommendedNextFamily: SourceInput["connector"] | null;
   rows: PortalCoverageRow[];
   supportMatrix: PortalSupportVariant[];
+  sourceCoverage: {
+    boardTarget: number;
+    operationalBoards: number;
+    readerFamilies: number;
+    configuredLiveFeeds: number;
+    freshHealthyLiveFeeds: number;
+    boards: Array<{
+      id: string;
+      name: string;
+      priority: number;
+      implementation: "planned";
+      access: "unreviewed";
+      operational: false;
+    }>;
+  };
 }
 
 export interface PortalSupportVariant {
