@@ -9,6 +9,7 @@ import {
 } from "../../../packages/contracts/src/outcome.js";
 import { request } from "./api.js";
 import { CalibrationWorkspace } from "./calibration.js";
+import { CohortsWorkspace } from "./cohorts.js";
 
 export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
   const [applicationId, setApplicationId] = useState("");
@@ -346,6 +347,7 @@ export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
         </div>
       )}
       <CalibrationWorkspace />
+      <CohortsWorkspace />
     </section>
   );
 }

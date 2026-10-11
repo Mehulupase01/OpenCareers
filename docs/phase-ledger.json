@@ -1897,7 +1897,13 @@
           "text": "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants using fixed application cohorts and suitable observation windows.",
           "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": ["docs/evidence/P16-outcome-foundation.md"],
+          "evidence": [
+            "docs/evidence/P16-outcome-foundation.md",
+            "docs/evidence/P16-fixed-cohorts.md",
+            "tests/unit/cohort-report.test.ts",
+            "tests/integration/outcomes.test.ts",
+            "tests/e2e/outcomes.spec.ts"
+          ],
           "nextAction": "P16-02"
         },
         {
@@ -1957,13 +1963,13 @@
         {
           "id": "P16-G3",
           "requirement": "Reported conversion rates include numerator, denominator, date range, and relevant exclusions.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["docs/evidence/P16-fixed-cohorts.md", "tests/unit/cohort-report.test.ts"]
         },
         {
           "id": "P16-G4",
           "requirement": "No UI uses match score as a fabricated selection probability.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": ["docs/evidence/P16-score-calibration.md", "tests/e2e/calibration.spec.ts"]
         },
         {
@@ -1994,7 +2000,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "fb2a4c7a0f41382b6b713e3315f2a1183a352ac1",
+      "lastVerifiedCommit": "2889dbc930de0a0505e05fef946358220a7dc74f",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2013,6 +2019,12 @@
           "commit": "fb2a4c7a0f41382b6b713e3315f2a1183a352ac1",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Reviewed categorical regression importer and real-domain synthetic fixture consumer, privacy and redirected-folder refusals, full browser regressions and production-only Windows installation. Not automatic correction capture, successor diagnostics workspace or additional P16 gate closure."
+        },
+        {
+          "runId": "38170532775",
+          "commit": "2889dbc930de0a0505e05fef946358220a7dc74f",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Fixed-review import/catalog and advisory diagnostics workspace, snapshot isolation/integrity, browser regressions and production-only Windows installation. Closes G4 with Matching source review and no-probability diagnostic contracts; not successor fixed cohorts, live quality or full P16."
         }
       ],
       "acceptanceTests": [],
@@ -2021,7 +2033,8 @@
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",
         "docs/evidence/P16-score-calibration.md",
-        "docs/evidence/P16-regression-import.md"
+        "docs/evidence/P16-regression-import.md",
+        "docs/evidence/P16-fixed-cohorts.md"
       ]
     },
     {

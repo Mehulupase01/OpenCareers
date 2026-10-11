@@ -57,6 +57,46 @@ describe("API trust boundary", () => {
         .statusCode,
     ).toBe(401);
     const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    const cohortUrl = "/v1/outcomes/cohorts";
+    expect((await app.inject({ url: cohortUrl, headers })).statusCode).toBe(401);
+    expect(
+      (await app.inject({ method: "POST", url: cohortUrl, headers, payload: {} })).statusCode,
+    ).toBe(401);
+    expect(
+      (await app.inject({ method: "POST", url: `${cohortUrl}/compare`, headers, payload: {} }))
+        .statusCode,
+    ).toBe(401);
+    const cohortInput = {
+      id: randomUUID(),
+      from: "2026-01-01T00:00:00.000Z",
+      through: "2026-01-02T00:00:00.000Z",
+    };
+    const frozen = await app.inject({
+      method: "POST",
+      url: cohortUrl,
+      headers: authenticated,
+      payload: cohortInput,
+    });
+    expect(frozen.statusCode).toBe(200);
+    expect(frozen.json()).toMatchObject({
+      snapshotId: cohortInput.id,
+      status: "insufficient_data",
+      denominator: 0,
+    });
+    expect(
+      (await app.inject({ url: `${cohortUrl}/${cohortInput.id}`, headers: authenticated })).json(),
+    ).toEqual(frozen.json());
+    expect((await app.inject({ url: cohortUrl, headers: authenticated })).json()).toHaveLength(1);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: cohortUrl,
+          headers: authenticated,
+          payload: { ...cohortInput, asOf: "2026-01-02T00:00:00.000Z" },
+        })
+      ).statusCode,
+    ).toBe(400);
     expect(
       (await app.inject({ url: "/v1/outcomes/calibration/datasets", headers })).statusCode,
     ).toBe(401);

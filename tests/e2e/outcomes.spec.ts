@@ -52,6 +52,32 @@ test("outcome history preserves corrections and synthetic cohorts refuse live fr
   ).toBeVisible();
   await expect(page.getByText(/0 eligible applications/)).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Fraction", exact: true })).toHaveCount(0);
+  const cohorts = page.getByRole("region", { name: "Fixed outcome cohorts" });
+  await expect(cohorts.getByRole("button", { name: "Freeze cohort", exact: true })).toBeEnabled();
+  await cohorts.getByRole("button", { name: "Freeze cohort", exact: true }).click();
+  await expect(
+    cohorts.getByRole("heading", { name: "Insufficient fixed-cohort data", exact: true }),
+  ).toBeVisible();
+  await expect(cohorts.getByRole("status")).toContainText("0 eligible applications");
+  const selected = await cohorts.getByLabel("Saved cohort", { exact: true }).inputValue();
+  expect(selected).toBeTruthy();
+  await expect(cohorts.getByRole("button", { name: "Freeze cohort", exact: true })).toBeEnabled();
+  await cohorts.getByRole("button", { name: "Freeze cohort", exact: true }).click();
+  await expect(cohorts.getByRole("button", { name: "Freeze cohort", exact: true })).toBeEnabled();
+  expect(
+    (await json("/v1/outcomes/cohorts")).filter((item: { id: string }) => item.id === selected),
+  ).toHaveLength(1);
+  await page.reload();
+  await page.getByRole("button", { name: "Outcomes", exact: true }).click();
+  await expect(cohorts.getByLabel("Saved cohort", { exact: true })).toBeEnabled();
+  await cohorts.getByLabel("Saved cohort", { exact: true }).selectOption(selected);
+  await cohorts.getByRole("button", { name: "Open fixed cohort", exact: true }).click();
+  await expect(
+    cohorts.getByRole("heading", { name: "Insufficient fixed-cohort data", exact: true }),
+  ).toBeVisible();
+  await expect(
+    cohorts.getByRole("button", { name: "Compare fixed groups", exact: true }),
+  ).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

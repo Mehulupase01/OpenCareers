@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OutcomeKind } from "../../packages/contracts/src/outcome.js";
 import { generatePacketContent } from "../../packages/documents/src/domain.js";
+import { CohortRepository } from "../../packages/persistence/src/cohort-repository.js";
 import {
   type Database,
   openPostgres,
@@ -37,9 +38,9 @@ for (const engine of ["sqlite", "postgres"] as const) {
       afterEach(async () => {
         await db?.close();
       });
-      const application = async (synthetic = true) => {
+      const application = async (synthetic = true, source = documentJob.source) => {
         const id = randomUUID();
-        await repo.putJob({ ...documentJob, id, requisitionId: id, synthetic });
+        await repo.putJob({ ...documentJob, id, requisitionId: id, synthetic, source });
         return repo.createApplication(id, "synthetic-candidate");
       };
       const input = (
@@ -78,7 +79,10 @@ for (const engine of ["sqlite", "postgres"] as const) {
         return id;
       };
       // Test-only FK-complete rows; these are never live employer evidence.
-      const receipt = async (applicationId: string) => {
+      const receipt = async (
+        applicationId: string,
+        kind: "legacy" | "greenhouse" | "mock_ats" = "legacy",
+      ) => {
         const id = randomUUID();
         const at = now.toISOString();
         await db.query(
@@ -102,7 +106,35 @@ for (const engine of ["sqlite", "postgres"] as const) {
           "INSERT INTO attempts(id,owner_id,application_id,intent_id,fence,state,started_at) VALUES($1,$2,$3,$1,1,'CONFIRMED',$4)",
           [id, owner, applicationId, at],
         );
-        const evidence = JSON.stringify({ kind: "synthetic-outcome-fixture", applicationId });
+        const jobId = (
+          await db.query("SELECT job_id FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            applicationId,
+          ])
+        )[0]?.job_id;
+        const evidence = JSON.stringify(
+          kind === "legacy"
+            ? { kind: "synthetic-outcome-fixture", applicationId }
+            : kind === "greenhouse"
+              ? {
+                  kind,
+                  receiptId: id,
+                  board: "synthetic-fixture",
+                  postingId: "1",
+                  jobId,
+                  receiptUrl: "https://receipt.synthetic.example/fixture",
+                  receivedAt: at,
+                  emailHash: "a".repeat(64),
+                }
+              : {
+                  kind,
+                  recordId: id,
+                  jobId,
+                  receiptUrl: "https://receipt.synthetic.example/fixture",
+                  receivedAt: at,
+                  emailHash: "a".repeat(64),
+                },
+        );
         await db.query(
           "INSERT INTO receipts(id,owner_id,application_id,attempt_id,evidence,sha256,observed_at) VALUES($1,$2,$3,$1,$4,$5,$6)",
           [
@@ -125,6 +157,161 @@ for (const engine of ["sqlite", "postgres"] as const) {
         through: "2026-09-30T00:00:00.000Z",
         asOf: now.toISOString(),
         observationDays: 30,
+      });
+
+      const fixedInput = () => ({
+        id: randomUUID(),
+        from: "2026-08-01T00:00:00.000Z",
+        through: "2026-09-30T00:00:00.000Z",
+        observationDays: 30,
+      });
+      it("freezes canonical receipt-verified cohorts and horizon labels without changing authority", async () => {
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const first = [];
+        // Test-only non-synthetic flags and typed receipts exercise arithmetic, not live evidence.
+        for (let index = 0; index < 40; index++) {
+          const app = await application(false, index < 20 ? "source-a" : "source-b");
+          await receipt(app.id, "greenhouse");
+          await outcomes.recordOwner(input(app.id, index < 20 ? "INTERVIEW" : "REJECTION"));
+          first.push(app);
+        }
+        now = new Date("2026-09-20T00:00:00.000Z");
+        await outcomes.recordOwner(input(first[0]?.id as string, "OFFER", 1));
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const control = await repo.getControl(),
+          request = fixedInput();
+        const report = await cohorts.record(request);
+        expect(report).toMatchObject({
+          denominator: 40,
+          status: "measured",
+          counts: { INTERVIEW: 20, REJECTION: 20, OFFER: 0 },
+        });
+        expect(report.groups.find((group) => group.dimension === "sponsorship")).toMatchObject({
+          value: "unknown",
+          denominator: 40,
+        });
+        const comparison = await cohorts.compare({
+          leftSnapshotId: request.id,
+          rightSnapshotId: request.id,
+          dimension: "source",
+          leftValue: "source-a",
+          rightValue: "source-b",
+        });
+        expect(comparison).toMatchObject({
+          status: "measured",
+          differences: { INTERVIEW: 1, REJECTION: -1 },
+          left: { denominator: 20 },
+          right: { denominator: 20 },
+        });
+        await application(false, "source-c");
+        await db.query("UPDATE jobs SET data='{}' WHERE owner_id=$1", [owner]);
+        await outcomes.recordOwner(input(first[1]?.id as string, "UNKNOWN", 1));
+        expect(await cohorts.record(request)).toEqual(report);
+        expect(await cohorts.report(request.id)).toEqual(report);
+        expect(
+          await cohorts.compare({
+            leftSnapshotId: request.id,
+            rightSnapshotId: request.id,
+            dimension: "source",
+            leftValue: "source-a",
+            rightValue: "source-b",
+          }),
+        ).toEqual(comparison);
+        expect(await repo.getControl()).toEqual(control);
+        expect((await cohorts.list())[0]?.id).toBe(request.id);
+        expect(
+          await db.query(
+            "SELECT * FROM audit_events WHERE owner_id=$1 AND action='outcome.cohort_recorded'",
+            [owner],
+          ),
+        ).toHaveLength(1);
+        await expect(cohorts.record({ ...request, observationDays: 31 })).rejects.toMatchObject({
+          code: "REVISION_STALE",
+        });
+      });
+      it("excludes synthetic, mock, malformed, unresolved, duplicate and recent evidence", async () => {
+        const cohorts = new CohortRepository(db, owner, () => now);
+        await receipt((await application()).id, "greenhouse");
+        await receipt((await application(false)).id, "mock_ats");
+        const invalid = await receipt((await application(false)).id, "greenhouse");
+        await db.query("UPDATE receipts SET evidence='not-json' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          invalid,
+        ]);
+        const unresolved = await application(false);
+        await receipt(unresolved.id, "greenhouse");
+        await db.query("UPDATE applications SET state='UNKNOWN' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          unresolved.id,
+        ]);
+        const a = await application(false),
+          b = await application(false);
+        await receipt(a.id, "greenhouse");
+        await receipt(b.id, "greenhouse");
+        await db.query(
+          "INSERT INTO identity_resolutions(owner_id,id,from_job_id,to_job_id,reason,created_at) VALUES($1,$2,$3,$4,'synthetic-fixture',$5)",
+          [owner, randomUUID(), b.jobId, a.jobId, now.toISOString()],
+        );
+        now = new Date("2026-09-25T00:00:00.000Z");
+        await receipt((await application(false)).id, "greenhouse");
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const report = await cohorts.record(fixedInput());
+        expect(report).toMatchObject({
+          denominator: 1,
+          fractions: null,
+          counts: { UNKNOWN: 1 },
+          exclusions: {
+            synthetic: 1,
+            unverified: 2,
+            unresolved: 1,
+            duplicate: 1,
+            stillObserving: 1,
+          },
+        });
+        expect(report.groups.every((group) => group.fractions === null)).toBe(true);
+      });
+      it("refuses incompatible comparisons, caller timestamps, unknown groups and tenant access", async () => {
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const a = await application(false, "source-a"),
+          b = await application(false, "source-b");
+        await receipt(a.id, "greenhouse");
+        await receipt(b.id, "greenhouse");
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const left = fixedInput(),
+          right = { ...fixedInput(), observationDays: 31 };
+        await cohorts.record(left);
+        await cohorts.record(right);
+        const compare = {
+          leftSnapshotId: left.id,
+          rightSnapshotId: right.id,
+          dimension: "source",
+          leftValue: "source-a",
+          rightValue: "source-b",
+        };
+        await expect(cohorts.compare(compare)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        expect(await cohorts.compare({ ...compare, rightSnapshotId: left.id })).toMatchObject({
+          status: "insufficient_data",
+          differences: null,
+        });
+        await expect(
+          cohorts.compare({ ...compare, rightSnapshotId: left.id, leftValue: "missing" }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(
+          cohorts.compare({ ...compare, rightSnapshotId: left.id, rightValue: "source-a" }),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(
+          cohorts.record({ ...fixedInput(), asOf: now.toISOString() }),
+        ).rejects.toThrow();
+        const other = new CohortRepository(db, `other-${owner}`, () => now);
+        expect(await other.list()).toEqual([]);
+        await expect(other.report(left.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await db.query("UPDATE outcome_cohorts SET data='{}' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          left.id,
+        ]);
+        await expect(cohorts.report(left.id)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(cohorts.record(left)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(cohorts.list()).rejects.toMatchObject({ code: "STATE_INVALID" });
       });
 
       it("records attributed history without changing application state or policy", async () => {

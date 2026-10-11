@@ -1488,3 +1488,44 @@ comparison refusal, then pre-dispatch experiment assignment/stop guards. Scoring
 code-version compatibility, private regression proposal capture and broader form/
 adapter learning remain. Keep real receipts, Windows physical/logon drills,
 24/72-hour soaks and server/hybrid acceptance separate from synthetic evidence.
+
+## 2026-10-11: Immutable Fixed Horizon Cohort Workflow
+
+Prior diagnostics workspace commit 2889dbc930de0a0505e05fef946358220a7dc74f
+is green in CI 38170532775 on Windows, Ubuntu and PostgreSQL, including full
+browser and extracted Windows installation. Matching source review, no-probability
+diagnostic contracts and browser assertions close P16-G4 only. Counts are now
+12/19 phases and 92/128 gates; P16 and its P15 dependency remain open.
+
+The successor adds owner-audited immutable cohort snapshots in the authoritative
+database, typed/digest-verified non-mock receipt qualification, canonical job
+deduplication, fixed horizon labels and UNKNOWN silence. Cutoff is server-owned,
+exact retry/read preserves frozen evidence after source changes, and changed IDs,
+tampering or overflow fail. Catalog/report/compare routes are authenticated.
+Comparison requires identical windows/cutoffs/minima and disjoint distinct groups,
+with per-group sample refusals. Controls and submission authority stay unchanged.
+
+The Outcomes workspace supports freeze/retry/new snapshot, persisted selection,
+group reporting and comparisons. Source and unique stored role-family values are
+captured, not reconstructed as submission-time metadata. Seniority/sponsorship
+are explicitly UNKNOWN; document templates are not experiment wording variants.
+Reports are horizon outcome fractions, not cumulative conversion or causal/hiring
+claims. Global pre-grouping exclusions must not be read as per-source exclusions.
+See docs/evidence/P16-fixed-cohorts.md for exact methodology, bounds and limits.
+
+Frozen pnpm check: 683 passed / 236 skipped in 91 files; lint/types/ledger/build
+pass. Full desktop/mobile suite: 66/66 passed (4.1 minutes), inspected screenshots
+and overflow pass. Extracted production-only Windows installation: 1/1 passed
+(26.76 seconds total). PostgreSQL cases skipped locally; successor CI pending.
+Browser evidence covers real synthetic freeze/retry/reload/refusal, while measured
+group arithmetic is fixture-tested, not live data or all metadata acceptance.
+No private owner runtime, documents, model/mailbox calls, real action or soak was
+touched. Preview remains denied/stopped, with no scheduled coding continuation.
+
+P16-02/G3 remain in progress. Next major milestone is controlled experiment
+definition, immutable pre-dispatch single-variant assignment and stop/expiry checks
+in the existing guarded engine; receipt/UNKNOWN reconciliation must still work
+after stop. The plan's contradictory dispatch sentence is corrected: assignment
+must precede dispatch, never follow it. Then complete private regression proposal
+capture/broader correction cases, authoritative metadata/version history and the
+honest final calibration report. External production drills remain separate.

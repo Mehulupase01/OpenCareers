@@ -78,8 +78,8 @@ over a real observation window.
    recorded before the packet is dispatched, a single-variant rule per job, a
    declared metric, and a stop condition. Prove in
    `tests/integration/experiments.test.ts` that a second assignment to the
-   same job is refused, that an assignment cannot precede its own dispatch
-   record, and that a stopped experiment leaves already-sent applications
+   same job is refused, that assignment is refused once its dispatch record
+   exists, and that a stopped experiment leaves already-sent applications
    untouched.
 7. Calibration report. Write `docs/evidence/P16-calibration.md` recording the
    actual measured figures, their denominators, their windows, and the

@@ -141,3 +141,13 @@ normalization; those failing iterations are not final acceptance evidence.
 No owner services, private document, model/mailbox call, employer action or
 long-duration soak was touched. P16-03/G4 stay in progress; totals remain
 12/19 phases and 91/128 gates.
+
+Subsequent CI 38170532775 at 2889dbc930de0a0505e05fef946358220a7dc74f
+passes Windows, Ubuntu and PostgreSQL, including full browser regressions and
+production-only Windows installation. Source review confirms Matching states
+deterministic scores rather than hiring probabilities and displays totals /100;
+the calibration UI displays reviewed-relevance diagnostics with explicit limits.
+Together with the measured-display/refusal browser assertions and diagnostic unit
+contracts, this closes P16-G4 only. P16-03 and the phase remain in progress.
+Totals now 12/19 phases and 92/128 gates; successor fixed cohorts are not covered
+by this prior run.

@@ -153,6 +153,9 @@ export const migrations = [
   [
     "CREATE TABLE calibration_datasets (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, binding TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id))",
   ],
+  [
+    "CREATE TABLE outcome_cohorts (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, binding TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id,id))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {
