@@ -1365,16 +1365,16 @@
     {
       "id": "P12",
       "title": "Bounded multi-agent orchestration and cost optimization",
-      "status": "code_complete_verification_pending",
+      "status": "complete",
       "dependsOn": ["P11"],
       "tickets": [
         {
           "id": "P12-01",
           "text": "Graph contracts. Implement extractor, match analyst, drafter, form-answer planner, critic, and bounded repair nodes with typed input and output and capability restrictions.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": ["T12", "T30"],
           "evidence": ["docs/evidence/P12-workflow-integration.md"],
-          "nextAction": "P12-01"
+          "nextAction": null
         },
         {
           "id": "P12-02",
@@ -1390,24 +1390,24 @@
         {
           "id": "P12-03",
           "text": "Batching. Batch only independent similarly sized tasks, require item IDs, validate each result separately, and split on truncation or context pressure.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": ["T12", "T30"],
           "evidence": [
             "docs/evidence/P12-workflow-integration.md",
             "tests/integration/batch-gateway.test.ts"
           ],
-          "nextAction": "P12-03"
+          "nextAction": null
         },
         {
           "id": "P12-04",
           "text": "Dynamic routing. Select eligible free models by measured task quality, context needs, health, and latency, keeping model pinning subject to the free-only firewall.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "acceptanceTests": ["T12", "T30"],
           "evidence": [
             "docs/evidence/P12-workflow-integration.md",
             "tests/integration/matching.test.ts"
           ],
-          "nextAction": "P12-04"
+          "nextAction": null
         },
         {
           "id": "P12-05",
@@ -1470,7 +1470,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "ec192530569cbc4e8e9b114743589b56d18cdca5",
+      "lastVerifiedCommit": "370e584c60a0bc5d66e5fbacb82f344230a196c3",
       "remoteVerification": [
         {
           "runId": "38098680540",
@@ -1483,10 +1483,16 @@
           "commit": "ec192530569cbc4e8e9b114743589b56d18cdca5",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Bounded inference observations/admission, supported-evidence completion, batch deferral and synthetic held-out ablation/default-off decision; not subsequent task-class worker routing or independent runtime changes"
+        },
+        {
+          "runId": "38131370706",
+          "commit": "370e584c60a0bc5d66e5fbacb82f344230a196c3",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Integrated minimized nodes, bounded ledger-backed batch dispatch, production letter task-class routing and default-off critique, all 58 browser cases per OS lane; Windows rerun after initial Chromium ERR_NO_BUFFER_SPACE. Excludes later migration-18 discovery and preparation-control hardening."
         }
       ],
       "acceptanceTests": ["T12", "T30"],
-      "nextAction": "P12-01",
+      "nextAction": null,
       "evidence": [
         "docs/plans/P12-bounded-agents.md",
         "docs/evidence/P12-preparation-foundations.md",

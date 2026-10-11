@@ -66,7 +66,13 @@ final-submission authority through the opt-in.
 All six safety/default-off gates now have green cross-platform evidence from
 the two preceding milestones, including run 38100030249 at
 `ec192530569cbc4e8e9b114743589b56d18cdca5`. The newer workflow integration
-tickets and phase remain verification-pending. Focused routing/runtime verification:
+tickets are now complete on CI 38131370706 at
+`370e584c60a0bc5d66e5fbacb82f344230a196c3`: Windows, Ubuntu and PostgreSQL
+passed, including all 58 desktop/mobile browser cases per OS lane. Windows
+passed on the failed-lane rerun after an initial Chromium `ERR_NO_BUFFER_SPACE`
+in the mock adapter test; the installer/lifecycle correction itself passed.
+This closes P12, not later discovery, preparation-control or P13 requirements.
+Focused routing/runtime verification:
 71 passed, 19 PostgreSQL skipped, seven files. Full milestone results and
 phase closure are recorded only after actual verification in the handoff.
 

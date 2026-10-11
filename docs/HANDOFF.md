@@ -999,3 +999,23 @@ P18 is not complete: logged-in permission-bound session consumption, operational
 are still open. No real inference, employer submission, Gmail consent, private
 runtime migration, Windows task installation or 24/72-hour soak was performed.
 No background Codex coding continuation was created.
+
+## 2026-10-11: P12 Phase Complete
+
+CI 38131370706 is green at `370e584c60a0bc5d66e5fbacb82f344230a196c3`.
+Windows passed on attempt two after the initial Chromium buffer-space failure;
+Ubuntu and PostgreSQL passed on the first attempt. Both OS lanes passed all
+58 desktop/mobile browser workflows. The integrated minimized-node, batch,
+task-scoped routing and mandatory worker-letter tickets now close alongside
+the previously verified bounds, checkpoint and synthetic ablation gates.
+
+P12 is complete. Counts: 12/19 phases, 86/128 gates. This is not a live-model
+quality claim: optional generic graph/batch dispatch and critique remain off
+by default because the measured synthetic variant showed no quality gain.
+No agent acquires final-submission authority. P13 and P18 remain open.
+
+Discovery milestone `200a4af36121a4366598ced56b3758da2eec82aa` has its own
+pending CI run 38132000459. Preparation-control hardening is under development
+and is not covered by the P12 closure SHA. Continue with policy-bound shared
+form preparation and independent Windows operation/soak engineering; do not
+wait for unavailable private Gmail consent or genuine application receipts.
