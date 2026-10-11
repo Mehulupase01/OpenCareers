@@ -39,3 +39,8 @@ passes packet validation, unknown-answer blocking, compiled API/dashboard
 readiness, manager exit zero and absence of both worker PIDs after stop.
 Public-source scan passes 383 files. The new draft bundle's SHA-256 is
 c28be86ec60126815f99ad292b40d56cd3b5a38631f0bf36b0c7a8ae0681f129.
+
+Successor CI [38155284587](https://github.com/Mehulupase01/OpenCareers/actions/runs/38155284587)
+at 97ecc898a16762fe7abb52c764f942a55f3bddaf passed Windows, Ubuntu and PostgreSQL,
+including Windows preflight, production-only clean installation and browser
+regressions. This supersedes the failed runner result, not the open OS/soak gates.

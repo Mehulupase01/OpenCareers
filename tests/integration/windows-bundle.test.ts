@@ -21,6 +21,10 @@ describe("Windows runtime bundle", () => {
       "scripts/windows-runtime.ps1",
       "scripts/windows-startup-host.ps1",
       "dist/scripts/runtime.js",
+      "dist/scripts/release-smoke.js",
+      "dist/scripts/release-smoke-run.js",
+      "dist/scripts/capacity-fixture.js",
+      "dist/tests/fixtures/document-packets.js",
       "dist/apps/api/src/main.js",
       "dist/apps/worker/src/main.js",
       "dist/packages/contracts/src/index.js",
@@ -93,6 +97,7 @@ describe("Windows runtime bundle", () => {
     expect(JSON.parse(files.get("package.json")?.toString() ?? "{}").scripts).toEqual({
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
+      "self-test": "node dist/scripts/release-smoke.js",
     });
     const again = await buildWindowsBundle(root);
     output.push(again.directory);

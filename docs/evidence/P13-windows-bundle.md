@@ -58,3 +58,12 @@ final opt-in installation also passes, including manager exit zero and both
 owned API/worker PIDs gone after authenticated stop. Public-source scan passes
 380 files; production dependency audit reports no known vulnerabilities. This
 does not diagnose the BSOD or establish the OS crash/startup acceptance gate.
+
+## Successor CI Verification
+
+CI [38155284587](https://github.com/Mehulupase01/OpenCareers/actions/runs/38155284587)
+at 97ecc898a16762fe7abb52c764f942a55f3bddaf passed Windows, Ubuntu and PostgreSQL.
+Windows completed the mandatory production-only clean-install test, packet
+validation, compiled runtime/dashboard boot, graceful parent/child shutdown
+and browser regressions. No installed logon task, hardware drill, long soak
+or live receipt is implied. The later packaged self-test is separate evidence.

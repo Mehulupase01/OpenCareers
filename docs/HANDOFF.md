@@ -1309,3 +1309,24 @@ subsequent relaunch was rejected by execution policy. It is currently stopped;
 do not claim a live preview or retry a blocked launch through another mechanism.
 The synthetic DB remains available; private 4317/4318 and owner configs remain
 untouched. No logon task, live application, private model call or long soak ran.
+
+## 2026-10-11: Packaged Guarded Mock Workflow
+
+CI 38155284587 at 97ecc898a16762fe7abb52c764f942a55f3bddaf is now all green:
+Windows, Ubuntu and PostgreSQL, including Windows production-only clean install
+and browser regressions. P13 remote evidence records its bounded scope.
+
+The successor Windows bundle ships a no-argument compiled release-smoke command
+using the existing guarded capacity fixture and one synthetic document fixture.
+It ignores owner environment settings, creates fresh isolated synthetic SQLite,
+and verifies normal dispatch, lost-response read-only reconciliation and changed
+question blocking. Exactly two mock receipts/attempts, zero unresolved outcomes
+and no browser resources remain. It does not perform discovery, live matching,
+LLM generation or real submissions. See docs/evidence/P17-packaged-workflow.md.
+
+Sequential pnpm check: 636 passed / 217 skipped in 82 files, lint/types/ledger/
+build. Opt-in extracted production installation passes 1/1, including the new
+compiled workflow, refusal of target overrides, packet checks, API/dashboard
+boot and manager/child drain. Public scan: 387 files. Successor CI is pending.
+No phase/gate closes: 12/19 and 89/128. Private services remain untouched and
+the policy-blocked preview remains stopped. Do not bypass its blocked relaunch.

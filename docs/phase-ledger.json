@@ -1639,6 +1639,12 @@
           "commit": "53fb044be18853132739d361362c9ce7b689be46",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Capacity/stop TEMP alias corrections, guarded stop and read-only uncertain-outcome reconciliation, complete desktop/mobile stop/pause sequence and isolated Windows host; closes G5, not clean bundle, installed startup, hardware drills, soak or live ramp."
+        },
+        {
+          "runId": "38155284587",
+          "commit": "97ecc898a16762fe7abb52c764f942a55f3bddaf",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Bounded periodic writes, Windows preflight and production-only bundle installation with compiled packet generation, runtime startup and parent/child drain. Not the successor packaged mock workflow, installed logon startup, hardware drills, real-duration soaks or live ramp; no additional gate closure."
         }
       ],
       "acceptanceTests": ["T20", "T25"],
@@ -1975,7 +1981,10 @@
           "text": "Release package. Produce versioned Windows and server artifacts, checksums, release notes, migration instructions, and a rollback plan that preserves the application ledger or disables commits until reconciled.",
           "status": "in_progress",
           "acceptanceTests": [],
-          "evidence": ["docs/evidence/P13-windows-bundle.md"],
+          "evidence": [
+            "docs/evidence/P13-windows-bundle.md",
+            "docs/evidence/P17-packaged-workflow.md"
+          ],
           "nextAction": "P17-01"
         },
         {
@@ -2064,7 +2073,11 @@
       "remoteVerification": [],
       "acceptanceTests": [],
       "nextAction": "P17-01",
-      "evidence": ["docs/plans/P17-release-handoff.md", "docs/evidence/P13-windows-bundle.md"]
+      "evidence": [
+        "docs/plans/P17-release-handoff.md",
+        "docs/evidence/P13-windows-bundle.md",
+        "docs/evidence/P17-packaged-workflow.md"
+      ]
     },
     {
       "id": "P18",

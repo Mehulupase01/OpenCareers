@@ -83,6 +83,41 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     expect(packet.kinds).toEqual(
       expect.arrayContaining(["cv_pdf", "cv_docx", "letter_pdf", "letter_docx"]),
     );
+    const smoke = await execute(process.execPath, ["dist/scripts/release-smoke.js"], {
+      cwd: installation,
+      env: {
+        ...environment(),
+        AUTOPILOT_PROFILE: "local",
+        AUTOPILOT_DATA_DIR: "must-not-open-this-existing-private-path",
+        AUTOPILOT_DATABASE_URL: "must-not-connect-to-this-private-database",
+        AUTOPILOT_EXTERNAL_SUBMISSION: "true",
+      },
+      timeout: 60000,
+      maxBuffer: 1024 * 1024,
+    });
+    const workflow = JSON.parse(smoke.stdout.trim());
+    expect(workflow).toMatchObject({
+      status: "passed",
+      confirmedWithReceipt: 2,
+      attempts: 2,
+      unresolvedOutcomes: 0,
+      browserResourcesReleased: true,
+      realSubmissions: false,
+      realModelCalls: false,
+      productionReleaseAccepted: false,
+      scenarios: [
+        { scenario: "standard", outcome: "confirmed" },
+        { scenario: "response-loss", outcome: "reconciled_confirmed" },
+        { scenario: "changed-question", outcome: "needs_input" },
+      ],
+    });
+    await expect(
+      execute(process.execPath, ["dist/scripts/release-smoke.js", "--target", "external"], {
+        cwd: installation,
+        env: environment(),
+        timeout: 10000,
+      }),
+    ).rejects.toMatchObject({ code: 1 });
     const socket = createServer();
     await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
     const address = socket.address();
@@ -183,6 +218,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
           unknownAnswerStatus: packet.unknownAnswerStatus,
           compiledRuntimeReady: true,
           compiledDashboardServed: true,
+          guardedMockWorkflow: workflow,
           gracefullyStopped: true,
           realSubmissions: false,
           installedLogonTaskVerified: false,

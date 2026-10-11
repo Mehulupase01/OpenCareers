@@ -58,8 +58,12 @@ its exit status. Actual installed-task/reboot verification remains open; see
 `corepack pnpm bundle:windows` rebuilds a checksummed, precompiled runtime ZIP
 in a fresh temporary directory. Its `INSTALL.md` describes production-only
 dependency installation and guarded startup. Private data and dependencies are
-not bundled. Clean synthetic boot and packet generation are tested; this is
-not yet an accepted final release. See [bundle evidence](docs/evidence/P13-windows-bundle.md).
+not bundled. After installation, `node dist/scripts/release-smoke.js` runs a
+fresh, bounded mock-only workflow with guarded receipts, lost-response
+reconciliation and ambiguous-form blocking. It ignores private profile settings
+and accepts no target overrides. This is not yet an accepted final release.
+See [bundle evidence](docs/evidence/P13-windows-bundle.md) and
+[packaged workflow evidence](docs/evidence/P17-packaged-workflow.md).
 
 Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
 for mobile, and never reuse an existing server. Override them with

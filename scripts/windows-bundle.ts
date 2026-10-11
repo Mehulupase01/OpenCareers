@@ -15,6 +15,10 @@ const required = [
   "scripts/windows-runtime.ps1",
   "scripts/windows-startup-host.ps1",
   "dist/scripts/runtime.js",
+  "dist/scripts/release-smoke.js",
+  "dist/scripts/release-smoke-run.js",
+  "dist/scripts/capacity-fixture.js",
+  "dist/tests/fixtures/document-packets.js",
   "dist/apps/api/src/main.js",
   "dist/apps/worker/src/main.js",
   "dist/web/index.html",
@@ -76,6 +80,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
     scripts: {
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
+      "self-test": "node dist/scripts/release-smoke.js",
     },
   };
   files.set("package.json", Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));
@@ -95,6 +100,13 @@ From the extracted directory:
 
     corepack pnpm install --prod --frozen-lockfile
     corepack pnpm exec playwright install chromium
+
+Then run node dist/scripts/release-smoke.js. This bounded self-test accepts no
+options, ignores private environment configuration and creates fresh synthetic
+storage. It verifies two guarded mock receipts, lost-response reconciliation,
+ambiguous-form blocking and browser cleanup. It does not call an LLM, discover
+live jobs, apply to employers or qualify as a production soak. Its matching and
+letters are explicitly synthetic fixtures, not live inference evidence.
 
 The default start is synthetic demo mode; it cannot apply to real employers.
 Use node dist/scripts/runtime.js start with a clean environment and no private
