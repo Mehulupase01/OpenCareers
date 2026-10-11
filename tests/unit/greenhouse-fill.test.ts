@@ -67,6 +67,50 @@ describe("Greenhouse synthetic fill", () => {
 
   const approved = { question_123: "Synthetic reviewed answer.", consent: true };
 
+  it("rereads earlier controls when a later input changes them", async () => {
+    await page.evaluate(() => {
+      document.querySelector("#consent")?.addEventListener("input", () => {
+        const first = document.querySelector<HTMLInputElement>("#first_name");
+        if (first) first.value = "Synthetic parser overwrite";
+      });
+    });
+    const snapshot = await inspectGreenhouseForm(page, target);
+    const plan = planGreenhouseFields(snapshot, packet, approved);
+    const report = await fillGreenhouseForm(page, target, snapshot, plan, packet, cvPdf);
+    expect(report.status).toBe("unsupported");
+    expect(report.readBack.find((entry) => entry.name === "first_name")?.matches).toBe(false);
+    expect(report.issues).toContain("Greenhouse read-back mismatch: first_name");
+    expect(blocked).toBe(0);
+    await page.context().close();
+  });
+
+  it("rechecks a supplied production guard before every field and stops after revocation", async () => {
+    const snapshot = await inspectGreenhouseForm(page, target);
+    snapshot.jobId = packet.manifest.jobId;
+    const plan = planGreenhouseFields(snapshot, packet, approved);
+    let calls = 0;
+    await expect(
+      fillGreenhouseForm(
+        page,
+        target,
+        snapshot,
+        plan,
+        packet,
+        cvPdf,
+        async (_current, approvedPlan) => {
+          if (++calls === 3) throw new Error("Synthetic standing authority revoked.");
+          return approvedPlan;
+        },
+      ),
+    ).rejects.toThrow("approval");
+    expect(await page.locator("#first_name").inputValue()).toBe(
+      packet.content.cv.identity.fullName.split(" ")[0],
+    );
+    expect(await page.locator("#last_name").inputValue()).toBe("");
+    expect(blocked).toBe(0);
+    await page.context().close();
+  });
+
   it("rejects an invalid or wrong-posting packet before filling", async () => {
     const snapshot = await inspectGreenhouseForm(page, target);
     const plan = planGreenhouseFields(snapshot, packet, approved);

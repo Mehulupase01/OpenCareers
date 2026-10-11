@@ -52,7 +52,9 @@ records in the same transaction as existing listing freshness transitions.
   Final runner suite: 10 passed / 10 PostgreSQL skipped. Final spacing/capacity
   suite before the runner addition: 11 passed / 11 skipped. All 58 desktop/mobile
   browser cases passed. Public scan passed 356 files before this final evidence
-  addition; production dependency audit was clean. Remote milestone CI is pending.
+  addition; production dependency audit was clean. CI 38132000459 at
+  `200a4af36121a4366598ced56b3758da2eec82aa` passed all three lanes: 589 tests
+  plus all 58 browsers on each OS lane, and 464 PostgreSQL integration tests.
 
 No real board reads, private configuration, live inference or employer writes
 were needed for this milestone. P18-G3 remains open: these tests do not establish

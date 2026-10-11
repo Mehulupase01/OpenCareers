@@ -10,7 +10,7 @@ import {
 } from "../../contracts/src/browser.js";
 import type { BrowserSessionState } from "../../contracts/src/browser-session.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
-import { type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
+import { assertGuardedPlan, type FormAnswerGuard, packetEvidenceGuard } from "./answer-guard.js";
 import { fillAndReadNativeControl, installReadOnlyFormRoutes } from "./form-controls.js";
 import {
   type GreenhouseTarget,
@@ -113,14 +113,17 @@ export async function fillGreenhouseForm(
   plan: FieldPlan,
   packet: PacketSnapshot,
   cvPdf: Buffer,
+  validateAnswers?: FormAnswerGuard,
 ): Promise<FillReport> {
   const cv = packetCv(target, packet, cvPdf);
   const current = await inspectGreenhouseForm(page, target);
+  current.jobId = packet.manifest.jobId;
   if (snapshot.blocker !== "none" || current.blocker !== "none")
     throw new Error("Greenhouse form is blocked; filling is not permitted.");
   if (current.fingerprint !== snapshot.fingerprint || plan.fingerprint !== snapshot.fingerprint)
     throw new Error("Greenhouse form changed after planning.");
   if (plan.unresolved.length) throw new Error("Greenhouse plan has unresolved fields.");
+  if (validateAnswers) await assertGuardedPlan(validateAnswers, current, plan);
   const byName = new Map(snapshot.fields.map((field) => [field.name, field]));
   const names = new Set<string>();
   for (const entry of plan.entries) {
@@ -156,6 +159,11 @@ export async function fillGreenhouseForm(
   const issues: string[] = [];
   let uploadStatus: FillReport["uploadStatus"] = "idle";
   for (const entry of plan.entries) {
+    const before = await inspectGreenhouseForm(page, target);
+    if (before.blocker !== "none" || before.fingerprint !== snapshot.fingerprint)
+      throw new Error("Greenhouse form changed during filling.");
+    before.jobId = packet.manifest.jobId;
+    if (validateAnswers) await assertGuardedPlan(validateAnswers, before, plan);
     const field = byName.get(entry.name);
     if (!field) throw new Error("Greenhouse plan does not match the inspected controls.");
     const control = form.locator(`[id="${entry.name}"]`);
@@ -196,8 +204,43 @@ export async function fillGreenhouseForm(
     if (!matches) issues.push(`Greenhouse read-back mismatch: ${entry.name}`);
   }
   const after = await inspectGreenhouseForm(page, target);
+  after.jobId = packet.manifest.jobId;
+  if (validateAnswers) await assertGuardedPlan(validateAnswers, after, plan);
   if (after.fingerprint !== snapshot.fingerprint || after.blocker !== "none")
     issues.push("Greenhouse form changed during filling.");
+  for (const entry of readBack) {
+    const field = byName.get(entry.name);
+    if (!field) throw new Error("Greenhouse control disappeared before final read-back.");
+    const control = form.locator(`[id="${entry.name}"]`);
+    if (field.kind === "file") {
+      const selected = await control.evaluate(async (element) => {
+        const file = (element as HTMLInputElement).files?.[0];
+        return file
+          ? { name: file.name, bytes: Array.from(new Uint8Array(await file.arrayBuffer())) }
+          : null;
+      });
+      entry.actual = selected?.name ?? "";
+      entry.matches =
+        entry.actual === entry.expected &&
+        selected !== null &&
+        createHash("sha256").update(Buffer.from(selected.bytes)).digest("hex") === cv.sha256;
+      if (!entry.matches) uploadStatus = "failed";
+    } else {
+      entry.actual =
+        field.kind === "checkbox" ? await control.isChecked() : await control.inputValue();
+      entry.matches = entry.actual === entry.expected;
+    }
+    const valid = await control.evaluate((element) =>
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLSelectElement ||
+      element instanceof HTMLTextAreaElement
+        ? element.validity.valid
+        : false,
+    );
+    entry.matches = entry.matches && valid;
+    if (!entry.matches && !issues.includes(`Greenhouse read-back mismatch: ${entry.name}`))
+      issues.push(`Greenhouse read-back mismatch: ${entry.name}`);
+  }
   return fillReportSchema.parse({
     snapshot,
     status: uploadStatus === "failed" ? "upload_failed" : issues.length ? "unsupported" : "ready",
@@ -244,7 +287,7 @@ export async function prepareGreenhousePacket(
     );
     const fillReport =
       snapshot.blocker === "none" && !plan.unresolved.length && !blockedWriteCount
-        ? await fillGreenhouseForm(page, target, snapshot, plan, packet, cvPdf)
+        ? await fillGreenhouseForm(page, target, snapshot, plan, packet, cvPdf, validateAnswers)
         : undefined;
     return greenhousePreparationResult(
       target,

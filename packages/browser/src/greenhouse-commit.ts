@@ -102,7 +102,15 @@ export async function commitGreenhousePacket(
       current,
       plan,
     );
-    const report = await fillGreenhouseForm(page, target, current, checked, packet, cvPdf);
+    const report = await fillGreenhouseForm(
+      page,
+      target,
+      current,
+      checked,
+      packet,
+      cvPdf,
+      options.validateAnswers ?? packetEvidenceGuard(packet),
+    );
     if (
       report.status !== "ready" ||
       report.uploadStatus !== "selected" ||

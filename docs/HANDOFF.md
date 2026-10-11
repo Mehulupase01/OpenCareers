@@ -1019,3 +1019,38 @@ pending CI run 38132000459. Preparation-control hardening is under development
 and is not covered by the P12 closure SHA. Continue with policy-bound shared
 form preparation and independent Windows operation/soak engineering; do not
 wait for unavailable private Gmail consent or genuine application receipts.
+
+## 2026-10-11: Verified Discovery And Preparation Controls
+
+Discovery CI 38132000459 is green at `200a4af36121a4366598ced56b3758da2eec82aa`:
+589 unit/integration tests and all 58 browser cases on both Windows and Ubuntu;
+464 PostgreSQL integration tests. This is public-read checkpoint engineering,
+not newly granted job-board permission or operational 20-board coverage.
+
+P13-G1 closes on the previously verified real compiled application's detached
+parent-exit test in CI 38131370706. It establishes editor/Codex-independent
+operation, not an installed startup task, reboot or completed P13 phase.
+Counts: 12/19 phases and 87/128 gates; seven phases remain.
+
+Preparation safety now checks stop and preparation pause through the canonical
+answer guard. Production Greenhouse passes the guard before each field and
+after inspection; final reread checks earlier values, native validity and exact
+CV bytes. Stop/cancel is not misclassified as adapter form drift. Unrelated
+discovery/submission pauses remain separate. See the new section in
+`docs/evidence/P18-shared-form-core.md`. No extra submission engine or generic
+final-click capability was introduced.
+
+Full local check before final error-classification cases: 595 passed / 204
+PostgreSQL skipped, 72 files; lint/types/ledger/build passed. Final focused suite:
+37 passed, five files. Do not claim a full-local 598 result. This hardening needs
+its own remote CI. Previous all-58 local browser evidence predates the new
+control/final-readback changes; successor CI verifies their browser compatibility.
+Private services, secrets, owner CV/profile/policy, OAuth and Windows tasks were
+untouched. No real applications or real-duration soaks ran.
+
+Next implementation: origin/policy-bound shared-form preparation persistence
+and operator API/UI, keeping preparation-only readiness distinct from authorized
+final-submission readiness. Then extend supported family adapters and coverage
+catalog without counting permission-blocked/planned entries as operational.
+Continue independent P13 scheduling/capacity/installation work; genuine P08
+receipt, Gmail consent, P13 live ramp and real 24/72-hour soaks remain open.

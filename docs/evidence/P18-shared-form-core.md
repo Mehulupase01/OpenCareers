@@ -41,3 +41,27 @@ preparation persistence/exception views. This primitive is not registered as a
 SubmissionAdapter and cannot make arbitrary portals submit-capable. Files,
 multi-step navigation, custom controls and sensitive answers require separately
 reviewed variants, not relaxation of the generic low-risk mapper.
+
+## Preparation Guard Hardening
+
+2026-10-11. The canonical database answer guard now rejects emergency stop and
+preparation pause before another fill. Submission-only and discovery-only pause
+remain independent; already-dispatched actions are not claimed recalled.
+Restore quarantine and current packet/profile/authorization checks remain.
+
+Production Greenhouse preparation and guarded commit pass that canonical guard
+through the low-level fill driver. It reinspects structure and rechecks authority
+before every field and after inspection, then rereads all controls, native
+validity and exact CV bytes before reporting readiness. Later script overwrites
+of earlier values cannot survive as stale successful readback. Low-level fixture
+calls cannot establish database authority; no generic submission adapter is added.
+
+Owner stop/cancellation errors retain their control classification rather than
+becoming adapter form drift and quarantining an otherwise unchanged family.
+Changed answer approval remains fail-closed form drift. Regressions cover a
+mid-fill guard revocation, later-input overwrite, all four independent control
+settings and guard-error classification. Full local check before the final
+classification cases: 595 passed / 204 PostgreSQL skipped, 72 files, build/lint/
+types/ledger passed. Final focused suite: 37 passed across five files.
+Remote hardening CI still needs recording after push. P18-G2 remains in progress
+until policy/API/persistence/operator integration is complete.

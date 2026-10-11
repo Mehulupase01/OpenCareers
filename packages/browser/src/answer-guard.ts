@@ -1,6 +1,6 @@
 import type { FieldPlan, FormSnapshot } from "../../contracts/src/browser.js";
 import type { PacketSnapshot } from "../../contracts/src/documents.js";
-import { FormDriftError } from "../../contracts/src/index.js";
+import { DomainError, FormDriftError } from "../../contracts/src/index.js";
 
 export type FormAnswerGuard = (snapshot: FormSnapshot, plan: FieldPlan) => Promise<FieldPlan>;
 
@@ -47,7 +47,9 @@ export async function assertGuardedPlan(
     )
       throw new Error("Answer approval changed before filling.");
     return checked;
-  } catch {
+  } catch (error) {
+    if (error instanceof DomainError && ["POLICY_REVOKED", "TASK_CANCELLED"].includes(error.code))
+      throw error;
     throw new FormDriftError(
       "OTHER_FORM_CHANGED",
       "Current canonical approval does not support the prepared form answers.",

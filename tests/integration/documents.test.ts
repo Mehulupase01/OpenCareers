@@ -879,6 +879,42 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(checked.entries.map((entry) => entry.semanticKey)).toEqual(["cv"]);
         expect(checked.unresolved).toContain("full_name");
       });
+      it.each([
+        { control: { stopped: true }, blocked: true },
+        { control: { preparationPaused: true }, blocked: true },
+        { control: { submissionsPaused: true }, blocked: false },
+        { control: { discoveryPaused: true }, blocked: false },
+      ])(
+        "checks current $control before another preparation fill",
+        async ({ control, blocked }) => {
+          await seedProfileFacts();
+          const packet = await documents.savePacket(
+            await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+          );
+          const candidates = new CandidateRepository(
+            db,
+            owner,
+            () => new Date("2026-09-17T09:00:00.000Z"),
+          );
+          const result = readyBrowserResult(packet);
+          const snapshot = result.snapshots[0];
+          const plan = result.plans[0];
+          if (!snapshot || !plan) throw new Error("Missing synthetic identity plan.");
+          await candidates.validateFormPlan(packet, snapshot, plan);
+          await candidates.setControl(control);
+          if (blocked)
+            await expect(candidates.validateFormPlan(packet, snapshot, plan)).rejects.toMatchObject(
+              { code: "POLICY_REVOKED" },
+            );
+          else
+            expect(
+              (await candidates.validateFormPlan(packet, snapshot, plan)).entries,
+            ).toHaveLength(2);
+          expect(await db.query("SELECT * FROM attempts WHERE owner_id=$1", [owner])).toHaveLength(
+            0,
+          );
+        },
+      );
 
       it("excludes an approved answer that is scoped to a different employer", async () => {
         const evidenceFact = await new CandidateRepository(

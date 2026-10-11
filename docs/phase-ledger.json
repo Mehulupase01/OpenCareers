@@ -1552,7 +1552,7 @@
         {
           "id": "P13-G1",
           "requirement": "Closing Codex does not stop the application runtime.",
-          "status": "code_complete_verification_pending",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P13-runtime-foundation.md",
             "tests/integration/worker-lifecycle.test.ts"
@@ -1600,8 +1600,15 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "370e584c60a0bc5d66e5fbacb82f344230a196c3",
+      "remoteVerification": [
+        {
+          "runId": "38131370706",
+          "commit": "370e584c60a0bc5d66e5fbacb82f344230a196c3",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Compiled API/scheduler outlive their detached parent and recover from a killed scheduler; G1 runtime independence only, not installed startup, OS reboot, sleep/network drills, soak or live ramp."
+        }
+      ],
       "acceptanceTests": ["T20", "T25"],
       "nextAction": "P13-01",
       "evidence": [
@@ -2032,7 +2039,7 @@
         "status": "not_required",
         "note": "Every gate in this phase is satisfiable against synthetic fixtures and dated read-only public reads. No live employer write is required for any P18 gate."
       },
-      "lastVerifiedCommit": null,
+      "lastVerifiedCommit": "200a4af36121a4366598ced56b3758da2eec82aa",
       "nextAction": "P18-01",
       "evidence": [
         "docs/plans/P18-owner-sources-hosted-forms.md",
@@ -2045,7 +2052,14 @@
         "docs/evidence/P18-teamtailor-discovery.md"
       ],
       "acceptanceTests": ["T03", "T31", "T32"],
-      "remoteVerification": [],
+      "remoteVerification": [
+        {
+          "runId": "38132000459",
+          "commit": "200a4af36121a4366598ced56b3758da2eec82aa",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Bounded resumable public polling, SIGKILL checkpoint recovery, complete-only ingest and 58 browser cases per OS lane; excludes logged-in ingestion, 20-source operational breadth and later preparation-control hardening."
+        }
+      ],
       "gates": [
         {
           "id": "P18-G1",

@@ -731,8 +731,12 @@ export class CandidateRepository extends Repository {
         "Reconcile the previous action before filling again.",
       );
     const control = await this.readControl(tx);
-    if (control.restoreBlocked || (commit && (control.stopped || control.submissionsPaused)))
-      throw new DomainError("POLICY_REVOKED", "Restore review prohibits browser preparation.");
+    if (
+      control.restoreBlocked ||
+      control.stopped ||
+      (commit ? control.submissionsPaused : control.preparationPaused)
+    )
+      throw new DomainError("POLICY_REVOKED", "Current controls prohibit this browser action.");
     const currentFacts = await this.facts(tx);
     const profile = json<ProfileSnapshot>(row, "profile_data");
     const today = this.now().slice(0, 10);

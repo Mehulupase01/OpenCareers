@@ -57,7 +57,10 @@ also corrected script initialization and isolated OS-environment handling.
 Final full-suite, browser and CI results are recorded at the milestone in the
 handoff: frozen 577/189 skipped, 70 files and all 58 browser cases; final
 handshake/diagnostic hardening passed 22 focused lifecycle/API tests. Successor
-CI remains pending. G1 is verification-pending, not a completed P13 phase. Real shutdown
+CI 38131370706 at `370e584c60a0bc5d66e5fbacb82f344230a196c3` is green on
+Windows, Ubuntu and PostgreSQL. The real compiled application remains healthy
+after its detached parent exits; this closes G1 runtime independence, not the
+P13 phase or installation/reboot requirements. Real shutdown
 recovery of ambiguous submission outcomes is also covered by existing guarded
 engine tests, not represented as a genuine employer submission.
 
