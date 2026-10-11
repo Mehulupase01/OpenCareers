@@ -104,6 +104,61 @@ for (const engine of ["sqlite", "postgres"] as const)
         );
         expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(5);
       });
+      it("caps active runs and expires abandoned pure work before admitting replacements", async () => {
+        let clock = Date.now();
+        const bounded = new GraphRepository(db, owner, () => new Date(clock));
+        for (let i = 0; i < 6; i++) await bounded.start(agentBinding(), agentBudget);
+        await expect(bounded.start(agentBinding(), agentBudget)).rejects.toMatchObject({
+          code: "MODEL_QUOTA_EXHAUSTED",
+        });
+        clock += agentBudget.wallTimeMs;
+        await expect(bounded.start(agentBinding(), agentBudget)).resolves.toEqual(
+          expect.any(String),
+        );
+        expect(
+          (
+            await db.query(
+              "SELECT COUNT(*) AS count FROM graph_runs WHERE owner_id=$1 AND state='failed'",
+              [owner],
+            )
+          )[0]?.count,
+        ).toEqual(engine === "postgres" ? "6" : 6);
+      });
+      it("prunes only old terminal graph records and preserves checkpoint evidence", async () => {
+        await graph.checkpoint(agentBinding(), graphDigest(agentNode), agentOutput);
+        await db.transaction(async (tx) => {
+          for (let i = 0; i < 1002; i++) {
+            const id = `old-${String(i).padStart(4, "0")}`;
+            await tx.query(
+              "INSERT INTO graph_runs(owner_id,id,binding,budget,state,started_at,ended_at) VALUES($1,$2,$3,$4,'completed',$5,$5)",
+              [
+                owner,
+                id,
+                JSON.stringify(agentBinding()),
+                JSON.stringify(agentBudget),
+                "2026-01-01T00:00:00.000Z",
+              ],
+            );
+            await tx.query(
+              "INSERT INTO graph_nodes(owner_id,run_id,ordinal,kind,state,token_cap,request_cap) VALUES($1,$2,1,'extractor','completed',1000,1)",
+              [owner, id],
+            );
+          }
+        });
+        await graph.start(agentBinding(), agentBudget);
+        expect(
+          (await db.query("SELECT COUNT(*) AS count FROM graph_runs WHERE owner_id=$1", [owner]))[0]
+            ?.count,
+        ).toEqual(engine === "postgres" ? "1001" : 1001);
+        expect(
+          (
+            await db.query("SELECT COUNT(*) AS count FROM graph_nodes WHERE owner_id=$1", [owner])
+          )[0]?.count,
+        ).toEqual(engine === "postgres" ? "1000" : 1000);
+        expect(await graph.cached(agentBinding(), graphDigest(agentNode), "extractor")).toEqual(
+          agentOutput,
+        );
+      });
       it("reuses only compatible pure checkpoints across fresh run IDs", async () => {
         let calls = 0;
         const handler = async () => {

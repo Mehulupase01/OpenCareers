@@ -303,8 +303,14 @@ export class MatchingRunner {
   }
 
   async run(limit = 5) {
+    const paused = async () => {
+      const control = await this.repo.getControl();
+      return control.preparationPaused || control.stopped || control.restoreBlocked;
+    };
+    if (await paused()) return;
     await this.route();
     for (const jobId of await this.repo.pendingJobIds(limit)) {
+      if (await paused()) return;
       try {
         await this.assess(jobId);
       } catch (error) {

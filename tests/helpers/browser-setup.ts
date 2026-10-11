@@ -73,7 +73,16 @@ export async function ensureListing(page: Page): Promise<Listing> {
     })) as { source?: { id: string } } & { id: string };
     source = { id: (created.source ?? created).id, company };
   }
-  await json(`/v1/discovery/sources/${source.id}/poll`, { acknowledgeQuality: true });
+  try {
+    await json(`/v1/discovery/sources/${source.id}/poll`, { acknowledgeQuality: true });
+  } catch (error) {
+    // Creating a source can let the scheduler poll before this manual request.
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes("returned 429: Manual polls must be at least one minute apart.")
+    )
+      throw error;
+  }
 
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {

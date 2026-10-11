@@ -865,3 +865,27 @@ critic/repair, measured routing, held-out ablation and retention. Counts remain
 services and secrets untouched. No overnight follow-up was created: host
 automation tooling was unavailable; do not assume coding continues after the
 active session ends. Owned synthetic preview remains at 127.0.0.1:14324.
+
+## 2026-10-11: P12 Gateway And Reviewed Letter Workflow
+
+Implemented a reviewed-fact/minimized pure node gateway, allocation-backed
+critic/repair and cancellation through catalogue, endpoint and POST requests.
+`LetterDraftRunner.draftWithCritique` performs bounded draft/critique/one repair
+and independent packet validation; valid synthetic results render five local
+artifacts through the existing factory. Normal mandatory LLM drafting remains
+the worker default; graph/review variants remain disabled pending evaluation.
+See `docs/evidence/P12-letter-review.md` for tests and limits. Frozen code checks:
+546 passed / 179 PostgreSQL skipped, 66 files; focused workflow: 29 / 11 skipped.
+
+Foundation CI 38097596542 passed PostgreSQL and all code checks, but both browser
+lanes failed matching quota expectations (56/58 passed each). New triage caps
+were genuinely exhausted; tests now verify exact deferral evidence and keep
+the successful path. Listing fixture waits for an already-started poll instead
+of bypassing its cadence rule. Successor full browser/CI results still need
+recording. No P12 phase or gate is falsely closed. Remaining P12: measured
+task routing, ablation and production orchestration integration. Subsequent
+verification passes all 58 desktop/mobile browser cases. It exposed and fixed
+background matching ignoring preparation pause; regression tests also cover
+emergency stop and restore quarantine. Graph storage now caps six active runs,
+expires abandoned work, and retains 1,000 terminal runs and 1,000 checkpoints.
+Final frozen code verification passed; successor CI evidence still needs recording.

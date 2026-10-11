@@ -10,17 +10,53 @@ import {
   nodeOutputSchema,
 } from "../../contracts/src/agents.js";
 import { DomainError } from "../../contracts/src/index.js";
+import type { SqlExecutor } from "./database.js";
 import { OwnerScope } from "./owner-scope.js";
 
 export const graphDigest = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export class GraphRepository extends OwnerScope {
+  private async pruneTerminal(tx: SqlExecutor) {
+    const oldRuns =
+      "SELECT id FROM graph_runs WHERE owner_id=$1 AND state <> 'running' AND id NOT IN (SELECT id FROM graph_runs WHERE owner_id=$1 AND state <> 'running' ORDER BY ended_at DESC,id DESC LIMIT 1000)";
+    await tx.query(`DELETE FROM graph_nodes WHERE owner_id=$1 AND run_id IN (${oldRuns})`, [
+      this.ownerId,
+    ]);
+    await tx.query(`DELETE FROM graph_runs WHERE owner_id=$1 AND id IN (${oldRuns})`, [
+      this.ownerId,
+    ]);
+  }
+
   async start(bindingInput: GraphBinding, budgetInput: GraphRunBudget) {
     const binding = graphBindingSchema.parse(bindingInput);
     const budget = graphBudgetSchema.parse(budgetInput);
     const id = randomUUID();
     await this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
+      const running = await tx.query(
+        "SELECT id,budget,started_at FROM graph_runs WHERE owner_id=$1 AND state='running' ORDER BY started_at LIMIT 100",
+        [this.ownerId],
+      );
+      for (const run of running) {
+        const caps = graphBudgetSchema.parse(JSON.parse(String(run.budget)));
+        const elapsed = this.clock().getTime() - Date.parse(String(run.started_at));
+        if (elapsed < 0 || elapsed >= caps.wallTimeMs) {
+          await tx.query(
+            "UPDATE graph_runs SET state='failed',ended_at=$1 WHERE owner_id=$2 AND id=$3 AND state='running'",
+            [this.now(), this.ownerId, String(run.id)],
+          );
+          await this.audit(tx, String(run.id), "graph.expired", 1);
+        }
+      }
+      const count = (
+        await tx.query(
+          "SELECT COUNT(*) AS count FROM graph_runs WHERE owner_id=$1 AND state='running'",
+          [this.ownerId],
+        )
+      )[0];
+      if (Number(count?.count) >= 6)
+        throw new DomainError("MODEL_QUOTA_EXHAUSTED", "Active preparation run limit reached.");
+      await this.pruneTerminal(tx);
       await tx.query(
         "INSERT INTO graph_runs(owner_id,id,binding,budget,state,started_at) VALUES($1,$2,$3,$4,'running',$5)",
         [this.ownerId, id, JSON.stringify(binding), JSON.stringify(budget), this.now()],
@@ -165,6 +201,7 @@ export class GraphRepository extends OwnerScope {
       );
       if (!updated.length) throw new DomainError("REVISION_STALE", "Graph run is stale.");
       await this.audit(tx, runId, `graph.${state}`, 1);
+      await this.pruneTerminal(tx);
     });
   }
   async checkpoint(bindingInput: GraphBinding, inputHash: string, outputInput: NodeOutput) {

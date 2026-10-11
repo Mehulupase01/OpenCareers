@@ -71,7 +71,12 @@ export class OpenRouterTransport {
     const response = await this.fetcher(`https://openrouter.ai/api/v1${path}`, {
       ...init,
       redirect: "error",
-      signal: AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
+      signal: init?.signal
+        ? AbortSignal.any([
+            init.signal,
+            AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
+          ])
+        : AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         Accept: "application/json",
@@ -100,17 +105,18 @@ export class OpenRouterTransport {
     ) as unknown;
   }
 
-  catalogue() {
-    return this.call("/models");
+  catalogue(signal?: AbortSignal) {
+    return this.call("/models", { signal: signal ?? null });
   }
 
-  endpoints(model: string) {
+  endpoints(model: string, signal?: AbortSignal) {
     if (!/^[a-zA-Z0-9_.~-]+\/[a-zA-Z0-9_.~:-]+:free$/.test(model))
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Invalid free endpoint model.");
-    return this.call(`/models/${model}/endpoints`);
+    return this.call(`/models/${model}/endpoints`, { signal: signal ?? null });
   }
 
-  async complete(request: CompletionRequest): Promise<CompletionResponse> {
+  async complete(request: CompletionRequest, signal?: AbortSignal): Promise<CompletionResponse> {
+    signal?.throwIfAborted();
     const expected = providerPrivacy(
       request.model,
       request.provider.only[0] ?? "",
@@ -126,9 +132,14 @@ export class OpenRouterTransport {
         "MODEL_ROUTE_INELIGIBLE",
         "Completion requires an explicit route policy.",
       );
-    await verifyRequestRoute(request, this.routePolicy, this.privacyRevision, this);
+    await verifyRequestRoute(request, this.routePolicy, this.privacyRevision, {
+      catalogue: () => this.catalogue(signal),
+      endpoints: (model) => this.endpoints(model, signal),
+    });
+    signal?.throwIfAborted();
     const raw = (await this.call("/chat/completions", {
       method: "POST",
+      signal: signal ?? null,
       body: JSON.stringify(request),
     })) as {
       model?: unknown;

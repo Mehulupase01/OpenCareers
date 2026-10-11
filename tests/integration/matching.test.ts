@@ -123,6 +123,25 @@ for (const engine of ["sqlite", "postgres"] as const) {
           restarted.reserve("synthetic/model:free", "synthetic-provider", 3),
         ).rejects.toMatchObject({ code: "MODEL_QUOTA_EXHAUSTED" });
       });
+      it("does not start background inference while preparation, stop or restore controls are active", async () => {
+        await profileAndJob();
+        const runner = new MatchingRunner(matching, loadConfig({ AUTOPILOT_PROFILE: "demo" }));
+        for (const control of [
+          { preparationPaused: true, stopped: false, restoreBlocked: false },
+          { preparationPaused: false, stopped: true, restoreBlocked: false },
+          { preparationPaused: false, stopped: false, restoreBlocked: true },
+        ]) {
+          await db.query("UPDATE controls SET data=$1 WHERE owner_id=$2", [
+            JSON.stringify({ ...(await matching.getControl()), ...control }),
+            owner,
+          ]);
+          await runner.run();
+          expect((await matching.snapshot(50)).budget.used).toBe(0);
+          expect(
+            await db.query("SELECT id FROM match_assessments WHERE owner_id=$1", [owner]),
+          ).toEqual([]);
+        }
+      });
 
       it("binds reviewed provider evidence durably and replaces a strict cached route before sending", async () => {
         vi.setSystemTime(new Date("2026-10-09T12:00:00.000Z"));
