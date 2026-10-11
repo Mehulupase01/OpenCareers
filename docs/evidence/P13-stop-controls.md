@@ -15,8 +15,9 @@ fresh synthetic SQLite storage, production browser code and submission authority
   exist; stop does not erase or replay the sent request.
 
 The dashboard displays the already-sent recall limitation while stopped.
-Desktop/mobile tests prove reload persistence, separate stage-pause settings,
-resume without changing those pauses and responsive layout. Screenshots were
+Desktop/mobile tests prove reload persistence and responsive layout. Stop also
+sets submissionsPaused; resume clears stop but deliberately leaves submissions
+paused. Discovery/preparation pauses remain unchanged. Screenshots were
 inspected. An initial browser fixture queried the protected API before the demo
 session had completed; it now waits for the authenticated stop button. No
 authentication or production authority guard was relaxed.
@@ -26,3 +27,11 @@ pass, with final lint/types/build checks. The broader capacity checkpoint passed
 622 tests and all 60 pre-addition browser cases. Cross-platform successor CI
 must verify the final additions before P13-G5 closes. This is not a hardware
 reboot, sleep/wake or network-interface drill, nor a genuine employer submission.
+
+Successor CI 38138491138 at 80bd3f6 failed: its full Ubuntu browser sequence
+correctly exposed the test's incorrect expectation that stop preserved an
+unpaused submission flag. Focused runs began with that flag already paused and
+missed the error. The assertion now verifies the intentional submission pause,
+including after resume. Windows also exposed TEMP's short-path alias in the
+new capacity/stop fixtures. Fresh fixture directories are now created under a
+canonical TEMP parent; the production junction/symlink refusal is unchanged.

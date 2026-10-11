@@ -1212,3 +1212,29 @@ credentials, authorizations and Gmail consent remain untouched. No background
 coding continuation exists. Continue independent installation, capacity/whole-host
 measurement and server/hybrid engineering; hardware drills, real-duration evidence
 and genuine receipts are still required before the affected phases close.
+
+## 2026-10-11: CI Correction And Isolated Windows Host
+
+CI 38138491138 at 80bd3f6 failed; it is not release evidence. Windows TEMP aliases
+failed fresh capacity/stop storage guards, and Ubuntu's complete browser sequence
+exposed an incorrect pause assertion. Fixtures now canonicalize the TEMP parent
+before creating fresh children, without relaxing production redirection checks.
+Stop intentionally sets submissionsPaused; resume clears stop without re-enabling
+submissions. Discovery/preparation pauses are unchanged. The full browser sequence
+now tests this, rather than relying only on focused state.
+
+The local launcher now uses a hidden PowerShell host for start, validate, pinned
+version checks and status/stop. Node receives only OS essentials and an explicit
+config file. NODE_OPTIONS and arbitrary inherited app secrets are excluded.
+The scheduled host waits and propagates the real runtime exit code. Spaced paths,
+failed exit 17 and successful validation/control output pass disposable process
+tests. Real compiled lifecycle validation and approval/WhatIf tests also pass.
+See `docs/evidence/P13-windows-startup-host.md`. No task was installed/removed;
+private owner configs, DBs and services were not read or changed.
+
+Local verification: pnpm check passed 626 tests / 216 PostgreSQL skipped, 78
+files, lint/types/ledger/build; all 62 desktop/mobile browser tests passed.
+Public-source scan passed 375 files. Successor CI must verify the combined
+build before P13-G5 closes. Counts remain 12/19 phases and 88/128 gates.
+Docker CLI exists but the Linux engine is unavailable; no server deployment was
+tested. Continue clean Windows packaging and independent deployment engineering.

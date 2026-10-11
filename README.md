@@ -47,6 +47,14 @@ are fixture simulations and memory covers the Node driver, not Chromium children
 short runs do not satisfy production soak gates. See
 [capacity evidence](docs/evidence/P13-capacity-foundation.md).
 
+After building, the local Windows launcher supports `Start`, `Status`, `Stop`,
+`InstallStartup` and `RemoveStartup`. Supply `-ConfigFile` with an absolute
+private configuration path and `-NodePath` with the pinned Node executable to
+`scripts/windows-runtime.ps1`. Startup changes require `-ApproveStartup`;
+`-WhatIf` previews them. The hidden host isolates Node's environment and returns
+its exit status. Actual installed-task/reboot verification remains open; see
+[Windows runtime evidence](docs/evidence/P13-windows-startup-host.md).
+
 Browser tests use separate loopback ports 14317/14318 for desktop and 14319/14320
 for mobile, and never reuse an existing server. Override them with
 `AUTOPILOT_E2E_API_PORT`, `AUTOPILOT_E2E_WEB_PORT`, `AUTOPILOT_E2E_MOBILE_API_PORT`

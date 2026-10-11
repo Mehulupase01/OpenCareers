@@ -89,7 +89,7 @@ export async function runCapacity(
   const root = await realpath(resolve(import.meta.dirname, ".."));
   const fingerprint = await capacityBuildFingerprint(root);
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const directory = await mkdtemp(join(tmpdir(), "opencareers-capacity-"));
+  const directory = await mkdtemp(join(await realpath(tmpdir()), "opencareers-capacity-"));
   const config = {
     ...loadConfig({ AUTOPILOT_E2E_RUN_ID: randomUUID() }, root),
     dataDir: directory,

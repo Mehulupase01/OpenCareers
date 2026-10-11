@@ -15,20 +15,24 @@ if ($Mode -eq 'RemoveStartup' -and -not $ApproveStartup) { throw 'Startup remova
 if (-not $InstallRoot) { $InstallRoot = Split-Path -Parent $PSScriptRoot }
 $root = (Resolve-Path -LiteralPath $InstallRoot).Path
 $runtime = Join-Path $root 'dist\scripts\runtime.js'
+$startupHost = Join-Path $root 'scripts\windows-startup-host.ps1'
 if (-not (Test-Path -LiteralPath $runtime -PathType Leaf)) { throw 'Build the application before launching it.' }
+if (-not (Test-Path -LiteralPath $startupHost -PathType Leaf)) { throw 'The Windows startup host is missing.' }
+$powershell = (Get-Command powershell.exe -CommandType Application).Source
 if (-not $NodePath) { $NodePath = (Get-Command node -CommandType Application).Source }
 $node = (Resolve-Path -LiteralPath $NodePath).Path
-$versionText = & $node --version
+if (-not $ConfigFile) { $ConfigFile = Join-Path $root '.env' }
+$config = (Resolve-Path -LiteralPath $ConfigFile).Path
+if ($root.Contains('"') -or $config.Contains('"') -or $runtime.Contains('"') -or $node.Contains('"') -or $startupHost.Contains('"')) { throw 'Paths must not contain quote characters.' }
+$versionText = & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version
 if (-not $versionText -or $LASTEXITCODE -ne 0) { throw 'The Node executable did not return its version.' }
 $version = [Version]($versionText.Trim().TrimStart('v'))
 if ($version -lt [Version]'24.14.0' -or $version -ge [Version]'25.0.0') { throw 'Use the pinned Node 24 runtime.' }
-if (-not $ConfigFile) { $ConfigFile = Join-Path $root '.env' }
-$config = (Resolve-Path -LiteralPath $ConfigFile).Path
-if ($root.Contains('"') -or $config.Contains('"') -or $runtime.Contains('"')) { throw 'Paths must not contain quote characters.' }
 $previous = Get-Location
 try {
     Set-Location -LiteralPath $root
-    $validated = & $node $runtime validate --config $config
+    $hostArguments = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-File', "`"$startupHost`"", '-InstallRoot', "`"$root`"", '-ConfigFile', "`"$config`"", '-NodePath', "`"$node`"")
+    $validated = & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate
     if ($LASTEXITCODE -ne 0) { throw 'Private runtime configuration is invalid.' }
     $settings = $validated | ConvertFrom-Json
     if ($settings.profile -ne 'local') { throw 'Windows startup is restricted to the local private profile.' }
@@ -38,17 +42,17 @@ try {
     $suffix = ([BitConverter]::ToString($digest)).Replace('-', '').Substring(0, 12)
     $taskName = "OpenCareers-$suffix"
     switch ($Mode) {
-        'Status' { & $node $runtime status --config $config }
-        'Stop' { & $node $runtime stop --config $config }
+        'Status' { & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status }
+        'Stop' { & $powershell -NoProfile -NonInteractive -File $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop }
         'Start' {
             if ($PSCmdlet.ShouldProcess($root, 'Start hidden application runtime')) {
-                Start-Process -FilePath $node -ArgumentList @("`"$runtime`"", 'start', '--config', "`"$config`"") -WorkingDirectory $root -WindowStyle Hidden
+                Start-Process -FilePath $powershell -ArgumentList $hostArguments -WorkingDirectory $root -WindowStyle Hidden
             }
         }
         'InstallStartup' {
             if ($PSCmdlet.ShouldProcess($taskName, 'Install current-user logon startup')) {
                 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-                $action = New-ScheduledTaskAction -Execute $node -Argument "`"$runtime`" start --config `"$config`"" -WorkingDirectory $root
+                $action = New-ScheduledTaskAction -Execute $powershell -Argument ($hostArguments -join ' ') -WorkingDirectory $root
                 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
                 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
                 $taskSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -ExecutionTimeLimit ([TimeSpan]::Zero)

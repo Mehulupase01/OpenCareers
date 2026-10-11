@@ -5,7 +5,7 @@ test.afterEach(async ({ page }) => {
   if (page.url() !== "about:blank") await makeJson(page)("/v1/control/resume", {});
 });
 
-test("emergency stop persists across reload without replacing the stage pause controls", async ({
+test("emergency stop persists across reload and resume keeps submissions paused", async ({
   page,
 }, info) => {
   await page.goto("/");
@@ -17,7 +17,7 @@ test("emergency stop persists across reload without replacing the stage pause co
     page.getByText("Already-sent requests cannot be recalled.", { exact: true }),
   ).toBeVisible();
   const stopped = (await json("/v1/operations/summary")).control;
-  expect(stopped).toMatchObject({ ...before, stopped: true });
+  expect(stopped).toMatchObject({ ...before, stopped: true, submissionsPaused: true });
   await page.reload();
   await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
   await expect(
@@ -37,6 +37,7 @@ test("emergency stop persists across reload without replacing the stage pause co
   expect((await json("/v1/operations/summary")).control).toMatchObject({
     ...before,
     stopped: false,
+    submissionsPaused: true,
   });
 });
 

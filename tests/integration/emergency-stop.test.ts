@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +14,7 @@ describe("emergency stop at the guarded dispatch boundary", () => {
   let directory: string;
   let repository: Repository;
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), "opencareers-capacity-stop-"));
+    directory = await mkdtemp(join(await realpath(tmpdir()), "opencareers-capacity-stop-"));
     repository = await connect({ ...loadConfig({}), dataDir: directory });
   });
   afterEach(async () => {

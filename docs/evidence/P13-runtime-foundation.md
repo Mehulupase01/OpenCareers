@@ -73,3 +73,6 @@ and genuine receipt-backed ramp are still required. P14 server/hybrid and P15
 restore/security/72-hour soak remain. No background Codex continuation was set up.
 The operational target readout is now complete; the synthetic capacity foundation
 and stop-control acceptance are recorded separately in their P13 evidence files.
+The isolated hidden startup host and disposable process verification are described
+in `docs/evidence/P13-windows-startup-host.md`; actual task installation is still
+unverified.
