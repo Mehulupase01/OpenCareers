@@ -193,6 +193,10 @@ export function CalibrationWorkspace() {
               <dt>Minimum sample</dt>
               <dd>{report.minimumSample}</dd>
             </div>
+            <div>
+              <dt>Matching pipeline</dt>
+              <dd>{report.compatibility?.pipelineVersion ?? "Unrecorded"}</dd>
+            </div>
           </dl>
           <p className="muted">
             {report.window.from} to {report.window.through} UTC

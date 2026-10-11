@@ -43,6 +43,8 @@ for (const engine of ["sqlite", "postgres"] as const) {
         score = 50,
         modelId: string | null = null,
         existingJobId?: string,
+        pipelineVersion?: string,
+        profileId = documentProfile.id,
       ) => {
         const jobId = existingJobId ?? randomUUID();
         if (!existingJobId)
@@ -55,23 +57,16 @@ for (const engine of ["sqlite", "postgres"] as const) {
           revision,
           jobId,
           applicationId: null,
+          profileId,
           modelId,
           provider: null,
+          ...(pipelineVersion ? { pipelineVersion } : {}),
           createdAt: "2026-09-17T00:00:00.000Z",
           score: { ...documentAssessment.score, total: score },
         });
         await db.query(
           "INSERT INTO match_assessments(owner_id,id,job_id,profile_id,revision,data,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
-          [
-            owner,
-            id,
-            jobId,
-            documentProfile.id,
-            revision,
-            data,
-            hash(data),
-            "2026-09-17T00:00:00.000Z",
-          ],
+          [owner, id, jobId, profileId, revision, data, hash(data), "2026-09-17T00:00:00.000Z"],
         );
         return { id, jobId };
       };
@@ -174,6 +169,84 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(
           await db.query("SELECT * FROM calibration_datasets WHERE owner_id=$1", [owner]),
         ).toEqual([]);
+      });
+
+      it("freezes pipeline compatibility and refuses mixed or missing versions", async () => {
+        const version = "evidence-matching-v1";
+        const a = await assessment(true, 50, null, undefined, version);
+        const b = await assessment(true, 60, null, undefined, "synthetic-next-v2");
+        const legacy = await assessment();
+        const otherProfile = randomUUID();
+        await db.query(
+          "INSERT INTO profile_versions(id,owner_id,candidate_id,revision,data,created_at) VALUES($1,$2,'synthetic-candidate',2,'{}',$3)",
+          [otherProfile, owner, "2026-09-01T00:00:00.000Z"],
+        );
+        const changedProfile = await assessment(true, 60, null, undefined, version, otherProfile);
+        for (const other of [b, legacy, changedProfile])
+          await expect(
+            calibration.record(dataset([label(a.id), label(other.id)])),
+          ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        expect(
+          await db.query("SELECT * FROM calibration_datasets WHERE owner_id=$1", [owner]),
+        ).toEqual([]);
+        const input = dataset([label(a.id)]);
+        await expect(
+          calibration.record({ ...input, compatibility: { pipelineVersion: version } }),
+        ).rejects.toThrow();
+        const report = await calibration.record(input);
+        expect(report.compatibility).toEqual({
+          modelId: null,
+          provider: null,
+          pipelineVersion: version,
+          profileId: documentProfile.id,
+        });
+        expect(report.routeSha256).toBe(hash(JSON.stringify(report.compatibility)));
+        await db.query("UPDATE match_assessments SET data='{}' WHERE owner_id=$1", [owner]);
+        expect(await calibration.record(input)).toEqual(report);
+        expect(await calibration.report(input.id)).toEqual(report);
+        const stored = (
+          await db.query("SELECT data FROM calibration_datasets WHERE owner_id=$1 AND id=$2", [
+            owner,
+            input.id,
+          ])
+        )[0];
+        const changed = JSON.stringify({
+          ...JSON.parse(String(stored?.data)),
+          compatibility: { ...report.compatibility, pipelineVersion: "synthetic-next-v2" },
+        });
+        await db.query(
+          "UPDATE calibration_datasets SET data=$1,sha256=$2 WHERE owner_id=$3 AND id=$4",
+          [changed, hash(changed), owner, input.id],
+        );
+        await expect(calibration.report(input.id)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(calibration.record(input)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(calibration.list()).rejects.toMatchObject({ code: "STATE_INVALID" });
+      });
+
+      it("reads an earlier fixed dataset without assigning today's pipeline version", async () => {
+        const input = dataset([label((await assessment()).id)]);
+        await calibration.record(input);
+        const row = (
+          await db.query("SELECT data FROM calibration_datasets WHERE owner_id=$1 AND id=$2", [
+            owner,
+            input.id,
+          ])
+        )[0];
+        const historical = JSON.parse(String(row?.data));
+        delete historical.compatibility;
+        historical.routeSha256 = hash(JSON.stringify({ modelId: null, provider: null }));
+        const data = JSON.stringify(historical);
+        await db.query(
+          "UPDATE calibration_datasets SET data=$1,sha256=$2 WHERE owner_id=$3 AND id=$4",
+          [data, hash(data), owner, input.id],
+        );
+        const report = await calibration.report(input.id);
+        expect(report.compatibility).toBeNull();
+        expect(report.routeSha256).toBe(historical.routeSha256);
+        expect(report.limits).toContain(
+          "Legacy scores have no recorded matching pipeline version.",
+        );
+        expect(await calibration.record(input)).toEqual(report);
       });
       it("freezes the reviewed corpus and verifies the stored dataset on every read", async () => {
         const labels = [];

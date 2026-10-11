@@ -7,6 +7,23 @@ import {
 import { documentFacts } from "../fixtures/document-packets.js";
 
 describe("categorical regression publication", () => {
+  it.each([
+    { kind: "unsupported_form", reviewed: true, variant: "unsupported_required_control" },
+    { kind: "adapter_drift", reviewed: true, variant: "changed_form_fingerprint" },
+  ])("keeps $kind publication categorical and reviewed", (input) => {
+    const result = compileRegressionFixture(input);
+    expect(parseRegressionFixture(JSON.parse(result.bytes.toString()))).toEqual(result.fixture);
+    for (const extra of [
+      { html: "Private form content" },
+      { url: "https://private.example/apply" },
+      { candidateId: "private-owner" },
+    ])
+      expect(() => compileRegressionFixture({ ...input, ...extra })).toThrow();
+    expect(() => compileRegressionFixture({ ...input, reviewed: false })).toThrow();
+    expect(() =>
+      compileRegressionFixture({ ...input, variant: "private question text" }),
+    ).toThrow();
+  });
   const correction = {
     kind: "workload_correction",
     reviewed: true,

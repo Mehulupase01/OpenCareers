@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { buildServer } from "../../apps/api/src/server.js";
 import { loadConfig } from "../../packages/config/src/index.js";
+import { MATCHING_PIPELINE_VERSION } from "../../packages/matching/src/domain.js";
 import { CalibrationRepository } from "../../packages/persistence/src/calibration-repository.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
@@ -31,7 +32,12 @@ test("fixed review import is bounded, owner-confirmed and readable after reload"
       "INSERT INTO profile_versions(id,owner_id,candidate_id,revision,data,created_at) VALUES($1,$2,'synthetic-candidate',1,'{}',$3)",
       [documentProfile.id, owner, documentAssessment.createdAt],
     );
-    const assessment = { ...documentAssessment, id: randomUUID(), applicationId: null };
+    const assessment = {
+      ...documentAssessment,
+      id: randomUUID(),
+      applicationId: null,
+      pipelineVersion: MATCHING_PIPELINE_VERSION,
+    };
     const data = JSON.stringify(assessment);
     await db.query(
       "INSERT INTO match_assessments(owner_id,id,job_id,profile_id,revision,data,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
@@ -126,6 +132,7 @@ test("fixed review import is bounded, owner-confirmed and readable after reload"
       workspace.getByRole("heading", { name: "Insufficient reviewed data" }),
     ).toBeVisible();
     await expect(workspace.getByRole("status")).toContainText("Excluded synthetic");
+    await expect(workspace.getByRole("status")).toContainText(MATCHING_PIPELINE_VERSION);
     await expect(workspace.getByRole("status")).toContainText("not employer outcomes");
     await expect(workspace.getByText("Relevance discrimination AUC", { exact: true })).toHaveCount(
       0,
@@ -145,6 +152,7 @@ test("fixed review import is bounded, owner-confirmed and readable after reload"
       workspace.getByRole("heading", { name: "Insufficient reviewed data" }),
     ).toBeVisible();
     const after = await json("/v1/operations/summary");
+    await expect(workspace.getByRole("status")).toContainText(MATCHING_PIPELINE_VERSION);
     expect(after.control).toEqual(before.control);
     expect(after.applications.map((a: { id: string; state: string }) => [a.id, a.state])).toEqual(
       before.applications.map((a: { id: string; state: string }) => [a.id, a.state]),

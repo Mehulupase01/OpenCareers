@@ -10,6 +10,9 @@ import {
   semanticProposalSchema,
 } from "../../contracts/src/matching.js";
 
+// Bump when gates, evidence validation, scoring rules or semantic prompt meaning change.
+export const MATCHING_PIPELINE_VERSION = "evidence-matching-v1";
+
 const languageRank = new Map([
   ["unspecified", 0],
   ["A1", 1],

@@ -13,6 +13,7 @@ import {
 } from "../../contracts/src/matching.js";
 import {
   deterministicGates,
+  MATCHING_PIPELINE_VERSION,
   outcome,
   scoreMatch,
   validateProposal,
@@ -352,6 +353,7 @@ export class MatchingRunner {
       modelId: null,
       provider: null,
       explanation: reason,
+      pipelineVersion: MATCHING_PIPELINE_VERSION,
       createdAt: new Date().toISOString(),
     });
   }
@@ -378,6 +380,7 @@ export class MatchingRunner {
         modelId: null,
         provider: null,
         explanation: "Deterministic policy gates decided this vacancy without inference.",
+        pipelineVersion: MATCHING_PIPELINE_VERSION,
         createdAt: new Date().toISOString(),
       });
     }
@@ -529,6 +532,7 @@ export class MatchingRunner {
       modelId: snapshot.route.modelId,
       provider: snapshot.route.provider,
       explanation: validated.summary,
+      pipelineVersion: MATCHING_PIPELINE_VERSION,
       createdAt: new Date().toISOString(),
     });
   }

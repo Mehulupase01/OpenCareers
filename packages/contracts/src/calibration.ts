@@ -1,5 +1,15 @@
 import { z } from "zod";
 import { idSchema } from "./index.js";
+import { matchingPipelineVersionSchema } from "./matching.js";
+
+export const calibrationCompatibilitySchema = z
+  .object({
+    modelId: z.string().max(240).nullable(),
+    provider: z.string().max(120).nullable(),
+    pipelineVersion: matchingPipelineVersionSchema.nullable(),
+    profileId: idSchema,
+  })
+  .strict();
 
 export const calibrationDatasetSchema = z
   .object({
@@ -33,6 +43,7 @@ export const fixedCalibrationSchema = z
     through: z.iso.datetime(),
     recordedAt: z.iso.datetime(),
     routeSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    compatibility: calibrationCompatibilitySchema.optional(),
     samples: z
       .array(
         z

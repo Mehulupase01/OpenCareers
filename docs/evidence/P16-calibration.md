@@ -57,12 +57,16 @@ and physical Windows/server operation are tracked independently.
 
 - Ranking quality on a fixed, owner-reviewed, representative live holdout.
 - Genuine later employer outcomes and application-level cumulative conversion.
-- Compatible scoring/provider build history and submission-time metadata history.
+- Immutable upstream provider-build history and submission-time metadata history;
+  new matching assessments and fixed datasets now record local pipeline/profile
+  compatibility, while legacy version history remains explicitly unrecorded.
 - Authoritative seniority and sponsorship grouping; current unknowns stay unknown.
 - Truthful automatic wording/ordering variant generation and independent approval.
 - Selection bias, assignment effects and sample volumes sufficient for inference.
 - Broader private correction proposals and form/adapter regression cases; verified
-  workload corrections now have owner-gated proposal/export capture, not full breadth.
+  workload corrections have owner-gated proposal/export capture. Reviewed generic
+  unsupported-control and changed-fingerprint fixtures execute in the owned browser
+  engine; broader automatic capture and portal-specific variants remain open.
 
 Any recommendation is advisory. Existing owner authorization remains the sole
 policy source. An experiment definition, report, fixture or inferred preference

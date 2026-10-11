@@ -22,6 +22,20 @@ const fixture = (): FixedCalibration => ({
   })),
 });
 describe("fixed reviewed-relevance diagnostics", () => {
+  it("keeps legacy pipeline history explicitly unrecorded", () => {
+    const report = scoreCalibration(fixture());
+    expect(report.compatibility).toBeNull();
+    expect(report.limits).toContain("Legacy scores have no recorded matching pipeline version.");
+    const compatibility = {
+      modelId: null,
+      provider: null,
+      pipelineVersion: "evidence-matching-v1",
+      profileId: "synthetic-profile",
+    };
+    const known = scoreCalibration({ ...fixture(), compatibility });
+    expect(known.compatibility).toEqual(compatibility);
+    expect(known.limits).not.toContain("Legacy scores have no recorded matching pipeline version.");
+  });
   it("refuses small, synthetic-only and degenerate datasets", () => {
     const data = fixture();
     expect(scoreCalibration({ ...data, samples: data.samples.slice(0, 19) })).toMatchObject({

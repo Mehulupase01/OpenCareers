@@ -1914,6 +1914,7 @@
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-score-calibration.md",
+            "docs/evidence/P16-pipeline-history-and-form-regressions.md",
             "docs/evidence/P16-calibration.md",
             "tests/unit/score-calibration.test.ts",
             "tests/integration/calibration.test.ts",
@@ -1929,6 +1930,7 @@
           "evidence": [
             "docs/evidence/P16-regression-import.md",
             "docs/evidence/P16-private-regression-proposals.md",
+            "docs/evidence/P16-pipeline-history-and-form-regressions.md",
             "tests/integration/regression-proposals.test.ts",
             "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
@@ -2005,10 +2007,13 @@
         {
           "id": "P16-G7",
           "requirement": "A recommendation to change policy requires a new recorded owner policy revision before it affects commits.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
+            "docs/evidence/P16-policy-adoption-boundary.md",
             "docs/evidence/P16-controlled-experiments.md",
-            "tests/integration/experiments.test.ts"
+            "tests/integration/experiments.test.ts",
+            "tests/integration/documents.test.ts",
+            "tests/integration/candidate.test.ts"
           ]
         }
       ],
@@ -2017,7 +2022,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "b9c7410e4169212ffcb56187a24edec10ccbbf57",
+      "lastVerifiedCommit": "cfabde72e1954c4b455dc8ebd2259ab79a5c1cce",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2054,6 +2059,12 @@
           "commit": "b9c7410e4169212ffcb56187a24edec10ccbbf57",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Frozen variant cohort attribution backed by immutable definition, assignment, packet, intent, dispatch and receipt evidence; corruption and chronological refusal, full browser and Windows production-only installation. Not successor private proposals, live effectiveness or additional phase closure."
+        },
+        {
+          "runId": "38180066956",
+          "commit": "cfabde72e1954c4b455dc8ebd2259ab79a5c1cce",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Private transactional workload proposals, immutable owner review and approved-only export, canonical Amsterdam date checks, complete browser and extracted Windows installation. With existing canonical authorization and analytical/experiment tests closes G7 only, not successor pipeline history/form fixtures or full P16."
         }
       ],
       "acceptanceTests": [],

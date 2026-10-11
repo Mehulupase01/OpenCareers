@@ -29,6 +29,20 @@ export const regressionCorrectionSchema = z.discriminatedUnion("kind", [
       variant: z.literal("receipt_and_interview"),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("unsupported_form"),
+      reviewed: z.literal(true),
+      variant: z.literal("unsupported_required_control"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("adapter_drift"),
+      reviewed: z.literal(true),
+      variant: z.literal("changed_form_fingerprint"),
+    })
+    .strict(),
 ]);
 export type RegressionCorrection = z.infer<typeof regressionCorrectionSchema>;
 

@@ -5,10 +5,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
+import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
 import { chronology } from "../../packages/candidate/src/domain.js";
+import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { generatePacketContent } from "../../packages/documents/src/domain.js";
+import { buildPacket } from "../../packages/documents/src/factory.js";
 import { compileLetterProposal } from "../../packages/documents/src/letter-draft.js";
 import { classifyMail } from "../../packages/email/src/correlation.js";
+import { startMockAts } from "../../packages/mock-ats/src/server.js";
 import {
   compileRegressionFixture,
   parseRegressionFixture,
@@ -17,7 +22,7 @@ import {
 import { importRegressionFixture } from "../../scripts/regression-import.js";
 import { documentFacts, documentGenerationInput } from "../fixtures/document-packets.js";
 
-function verify(raw: unknown) {
+async function verify(raw: unknown) {
   const fixture = parseRegressionFixture(raw);
   if (fixture.kind === "workload_correction") {
     const base = documentFacts.find((fact) => fact.id === "fact-employment-full");
@@ -47,7 +52,7 @@ function verify(raw: unknown) {
         contributionIds: [content.letter.contributions[0]?.id ?? "missing"],
       }),
     ).toThrow("unsupported claims");
-  } else {
+  } else if (fixture.kind === "ambiguous_mail") {
     expect(
       classifyMail({
         id: "synthetic-regression-mail",
@@ -59,6 +64,67 @@ function verify(raw: unknown) {
         text: "We received your application. Interview invitation.",
       }),
     ).toBe("ambiguous");
+  } else {
+    const directory = await mkdtemp(join(tmpdir(), "opencareers-form-regression-"));
+    const mock = await startMockAts();
+    let owned: Awaited<ReturnType<typeof launchDryRunBrowser>> | undefined;
+    try {
+      owned = await launchDryRunBrowser(mock.url);
+      const store = new ArtifactStore(directory);
+      await store.initialize();
+      const input = documentGenerationInput();
+      const job = { ...input.job, id: "synthetic-engineer-1" };
+      const built = await buildPacket(store, {
+        ...input,
+        job,
+        assessment: { ...input.assessment, jobId: job.id },
+      });
+      const packet = {
+        manifest: built.manifest,
+        content: built.content,
+        valid: true,
+        invalidReason: null,
+      };
+      const cv = built.manifest.artifacts.find((item) => item.kind === "cv_pdf");
+      if (!cv) throw new Error("Missing synthetic PDF.");
+      const bytes = await store.read(cv.storageKey, cv.sha256);
+      await owned.page.goto(`${mock.url}/jobs/standard`);
+      if (fixture.kind === "unsupported_form") {
+        await owned.page.evaluate(() => {
+          const fieldset = document.querySelector("fieldset:not([hidden])");
+          if (!fieldset) throw new Error("Missing synthetic step.");
+          const label = document.createElement("label");
+          label.textContent = "Synthetic required control";
+          const input = document.createElement("input");
+          input.name = "synthetic_unknown_control";
+          input.type = "color";
+          input.required = true;
+          label.append(input);
+          fieldset.append(label);
+        });
+        const snapshot = await inspectForm(owned.page);
+        const plan = planFields(snapshot, packet, { country: "NL" });
+        expect(plan.unresolved).toContain("synthetic_unknown_control");
+        expect(plan.entries.some((item) => item.name === "synthetic_unknown_control")).toBe(false);
+        const result = await fillStep(owned.page, plan, bytes);
+        expect(result.status).toBe("needs_input");
+      } else {
+        await owned.page.getByRole("button", { name: "Next" }).click();
+        const plan = planFields(await inspectForm(owned.page), packet, {
+          sponsorship_required: "yes",
+        });
+        await owned.page.goto(`${mock.url}/jobs/changed-question`);
+        await owned.page.getByRole("button", { name: "Next" }).click();
+        expect((await inspectForm(owned.page)).fingerprint).not.toBe(plan.fingerprint);
+        await expect(fillStep(owned.page, plan, bytes)).rejects.toThrow("Form questions changed");
+      }
+      expect((await mock.app.inject({ url: "/__test/records" })).json().records).toHaveLength(0);
+      expect(owned.blockedCommitCount).toBe(0);
+    } finally {
+      await owned?.close();
+      await mock.app.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }
 describe("correction to executable synthetic regression", () => {
@@ -87,7 +153,9 @@ describe("correction to executable synthetic regression", () => {
       const result = JSON.parse(stdout);
       expect(result.kind).toBe("ambiguous_mail");
       expect(stdout).not.toContain(root);
-      verify(JSON.parse(await readFile(join(fixtures, "regressions", result.filename), "utf8")));
+      await verify(
+        JSON.parse(await readFile(join(fixtures, "regressions", result.filename), "utf8")),
+      );
       await writeFile(
         input,
         JSON.stringify({
@@ -125,12 +193,12 @@ describe("correction to executable synthetic regression", () => {
   it("runs every published categorical regression through real domain validators", async () => {
     const files = globSync("tests/fixtures/regressions/*.json");
     expect(files.length).toBeGreaterThan(0);
-    for (const file of files) verify(JSON.parse(await readFile(file, "utf8")));
+    for (const file of files) await verify(JSON.parse(await readFile(file, "utf8")));
     for (const correction of [
       { kind: "unsupported_letter_claim", reviewed: true, variant: "invented_quantity" },
       { kind: "ambiguous_mail", reviewed: true, variant: "receipt_and_interview" },
     ])
-      verify(compileRegressionFixture(correction).fixture);
+      await verify(compileRegressionFixture(correction).fixture);
   });
   it("exports a verified fact correction idempotently without copying private evidence", async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), "opencareers-regression-")));
@@ -152,7 +220,7 @@ describe("correction to executable synthetic regression", () => {
       const bytes = await readFile(path, "utf8");
       expect(bytes).not.toContain(fact.value.employer);
       expect(bytes).not.toContain(fact.id);
-      verify(JSON.parse(bytes));
+      await verify(JSON.parse(bytes));
       await writeFile(input, bytes);
       expect(await importRegressionFixture(root, input, true)).toEqual(exported);
       await writeFile(

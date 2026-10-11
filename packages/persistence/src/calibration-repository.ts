@@ -1,15 +1,33 @@
 import { createHash } from "node:crypto";
+import type { z } from "zod";
 import {
+  type calibrationCompatibilitySchema,
   calibrationDatasetSchema,
   fixedCalibrationSchema,
 } from "../../contracts/src/calibration.js";
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
 import { assessmentSchema } from "../../contracts/src/matching.js";
 import { scoreCalibration } from "../../matching/src/score-calibration.js";
+import type { Row } from "./database.js";
 import { jobIdentity } from "./job-identity.js";
 import { OwnerScope } from "./owner-scope.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+
+function readDataset(row: Row, expectedId: string) {
+  if (hash(String(row.data)) !== row.sha256)
+    throw new DomainError("STATE_INVALID", "Fixed dataset integrity check failed.");
+  const dataset = fixedCalibrationSchema.parse(JSON.parse(String(row.data)));
+  if (
+    dataset.id !== expectedId ||
+    (dataset.compatibility && hash(JSON.stringify(dataset.compatibility)) !== dataset.routeSha256)
+  )
+    throw new DomainError(
+      "STATE_INVALID",
+      "Fixed dataset compatibility or attribution check failed.",
+    );
+  return dataset;
+}
 
 export class CalibrationRepository extends OwnerScope {
   async list() {
@@ -20,11 +38,7 @@ export class CalibrationRepository extends OwnerScope {
     if (rows.length > 1000)
       throw new DomainError("STATE_INVALID", "Dataset catalog exceeds the bounded read size.");
     return rows.map((row) => {
-      if (hash(String(row.data)) !== row.sha256)
-        throw new DomainError("STATE_INVALID", "Fixed dataset integrity check failed.");
-      const dataset = fixedCalibrationSchema.parse(JSON.parse(String(row.data)));
-      if (dataset.id !== row.id)
-        throw new DomainError("STATE_INVALID", "Fixed dataset attribution check failed.");
+      const dataset = readDataset(row, String(row.id));
       const report = scoreCalibration(dataset);
       return {
         id: dataset.id,
@@ -50,9 +64,7 @@ export class CalibrationRepository extends OwnerScope {
       if (prior) {
         if (prior.binding !== binding)
           throw new DomainError("REVISION_STALE", "Fixed dataset identity was already used.");
-        if (hash(String(prior.data)) !== prior.sha256)
-          throw new DomainError("STATE_INVALID", "Fixed dataset integrity check failed.");
-        return scoreCalibration(fixedCalibrationSchema.parse(JSON.parse(String(prior.data))));
+        return scoreCalibration(readDataset(prior, input.id));
       }
       const from = Date.parse(input.from),
         through = Date.parse(input.through);
@@ -60,6 +72,7 @@ export class CalibrationRepository extends OwnerScope {
         throw new DomainError("STATE_INVALID", "Invalid completed review window.");
       const samples = [];
       const routes = new Set<string>();
+      let compatibility: z.infer<typeof calibrationCompatibilitySchema> | undefined;
       const jobs = new Set<string>();
       for (const label of input.labels) {
         const row = (
@@ -93,13 +106,18 @@ export class CalibrationRepository extends OwnerScope {
             "Only one reviewed assessment per job is allowed.",
           );
         jobs.add(canonicalJobId);
-        routes.add(
-          hash(JSON.stringify({ modelId: assessment.modelId, provider: assessment.provider })),
-        );
+        const currentCompatibility = {
+          modelId: assessment.modelId,
+          provider: assessment.provider,
+          pipelineVersion: assessment.pipelineVersion ?? null,
+          profileId: assessment.profileId,
+        };
+        compatibility ??= currentCompatibility;
+        routes.add(hash(JSON.stringify(currentCompatibility)));
         if (routes.size > 1)
           throw new DomainError(
             "STATE_INVALID",
-            "Separate model routes require separate fixed datasets.",
+            "Separate model routes, matching pipelines or profiles require separate fixed datasets.",
           );
         samples.push({
           ...label,
@@ -115,6 +133,7 @@ export class CalibrationRepository extends OwnerScope {
         through: input.through,
         recordedAt: this.now(),
         routeSha256: [...routes][0],
+        compatibility,
         samples,
       });
       const data = JSON.stringify(dataset);
@@ -141,8 +160,6 @@ export class CalibrationRepository extends OwnerScope {
       )
     )[0];
     if (!row) throw new DomainError("NOT_FOUND", "Fixed dataset not found.");
-    if (hash(String(row.data)) !== row.sha256)
-      throw new DomainError("STATE_INVALID", "Fixed dataset integrity check failed.");
-    return scoreCalibration(fixedCalibrationSchema.parse(JSON.parse(String(row.data))));
+    return scoreCalibration(readDataset(row, id));
   }
 }

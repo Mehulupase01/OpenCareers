@@ -123,6 +123,11 @@ export const scoreSchema = z
   .strict();
 export type MatchScore = z.infer<typeof scoreSchema>;
 
+export const matchingPipelineVersionSchema = z
+  .string()
+  .max(120)
+  .regex(/^[a-z0-9][a-z0-9._-]+$/);
+
 export const assessmentSchema = z
   .object({
     id: idSchema,
@@ -136,6 +141,7 @@ export const assessmentSchema = z
     score: scoreSchema,
     modelId: z.string().max(240).nullable(),
     provider: z.string().max(120).nullable(),
+    pipelineVersion: matchingPipelineVersionSchema.optional(),
     explanation: bounded,
     createdAt: z.iso.datetime(),
   })

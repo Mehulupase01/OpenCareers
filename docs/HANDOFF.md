@@ -1624,3 +1624,35 @@ verified workload corrections only. Continue directly with scoring pipeline
 compatibility/history, broader executable form/adapter regression cases and
 truthful variants, then independent release/deployment engineering. Real receipts,
 physical installation/drills and qualifying 24/72-hour soaks remain separate.
+
+## 2026-10-12: Matching Compatibility And Executable Form Cases
+
+Private proposal commit cfabde72e1954c4b455dc8ebd2259ab79a5c1cce is all-green in
+CI 38180066956 on Windows, Ubuntu and PostgreSQL. Existing analytical/experiment
+strictness and canonical authorization/dispatch tests close P16-G7 only. See
+docs/evidence/P16-policy-adoption-boundary.md. Counts: 12/19 phases, 93/128 gates.
+
+The successor records code-owned matching pipeline versions on new runner
+assessments. Fixed calibration derives/fixes model/provider/pipeline/profile
+compatibility, refuses mixed/unknown-versus-known histories and checks metadata
+digests on catalog/report/retry. Legacy records are not retagged. Diagnostics show
+the version and disclose upstream build uncertainty; no weights/policy change.
+Reviewed categorical unsupported-required-control and changed-fingerprint
+fixtures now execute through actual owned browser inspection/planning/filling,
+with zero final writes or accepted applications. Broader automatic capture remains
+open; these are generic mock cases, not every external portal variant.
+
+Full check: 710 passed / 257 skipped in 93 files, lint/types/ledger/build pass.
+Focused compatibility/matching/rank: 23/19 skips; regression/privacy: 7 passed.
+First affected browser run 9/10 exposed an outcome test racing shared worker
+preparation. It now owns isolated synthetic production handlers/database, without
+shared application mutation. Corrected affected workflows: 10/10 (1.2 minutes),
+desktop/mobile version/reload/refusal and analytical state invariance verified.
+Extracted production-only Windows install: 1/1 passed (23.64 seconds total).
+Public scan: 437 files. Successor CI pending; no broader CI claim for this batch.
+
+Continue into independent release integrity/clean-install engineering, alongside
+remaining seniority/sponsorship history, truthful variants and broad correction
+capture. Full P16/P15, real receipt/ramp, physical host/server/hybrid drills and
+qualifying actual-duration soaks remain open. Private runtime/secrets, model/mail
+calls and real employer actions were untouched. No background coding exists.

@@ -490,6 +490,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(assessment).toMatchObject({
           jobId,
           outcome: "auto_eligible",
+          pipelineVersion: "evidence-matching-v1",
           modelId: "synthetic/model:free",
           provider: "synthetic-provider",
         });

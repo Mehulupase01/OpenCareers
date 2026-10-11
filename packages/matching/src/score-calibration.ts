@@ -24,6 +24,7 @@ export function scoreCalibration(raw: FixedCalibration) {
     scope: "ranking_diagnostics_not_employer_outcomes" as const,
     advisoryOnly: true as const,
     routeSha256: dataset.routeSha256,
+    compatibility: dataset.compatibility ?? null,
     window: { from: dataset.from, through: dataset.through, recordedAt: dataset.recordedAt },
     sampleSize: samples.length,
     relevant,
@@ -34,6 +35,10 @@ export function scoreCalibration(raw: FixedCalibration) {
       "Owner labels are subjective, not independent ground truth.",
       "One fixed dataset does not establish out-of-sample performance.",
       "No ranking weights or authorization are changed.",
+      "Provider-reported model names do not identify immutable upstream model builds.",
+      ...(!dataset.compatibility?.pipelineVersion
+        ? ["Legacy scores have no recorded matching pipeline version."]
+        : []),
     ],
   };
   if (samples.length < 20)
