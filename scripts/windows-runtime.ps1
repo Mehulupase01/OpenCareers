@@ -10,6 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'This launcher requires Windows.' }
+if ($Mode -eq 'InstallStartup' -and -not $ApproveStartup) { throw 'Startup installation requires the explicit -ApproveStartup switch.' }
+if ($Mode -eq 'RemoveStartup' -and -not $ApproveStartup) { throw 'Startup removal requires the explicit -ApproveStartup switch.' }
 if (-not $InstallRoot) { $InstallRoot = Split-Path -Parent $PSScriptRoot }
 $root = (Resolve-Path -LiteralPath $InstallRoot).Path
 $runtime = Join-Path $root 'dist\scripts\runtime.js'
@@ -44,7 +46,6 @@ try {
             }
         }
         'InstallStartup' {
-            if (-not $ApproveStartup) { throw 'Startup installation requires the explicit -ApproveStartup switch.' }
             if ($PSCmdlet.ShouldProcess($taskName, 'Install current-user logon startup')) {
                 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
                 $action = New-ScheduledTaskAction -Execute $node -Argument "`"$runtime`" start --config `"$config`"" -WorkingDirectory $root
@@ -55,7 +56,6 @@ try {
             }
         }
         'RemoveStartup' {
-            if (-not $ApproveStartup) { throw 'Startup removal requires the explicit -ApproveStartup switch.' }
             if ($PSCmdlet.ShouldProcess($taskName, 'Remove startup without stopping the current runtime')) {
                 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
             }
