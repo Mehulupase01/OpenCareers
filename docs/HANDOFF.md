@@ -1743,3 +1743,29 @@ P14-01 is now in progress. No gate/phase closes: 12/19 and 94/128. Continue into
 fresh Chromium-cache clean-install verification and remaining production
 engineering while image CI runs. Private runtime/secrets were untouched; no
 live inference, Gmail access, employer submission or qualifying soak occurred.
+
+## 2026-10-12: Fresh Chromium Installation And Image Diagnostics
+
+Recovery commit 4bf7a88925229fd440489bd37a3e8fd5a17f4213 passed every Windows,
+Ubuntu and PostgreSQL lane in CI 38182786548. Server foundation d03f9c6 is pushed;
+38183327763 has a failed image lane: image build/non-root/runtime checks and
+network-isolated mock receipts reached completion, then Compose reported an
+unhealthy worker. It did not capture service logs before disposing its synthetic
+project, so the underlying cause is unknown. The successor adds bounded service
+diagnostics with its generated owner/vault tokens redacted. Do not guess a cause
+or call that deployment lane green; inspect the next job logs before fixing it.
+
+The successor Windows installer now downloads matching Chromium into an absent
+owned cache, checks the canonical executable remains within it, and propagates
+that cache (but no private app settings) to the compiled recovery child. The
+actual production-only extracted test passes 1/1 in 104.96 seconds. Focused
+recovery/bundle/context passes 11/11; server context 4/4 with image test locally
+skipped for unavailable daemon. Types/lint/build pass. See
+docs/evidence/P17-fresh-browser-install.md. Full 732-test baseline belongs to
+the prior server batch, not this focused successor. Successor CI pending;
+P17-G1 awaits its actual Windows proof. Counts unchanged: 12/19, 94/128.
+
+Continue with the server startup failure using bounded synthetic CI diagnostics,
+then broader deployment/hybrid and elapsed-soak engineering. Private runtime,
+secrets and real model/mail/employer operations remain untouched. No code task
+continues outside the current agent turn.

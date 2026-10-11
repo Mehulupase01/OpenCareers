@@ -15,11 +15,11 @@ import { HandoffRepository } from "../packages/persistence/src/handoff-repositor
 import { connect } from "../packages/persistence/src/index.js";
 import { SubmissionRepository } from "../packages/persistence/src/submission-repository.js";
 
-function childEnvironment() {
+export function recoveryChildEnvironment(env: NodeJS.ProcessEnv = process.env) {
   return {
     ...Object.fromEntries(
-      Object.entries(process.env).filter(([key]) =>
-        /^(SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|PATHEXT|PATH|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|PROGRAMFILES|PROGRAMFILES\(X86\))$/i.test(
+      Object.entries(env).filter(([key]) =>
+        /^(SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|PATHEXT|PATH|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|PROGRAMFILES|PROGRAMFILES\(X86\)|PLAYWRIGHT_BROWSERS_PATH)$/i.test(
           key,
         ),
       ),
@@ -79,7 +79,7 @@ async function runOwnedReleaseRecovery(directory: string) {
     join(import.meta.dirname, `release-recovery-worker.${source ? "ts" : "js"}`),
     [directory],
     {
-      env: childEnvironment(),
+      env: recoveryChildEnvironment(),
       execArgv: source ? ["--import", "tsx"] : [],
       stdio: ["ignore", "ignore", "ignore", "ipc"],
       windowsHide: true,

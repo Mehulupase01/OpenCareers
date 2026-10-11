@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -29,6 +29,11 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
   async () => {
     const bundle = await buildWindowsBundle();
     const installation = join(bundle.directory, "clean installation");
+    const browserCache = join(bundle.directory, "isolated chromium");
+    const installationEnvironment = { ...environment(), PLAYWRIGHT_BROWSERS_PATH: browserCache };
+    await expect(lstat(browserCache)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
     const archiveBytes = await readFile(bundle.path);
     expect(createHash("sha256").update(archiveBytes).digest("hex")).toBe(bundle.checksum);
     const archive = await yauzl.fromBufferPromise(archiveBytes, {
@@ -51,7 +56,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     }
     const verified = await execute(process.execPath, ["dist/scripts/verify-bundle.js"], {
       cwd: installation,
-      env: environment(),
+      env: installationEnvironment,
       timeout: 30000,
     });
     expect(JSON.parse(verified.stdout)).toMatchObject({
@@ -68,7 +73,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
       ["dist/scripts/verify-bundle.js", "--manifest-sha256", installedManifestSha256],
       {
         cwd: installation,
-        env: environment(),
+        env: installationEnvironment,
         timeout: 30000,
       },
     );
@@ -82,7 +87,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
       await expect(
         execute(process.execPath, ["dist/scripts/verify-bundle.js"], {
           cwd: installation,
-          env: environment(),
+          env: installationEnvironment,
           timeout: 30000,
         }),
       ).rejects.toMatchObject({
@@ -98,7 +103,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
         ["dist/scripts/verify-bundle.js", "--manifest-sha256", "0".repeat(64)],
         {
           cwd: installation,
-          env: environment(),
+          env: installationEnvironment,
           timeout: 30000,
         },
       ),
@@ -116,8 +121,24 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
             "& corepack pnpm install --prod --frozen-lockfile; exit $LASTEXITCODE",
           ]
         : ["pnpm", "install", "--prod", "--frozen-lockfile"],
-      { cwd: installation, env: environment(), timeout: 180000, maxBuffer: 1024 * 1024 },
+      { cwd: installation, env: installationEnvironment, timeout: 180000, maxBuffer: 1024 * 1024 },
     );
+    await execute(process.execPath, ["node_modules/playwright/cli.js", "install", "chromium"], {
+      cwd: installation,
+      env: installationEnvironment,
+      timeout: 180000,
+      maxBuffer: 1024 * 1024,
+    });
+    const browserExecutable = await execute(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        "import {chromium} from 'playwright'; import {realpath} from 'node:fs/promises'; import {sep} from 'node:path'; const cache=await realpath(process.env.PLAYWRIGHT_BROWSERS_PATH); const browser=await realpath(chromium.executablePath()); if(!browser.startsWith(cache+sep)) process.exit(1); console.log(JSON.stringify({isolatedBrowserExecutable:true}));",
+      ],
+      { cwd: installation, env: installationEnvironment, timeout: 15000 },
+    );
+    expect(JSON.parse(browserExecutable.stdout)).toEqual({ isolatedBrowserExecutable: true });
     await writeFile(
       join(installation, "synthetic-document-input.json"),
       JSON.stringify(documentGenerationInput()),
@@ -129,7 +150,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
         "-e",
         'const {readFile}=await import("node:fs/promises"); const {ArtifactStore}=await import("./dist/packages/documents/src/artifact-store.js"); const {buildPacket}=await import("./dist/packages/documents/src/factory.js"); const store=new ArtifactStore("../synthetic-packets"); await store.initialize(); const input=JSON.parse(await readFile("synthetic-document-input.json","utf8")); const packet=await buildPacket(store, {...input, requestedAnswers:[]}); const uncertain=await buildPacket(store,input); console.log(JSON.stringify({validation:packet.manifest.validation, unknownAnswerStatus:uncertain.manifest.validation.status, kinds:packet.manifest.artifacts.map(a=>a.kind)}));',
       ],
-      { cwd: installation, env: environment(), timeout: 15000 },
+      { cwd: installation, env: installationEnvironment, timeout: 15000 },
     );
     const packet = JSON.parse(imported.stdout.trim());
     expect(packet.validation.status).toBe("valid");
@@ -143,7 +164,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     const smoke = await execute(process.execPath, ["dist/scripts/release-smoke.js"], {
       cwd: installation,
       env: {
-        ...environment(),
+        ...installationEnvironment,
         AUTOPILOT_PROFILE: "local",
         AUTOPILOT_DATA_DIR: "must-not-open-this-existing-private-path",
         AUTOPILOT_DATABASE_URL: "must-not-connect-to-this-private-database",
@@ -171,14 +192,14 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     await expect(
       execute(process.execPath, ["dist/scripts/release-smoke.js", "--target", "external"], {
         cwd: installation,
-        env: environment(),
+        env: installationEnvironment,
         timeout: 10000,
       }),
     ).rejects.toMatchObject({ code: 1 });
     const recovered = await execute(process.execPath, ["dist/scripts/release-recovery.js"], {
       cwd: installation,
       env: {
-        ...environment(),
+        ...installationEnvironment,
         AUTOPILOT_PROFILE: "local",
         AUTOPILOT_DATA_DIR: "must-not-open-this-existing-private-path",
         AUTOPILOT_DATABASE_URL: "must-not-connect-to-this-private-database",
@@ -203,7 +224,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     await expect(
       execute(process.execPath, ["dist/scripts/release-recovery.js", "--target", "external"], {
         cwd: installation,
-        env: environment(),
+        env: installationEnvironment,
         timeout: 10000,
       }),
     ).rejects.toMatchObject({ code: 1 });
@@ -214,7 +235,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
     const port = address.port;
     await new Promise<void>((resolve) => socket.close(() => resolve()));
     const env = {
-      ...environment(),
+      ...installationEnvironment,
       AUTOPILOT_PROFILE: "demo",
       AUTOPILOT_E2E_RUN_ID: randomUUID(),
       AUTOPILOT_PORT: String(port),

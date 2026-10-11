@@ -30,6 +30,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_SERVER_IMAGE !== "1")(
     const serverEnv = join(directory, "server.env");
     const composeEnv = join(directory, "compose.env");
     const ownerToken = randomBytes(32).toString("hex");
+    const vaultKey = randomBytes(32).toString("base64");
     await writeFile(
       postgresEnv,
       "POSTGRES_USER=synthetic_server\nPOSTGRES_PASSWORD=synthetic-test-only\nPOSTGRES_DB=synthetic_server\n",
@@ -37,7 +38,7 @@ it.skipIf(process.env.AUTOPILOT_TEST_SERVER_IMAGE !== "1")(
     );
     await writeFile(
       serverEnv,
-      `AUTOPILOT_OWNER_ID=synthetic-server-owner\nAUTOPILOT_OWNER_TOKEN=${ownerToken}\nAUTOPILOT_VAULT_KEY=${randomBytes(32).toString("base64")}\nAUTOPILOT_DATABASE_URL=postgresql://synthetic_server:synthetic-test-only@database:5432/synthetic_server\nAUTOPILOT_ALLOWED_ORIGINS=https://owned.synthetic.example\n`,
+      `AUTOPILOT_OWNER_ID=synthetic-server-owner\nAUTOPILOT_OWNER_TOKEN=${ownerToken}\nAUTOPILOT_VAULT_KEY=${vaultKey}\nAUTOPILOT_DATABASE_URL=postgresql://synthetic_server:synthetic-test-only@database:5432/synthetic_server\nAUTOPILOT_ALLOWED_ORIGINS=https://owned.synthetic.example\n`,
       { flag: "wx", mode: 0o600 },
     );
     await writeFile(composeEnv, "", { flag: "wx", mode: 0o600 });
@@ -134,7 +135,16 @@ it.skipIf(process.env.AUTOPILOT_TEST_SERVER_IMAGE !== "1")(
         ),
       ).toBe(true);
       started = true;
-      await compose(["up", "--detach", "--wait", "--wait-timeout", "180"], 240000);
+      try {
+        await compose(["up", "--detach", "--wait", "--wait-timeout", "180"], 240000);
+      } catch (error) {
+        // This lane creates only disposable synthetic credentials; redact them before diagnostics.
+        const logs = await compose(["logs", "--no-color", "--tail", "40", "api", "worker"]);
+        console.error(
+          logs.stdout.replaceAll(ownerToken, "[redacted]").replaceAll(vaultKey, "[redacted]"),
+        );
+        throw error;
+      }
       const serviceOutput = (await compose(["ps", "--format", "json"])).stdout.trim();
       const services = serviceOutput.startsWith("[")
         ? JSON.parse(serviceOutput)
