@@ -18,6 +18,7 @@ import { MatchingRepository } from "../../packages/persistence/src/matching-repo
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { identity, policy } from "../helpers/candidate-fixtures.js";
 import { greenhouseFixture, sourceFixture } from "../helpers/discovery-fixtures.js";
+import { syntheticCatalogue } from "../helpers/route-fixtures.js";
 
 for (const engine of ["sqlite", "postgres"] as const) {
   describe.skipIf(engine === "postgres" && !process.env.AUTOPILOT_TEST_DATABASE_URL)(
@@ -286,6 +287,61 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(transport.complete).not.toHaveBeenCalled();
         expect((await matching.snapshot(5)).route.status).toBe("paused");
         expect((await matching.snapshot(5)).budget.used).toBe(0);
+      });
+
+      it("selects and caches measured routes by task class without reusing drafting rankings for triage", async () => {
+        vi.setSystemTime(new Date("2026-10-09T12:00:00.000Z"));
+        const { jobId } = await profileAndJob();
+        const models = ["synthetic/triage:free", "synthetic/drafter:free"];
+        const catalogue = { data: models.flatMap((model) => syntheticCatalogue(model).data) };
+        const samples = vi.spyOn(matching, "routeSamples").mockImplementation(async (allocation) =>
+          models.flatMap((model) =>
+            Array.from({ length: 5 }, (_, index) => ({
+              modelId: model,
+              provider: "synthetic",
+              accepted: model === models[allocation === "packet_drafting" ? 1 : 0] || index < 3,
+              latencyMs: 20,
+              observedAt: new Date().toISOString(),
+            })),
+          ),
+        );
+        const input = await matching.input(jobId);
+        const transport = {
+          catalogue: vi.fn(async () => catalogue),
+          complete: vi.fn(async (request: CompletionRequest) => ({
+            model: request.model,
+            provider: "synthetic",
+            content: JSON.stringify(fixtureProposal(input)),
+            usage: { promptTokens: 20, completionTokens: 10 },
+          })),
+        };
+        const config = {
+          ...loadConfig({}),
+          profile: "local" as const,
+          inference: {
+            enabled: true,
+            apiKey: "synthetic-private-key-not-real",
+            dailyLimit: 50,
+            modelAllowlist: models,
+            providerAllowlist: ["synthetic"],
+          },
+        };
+        const runner = new MatchingRunner(matching, config, transport);
+        await runner.prepareRoute("packet_drafting");
+        expect((await matching.snapshot(50)).route).toMatchObject({
+          modelId: models[1],
+          allocationClass: "packet_drafting",
+        });
+        await runner.prepareRoute("packet_drafting");
+        expect(transport.catalogue).toHaveBeenCalledOnce();
+        expect((await runner.assessNow(jobId)).outcome).toBe("auto_eligible");
+        expect((await matching.snapshot(50)).route).toMatchObject({
+          modelId: models[0],
+          allocationClass: "semantic_triage",
+        });
+        expect(transport.catalogue).toHaveBeenCalledTimes(2);
+        expect(samples).toHaveBeenCalledWith("packet_drafting");
+        expect(samples).toHaveBeenCalledWith("semantic_triage");
       });
 
       it("rechecks a reviewed route transactionally when reserving and recording a disclosure", async () => {

@@ -10,7 +10,6 @@ import {
 } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { ArtifactStore } from "../../../packages/documents/src/artifact-store.js";
-import { generatePacketContent } from "../../../packages/documents/src/domain.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
 import { GmailService } from "../../../packages/email/src/service.js";
@@ -29,11 +28,22 @@ import { SubmissionRepository } from "../../../packages/persistence/src/submissi
 import { VerificationRepository } from "../../../packages/persistence/src/verification-repository.js";
 import { DocumentStorage } from "../../../packages/security/src/document-storage.js";
 import { runInspectionTask } from "./inspection.js";
+import { draftWorkerLetter } from "./preparation.js";
 
 const logger = createLogger();
 const controller = new AbortController();
 process.on("SIGINT", () => controller.abort());
 process.on("SIGTERM", () => controller.abort());
+process.on("disconnect", () => controller.abort());
+process.on("message", (message) => {
+  if (
+    typeof message === "object" &&
+    message !== null &&
+    "type" in message &&
+    message.type === "shutdown"
+  )
+    controller.abort();
+});
 const config = loadConfig();
 const repository = await connect(config);
 await new CandidateRepository(repository.db, repository.ownerId).initialize();
@@ -71,9 +81,24 @@ const letterDraftRunner = config.inference.apiKey
         dailyLimit: config.inference.dailyLimit,
       }),
       config.inference.privacyRevision,
+      (allocationClass) => matching.prepareRoute(allocationClass),
     )
   : null;
-const workerId = `scheduler-${randomUUID().slice(0, 8)}`;
+const workerId = `scheduler-${config.runtimeInstance ? `${config.runtimeInstance}-` : ""}${randomUUID().slice(0, 8)}`;
+let heartbeatPending: Promise<void> = Promise.resolve();
+let heartbeatRunning = false;
+const heartbeatTimer = setInterval(() => {
+  if (heartbeatRunning) return;
+  heartbeatRunning = true;
+  heartbeatPending = repository
+    .heartbeat(workerId, "scheduler")
+    .catch(() => {
+      logger.warn("Worker heartbeat deferred.");
+    })
+    .finally(() => {
+      heartbeatRunning = false;
+    });
+}, 15000);
 try {
   while (!controller.signal.aborted) {
     try {
@@ -165,10 +190,7 @@ try {
                 .filter((question) => /^[A-Z]{2}$/.test(question.country)),
               new Date().toISOString().slice(0, 10),
             );
-            const letterDraft =
-              config.profile === "demo"
-                ? undefined
-                : await letterDraftRunner?.draft(input, generatePacketContent(input));
+            const letterDraft = await draftWorkerLetter(config, input, letterDraftRunner);
             if (config.profile !== "demo" && !letterDraft)
               throw new DomainError("MODEL_ROUTE_INELIGIBLE", "LLM letter route is unavailable.");
             const packet = await documents.savePacket(
@@ -343,7 +365,10 @@ try {
     }
   }
 } finally {
+  clearInterval(heartbeatTimer);
+  await heartbeatPending;
   await mailSync;
   await gmail.close();
   await repository.db.close();
+  if (process.connected) process.disconnect();
 }

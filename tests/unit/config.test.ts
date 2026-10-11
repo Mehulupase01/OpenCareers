@@ -10,7 +10,26 @@ describe("configuration fails closed", () => {
       host: "127.0.0.1",
       externalSubmissionEnabled: false,
       ownerId: "synthetic-owner",
+      inference: { letterReviewEnabled: false },
     });
+  });
+  it("keeps letter critique default-off and requires configured private inference for opt-in", () => {
+    expect(() => loadConfig({ AUTOPILOT_LETTER_REVIEW: "true" })).toThrow(/private inference/);
+    const env = {
+      AUTOPILOT_PROFILE: "local",
+      AUTOPILOT_DATA_DIR: resolve(process.cwd(), "..", "private-review-test"),
+      AUTOPILOT_OWNER_TOKEN: "x".repeat(40),
+      AUTOPILOT_LETTER_REVIEW: "true",
+    };
+    expect(() => loadConfig(env)).toThrow(/private inference/);
+    expect(
+      loadConfig({
+        ...env,
+        AUTOPILOT_OPENROUTER_API_KEY: "synthetic-key-not-real",
+        AUTOPILOT_OPENROUTER_MODEL_ALLOWLIST: "synthetic/model:free",
+        AUTOPILOT_OPENROUTER_PROVIDER_ALLOWLIST: "synthetic",
+      }).inference.letterReviewEnabled,
+    ).toBe(true);
   });
   it("accepts a private restore checksum but rejects malformed and demo restore activation", () => {
     const base = {

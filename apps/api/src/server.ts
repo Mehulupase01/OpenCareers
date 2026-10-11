@@ -129,7 +129,36 @@ export async function buildServer(
       await repository.db.query(
         "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1",
       );
-      return { status: "ready", version: VERSION, profile: config.profile };
+      return {
+        status: "ready",
+        version: VERSION,
+        profile: config.profile,
+        ...(config.runtimeInstance ? { instance: config.runtimeInstance } : {}),
+      };
+    } catch {
+      return reply.code(503).send({ status: "unavailable", code: "STORAGE_UNAVAILABLE" });
+    }
+  });
+  app.get("/health/runtime", async (_request, reply) => {
+    try {
+      const row = (
+        await repository.db.query(
+          "SELECT last_seen_at FROM workers WHERE owner_id=$1 AND kind='scheduler' AND version=$2 AND id LIKE $3 ORDER BY last_seen_at DESC LIMIT 1",
+          [
+            repository.ownerId,
+            VERSION,
+            config.runtimeInstance ? `scheduler-${config.runtimeInstance}-%` : "%",
+          ],
+        )
+      )[0];
+      const age = row ? Date.now() - Date.parse(String(row.last_seen_at)) : Number.NaN;
+      if (!Number.isFinite(age) || age < 0 || age > 90000)
+        return reply.code(503).send({ status: "unavailable", code: "WORKER_UNAVAILABLE" });
+      return {
+        status: "ready",
+        version: VERSION,
+        ...(config.runtimeInstance ? { instance: config.runtimeInstance } : {}),
+      };
     } catch {
       return reply.code(503).send({ status: "unavailable", code: "STORAGE_UNAVAILABLE" });
     }

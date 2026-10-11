@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { usableFact } from "../../candidate/src/domain.js";
-import { nodeAllocation, nodeInputSchema, nodeOutputSchema } from "../../contracts/src/agents.js";
+import {
+  type AllocationClass,
+  nodeAllocation,
+  nodeOutputSchema,
+} from "../../contracts/src/agents.js";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
 import { DomainError } from "../../contracts/src/index.js";
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
 import { type PureNodeHandler, validateNodeOutput } from "./graph.js";
+import { minimizedPreparationNode } from "./preparation-input.js";
 import {
   assertPrivacyRoute,
-  careerTextMinimizer,
   type PrivacyRevision,
   privacyBinding,
   providerPrivacy,
@@ -32,50 +35,16 @@ export function createPreparationNodeHandler(
   transport: Pick<OpenRouterTransport, "complete">,
   profileFacts: CandidateFact[],
   revision: PrivacyRevision = "strict-zdr-v1",
+  prepareRoute?: (allocationClass: AllocationClass) => Promise<void>,
 ): PureNodeHandler {
   const facts = structuredClone(profileFacts);
-  const minimize = careerTextMinimizer(facts);
   return async (rawNode, limits) => {
     limits.signal.throwIfAborted();
-    const node = nodeInputSchema.parse(rawNode);
+    const { node, safe } = minimizedPreparationNode(rawNode, facts, revision);
     if (limits.maxRequests !== 1 || limits.maxTokens < 1)
       throw new DomainError("MODEL_QUOTA_EXHAUSTED", "Node has no inference allocation.");
-    if (revision === "reviewed-career-facts-v1" && node.kind === "form_answer_planner")
-      throw new DomainError(
-        "MODEL_ROUTE_INELIGIBLE",
-        "Reviewed career policy does not authorize novel form questions.",
-      );
-    for (const supplied of node.input.facts) {
-      const fact = facts.find(
-        (item) => item.id === supplied.id && item.revision === supplied.revision,
-      );
-      if (
-        !fact ||
-        !usableFact(fact, new Date().toISOString().slice(0, 10)) ||
-        ["identity", "work_authorization", "availability"].includes(fact.value.kind) ||
-        !JSON.stringify(fact.value).includes(supplied.text)
-      )
-        throw new DomainError(
-          "CLAIM_UNSUPPORTED",
-          "Node facts do not match reviewed career evidence.",
-        );
-    }
-    const safe = structuredClone(node);
-    const identifiers = [
-      safe.input.jobId,
-      ...safe.input.facts.map((fact) => fact.id),
-      ...safe.input.claims.flatMap((claim) => claim.factIds),
-    ];
-    if (identifiers.some((id) => minimize(id) !== id))
-      throw new DomainError(
-        "MODEL_ROUTE_INELIGIBLE",
-        "Preparation identifiers contain private data.",
-      );
-    safe.input.description = minimize(safe.input.description);
-    for (const fact of safe.input.facts) fact.text = minimize(fact.text);
-    for (const claim of safe.input.claims) claim.text = minimize(claim.text);
-    for (const requirement of safe.input.requirements)
-      requirement.text = minimize(requirement.text);
+    await prepareRoute?.(nodeAllocation[node.kind]);
+    limits.signal.throwIfAborted();
     const route = (await ledger.snapshot(dailyLimit)).route;
     if (route.status !== "ready" || !route.modelId || !route.provider)
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "No reviewed preparation route is ready.");

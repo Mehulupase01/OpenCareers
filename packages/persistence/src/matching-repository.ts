@@ -53,6 +53,7 @@ export class MatchingRepository extends Repository {
         reason: decision.eligible ? "Eligible free route is ready." : decision.reasons.join(" "),
         privacyBinding: decision.privacyBinding ?? null,
         endpointEvidence: decision.endpointEvidence ?? null,
+        allocationClass: decision.allocationClass ?? "semantic_triage",
       };
       await tx.query(
         "INSERT INTO inference_state(owner_id,status,data,catalogue_id,updated_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(owner_id) DO UPDATE SET status=excluded.status,data=excluded.data,catalogue_id=excluded.catalogue_id,backoff_until=NULL,updated_at=excluded.updated_at",
@@ -467,6 +468,7 @@ export class MatchingRepository extends Repository {
             provider: string | null;
             reason: string;
             privacyBinding?: string;
+            allocationClass?: AllocationClass;
           }>(state)
         : { modelId: null, provider: null, reason: "Inference is not configured." };
       const day = localDay(this.clock());
@@ -500,6 +502,7 @@ export class MatchingRepository extends Repository {
           backoffUntil: (state?.backoff_until as string | null) ?? null,
           reason: data.reason,
           privacyBinding: "privacyBinding" in data ? (data.privacyBinding ?? null) : null,
+          allocationClass: "allocationClass" in data ? (data.allocationClass ?? null) : null,
         },
         budget: { day, limit: dailyLimit, used, reserved },
         assessments: latest.map((row) => assessmentSchema.parse(json(row))),

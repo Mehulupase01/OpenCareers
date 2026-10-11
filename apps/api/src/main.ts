@@ -17,12 +17,25 @@ try {
     stopping = true;
     await app.close();
     await repository.db.close();
+    if (process.connected) process.disconnect();
   };
   process.on("SIGINT", () => {
     void stop();
   });
   process.on("SIGTERM", () => {
     void stop();
+  });
+  process.on("disconnect", () => {
+    void stop();
+  });
+  process.on("message", (message) => {
+    if (
+      typeof message === "object" &&
+      message !== null &&
+      "type" in message &&
+      message.type === "shutdown"
+    )
+      void stop();
   });
   await app.listen({ host: config.host, port: config.port });
   logger.info(

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type AllocationClass, allocationClassSchema } from "./agents.js";
 import { factSchema } from "./candidate.js";
 import { idSchema, jobInputSchema } from "./index.js";
 
@@ -50,6 +51,7 @@ export const routeDecisionSchema = z
     catalogueFetchedAt: z.iso.datetime(),
     privacyBinding: z.string().max(80).optional(),
     endpointEvidence: z.unknown().optional(),
+    allocationClass: allocationClassSchema.optional(),
   })
   .strict();
 export type RouteDecision = z.infer<typeof routeDecisionSchema>;
@@ -167,6 +169,7 @@ export interface MatchingSnapshot {
     backoffUntil: string | null;
     reason: string;
     privacyBinding?: string | null;
+    allocationClass?: AllocationClass | null;
   };
   budget: { day: string; limit: number; used: number; reserved: number };
   assessments: MatchAssessment[];

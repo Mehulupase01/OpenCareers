@@ -45,6 +45,29 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("requires a fresh same-owner scheduler heartbeat for managed runtime health", async () => {
+    const { app, repository, db, headers } = await setup();
+    expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(503);
+    await repository.heartbeat("synthetic-runtime-worker", "scheduler");
+    expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(200);
+    for (const timestamp of [new Date(Date.now() - 120000), new Date(Date.now() + 120000)]) {
+      await db.query("UPDATE workers SET last_seen_at=$1 WHERE owner_id=$2", [
+        timestamp.toISOString(),
+        repository.ownerId,
+      ]);
+      expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(503);
+    }
+  });
+  it("does not accept the previous runtime generation's fresh heartbeat", async () => {
+    const instance = randomUUID();
+    const { app, repository, headers } = await setup("demo", { runtimeInstance: instance });
+    await repository.heartbeat(`scheduler-${randomUUID()}-old`, "scheduler");
+    expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(503);
+    await repository.heartbeat(`scheduler-${instance}-current`, "scheduler");
+    expect((await app.inject({ url: "/health/runtime", headers })).statusCode).toBe(200);
+    expect((await app.inject({ url: "/health/runtime", headers })).json().instance).toBe(instance);
+    expect((await app.inject({ url: "/health/ready", headers })).json().instance).toBe(instance);
+  });
   it("protects owner-source sessions, never returns their material, and allows local revocation", async () => {
     const demo = await setup();
     expect(

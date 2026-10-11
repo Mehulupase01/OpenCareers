@@ -923,3 +923,45 @@ secrets, CVs and authorizations were untouched; no real applications were sent.
 Next: complete P12 worker/task integration without granting agents submission
 authority, then independent Windows runtime engineering alongside P18 coverage.
 Genuine receipts, Gmail consent and real 24/72-hour soaks remain unfinished.
+
+## 2026-10-11: P12 Integrated Workflow And P13 Runtime
+
+Routing/ablation commit `ec192530569cbc4e8e9b114743589b56d18cdca5` is green
+in CI 38100030249 (Windows, Ubuntu, PostgreSQL). Its verified bounds and
+default-off decision close P12-G1/G5; all six P12 gates now have evidence.
+Counts: 11/19 phases, 86/128 gates. P12 is code-complete/verification-pending
+until the newer workflow ticket evidence passes milestone CI, not yet complete.
+
+See `docs/evidence/P12-workflow-integration.md`. The real batch dispatcher now
+shares the production transport/ledger, minimized evidence, isolated identities,
+bounded splitting and non-amplifying deferral. Task-class routing is persisted
+in the existing inference state and wired into worker letters. The tested worker
+letter boundary requires LLM drafting privately; optional bounded critique is
+selected only with `AUTOPILOT_LETTER_REVIEW=true`. Default is false, and generic
+graph/batch auto-dispatch remains off under the measured no-improvement decision.
+There is no template fallback for a failed private LLM call and no agent authority.
+
+P13 runtime engineering proceeds independently under the approved sequencing.
+The compiled launcher supervises API/worker, checks current-generation readiness,
+caps restart/backoff, drains through IPC and controls locally with an independent
+nonce. The actual application outlives its detached launcher, refuses duplicate
+start/unauthenticated stop, recovers after its scheduler is killed and stops
+cleanly. Future/corrupt config is refused. Explicit private config avoids the
+repository env. Metadata/error-code logs are bounded and do not retain raw child
+output. Windows startup requires explicit approval and was dry-run only; no
+scheduled task or private installation was changed. See
+`docs/evidence/P13-runtime-foundation.md` and `docs/WINDOWS-RUNTIME.md`.
+
+Frozen full check: 577 passed / 189 PostgreSQL skipped, 70 files; lint, types,
+ledger and build passed. All 58 desktop/mobile browser cases passed. Final
+generation-handshake and diagnostic-code hardening passed 22 targeted tests
+(seven lifecycle, 15 API). Do not claim a full-local 578 result. Public scan
+349 files and production audit clean before this handoff addition; final scan
+and successor CI still need recording. Existing lint/chunk-size warnings remain.
+
+No live inference or real applications were sent, and private services/DBs,
+CVs, keys, OAuth grants and standing policies were untouched. P13 still requires
+actual approved startup, packaging, scheduling, operations/capacity evidence,
+real 24-hour soak and genuine receipt-backed ramp. P14-P17 and P18 source-session
+consumption, resumable large polls, operational 20-source breadth and policy-bound
+shared-form/adapters remain. No overnight Codex continuation was created.

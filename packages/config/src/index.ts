@@ -9,6 +9,7 @@ const envSchema = z.object({
   AUTOPILOT_PORT: z.coerce.number().int().min(1024).max(65535).default(4317),
   AUTOPILOT_DATA_DIR: z.string().optional(),
   AUTOPILOT_E2E_RUN_ID: z.uuid().optional(),
+  AUTOPILOT_RUNTIME_INSTANCE: z.uuid().optional(),
   AUTOPILOT_OWNER_ID: z
     .string()
     .regex(/^[a-zA-Z0-9_.:-]+$/)
@@ -29,6 +30,7 @@ const envSchema = z.object({
     .enum(["strict-zdr-v1", "reviewed-career-facts-v1"])
     .default("strict-zdr-v1"),
   AUTOPILOT_EXTERNAL_SUBMISSION: z.enum(["true", "false"]).default("false"),
+  AUTOPILOT_LETTER_REVIEW: z.enum(["true", "false"]).default("false"),
 });
 
 export interface Config {
@@ -39,6 +41,7 @@ export interface Config {
   ownerId: string;
   ownerToken: string | undefined;
   vaultKey: string | undefined;
+  runtimeInstance?: string | undefined;
   restoreSnapshotSha256?: string | undefined;
   databaseUrl: string | undefined;
   allowedOrigins: string[];
@@ -49,6 +52,7 @@ export interface Config {
     modelAllowlist: string[];
     providerAllowlist: string[];
     privacyRevision?: PrivacyRevision;
+    letterReviewEnabled?: boolean;
   };
   externalSubmissionEnabled: boolean;
 }
@@ -157,6 +161,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   if (profile === "demo" && e.AUTOPILOT_OPENROUTER_API_KEY)
     throw new DomainError("CONFIG_INVALID", "Demo cannot use an external inference key.");
   if (
+    e.AUTOPILOT_LETTER_REVIEW === "true" &&
+    (profile === "demo" || !e.AUTOPILOT_OPENROUTER_API_KEY)
+  )
+    throw new DomainError(
+      "CONFIG_INVALID",
+      "Letter review requires a configured private inference profile.",
+    );
+  if (
     e.AUTOPILOT_INFERENCE_PRIVACY_REVISION !== "strict-zdr-v1" &&
     (profile === "demo" || !e.AUTOPILOT_OPENROUTER_API_KEY)
   )
@@ -197,6 +209,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     ownerId: profile === "demo" ? "synthetic-owner" : e.AUTOPILOT_OWNER_ID,
     ownerToken: e.AUTOPILOT_OWNER_TOKEN,
     vaultKey,
+    runtimeInstance: e.AUTOPILOT_RUNTIME_INSTANCE,
     restoreSnapshotSha256: e.AUTOPILOT_RESTORE_SNAPSHOT_SHA256,
     databaseUrl: e.AUTOPILOT_DATABASE_URL,
     allowedOrigins,
@@ -207,6 +220,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
       modelAllowlist,
       providerAllowlist,
       privacyRevision: e.AUTOPILOT_INFERENCE_PRIVACY_REVISION,
+      letterReviewEnabled: e.AUTOPILOT_LETTER_REVIEW === "true",
     },
     externalSubmissionEnabled,
   };

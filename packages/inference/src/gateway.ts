@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Config } from "../../config/src/index.js";
+import { type AllocationClass, allocationClassSchema } from "../../contracts/src/agents.js";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
 import { DomainError } from "../../contracts/src/index.js";
 import {
@@ -208,7 +209,11 @@ export class MatchingRunner {
         : null);
   }
 
-  private async route() {
+  async prepareRoute(allocationClass: AllocationClass) {
+    return this.route(allocationClassSchema.parse(allocationClass));
+  }
+
+  private async route(allocationClass: AllocationClass = "semantic_triage") {
     const current = await this.repo.snapshot(this.config.inference.dailyLimit);
     if (this.config.profile === "demo") {
       if (current.route.status !== "fixture")
@@ -233,7 +238,8 @@ export class MatchingRunner {
     if (
       fresh &&
       ["ready", "paused"].includes(current.route.status) &&
-      current.route.privacyBinding === binding
+      current.route.privacyBinding === binding &&
+      (current.route.allocationClass ?? "semantic_triage") === allocationClass
     ) {
       if (current.route.status === "ready" && current.route.modelId && current.route.provider)
         try {
@@ -260,10 +266,11 @@ export class MatchingRunner {
           dailyLimit: this.config.inference.dailyLimit,
         },
         fetchedAt,
-        await this.repo.routeSamples("semantic_triage"),
+        await this.repo.routeSamples(allocationClass),
         this.config.inference.privacyRevision,
       );
       decision.privacyBinding = binding;
+      decision.allocationClass = allocationClass;
       if (decision.eligible && decision.provider) {
         try {
           providerPrivacy(

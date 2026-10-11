@@ -157,6 +157,7 @@ describe("LLM letter proposal boundary", () => {
   });
 
   it("charges one durable reservation and returns validated route evidence", async () => {
+    const prepareRoute = vi.fn(async () => undefined);
     const ledger = {
       snapshot: vi.fn(async () => ({
         route: { status: "ready", modelId: "synthetic/model:free", provider: "synthetic" },
@@ -177,6 +178,8 @@ describe("LLM letter proposal boundary", () => {
           usage: { promptTokens: 80, completionTokens: 40 },
         }),
       },
+      "strict-zdr-v1",
+      prepareRoute,
     );
     const draft = await runner.draft(input, content);
     expect(draft.letter.motivation).toBe(proposal.motivation);
@@ -198,6 +201,10 @@ describe("LLM letter proposal boundary", () => {
       { latencyMs: expect.any(Number), tokens: 120 },
     );
     expect(ledger.release).not.toHaveBeenCalled();
+    expect(prepareRoute).toHaveBeenCalledWith("packet_drafting");
+    expect(prepareRoute.mock.invocationCallOrder[0]).toBeLessThan(
+      ledger.snapshot.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it("fails closed without a route and records a sent invalid proposal as failed", async () => {

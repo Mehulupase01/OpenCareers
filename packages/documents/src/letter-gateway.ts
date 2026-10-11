@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import type { AllocationClass } from "../../contracts/src/agents.js";
 import type { PacketContent } from "../../contracts/src/documents.js";
 import { DomainError } from "../../contracts/src/index.js";
 import {
@@ -51,6 +52,7 @@ export class LetterDraftRunner {
     private readonly dailyLimit: number,
     private readonly transport: Pick<OpenRouterTransport, "complete">,
     private readonly privacyRevision: PrivacyRevision = "strict-zdr-v1",
+    private readonly prepareRoute?: (allocationClass: AllocationClass) => Promise<void>,
   ) {}
 
   async draft(input: PacketGenerationInput, content: PacketContent) {
@@ -184,6 +186,7 @@ export class LetterDraftRunner {
     budget?.signal.throwIfAborted();
     if (budget && (budget.requests < 1 || budget.tokens < 1))
       throw new DomainError("MODEL_QUOTA_EXHAUSTED", "Letter review budget exhausted.");
+    await this.prepareRoute?.(allocationClass);
     const route = (await this.ledger.snapshot(this.dailyLimit)).route;
     if (route.status !== "ready" || !route.modelId || !route.provider)
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "No reviewed free letter route is ready.");
