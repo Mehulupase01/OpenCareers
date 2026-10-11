@@ -9,6 +9,7 @@ import type { Repository } from "../../../packages/persistence/src/repository.js
 export async function outcomeRoutes(app: FastifyInstance, repository: Repository) {
   const outcomes = new OutcomeRepository(repository.db, repository.ownerId);
   const calibration = new CalibrationRepository(repository.db, repository.ownerId);
+  app.get("/v1/outcomes/calibration/datasets", () => calibration.list());
   app.post("/v1/outcomes/calibration/datasets", (request) => calibration.record(request.body));
   app.get("/v1/outcomes/calibration/datasets/:id", (request) =>
     calibration.report(z.object({ id: z.uuid() }).parse(request.params).id),

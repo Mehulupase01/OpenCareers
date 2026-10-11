@@ -71,6 +71,11 @@ increment; the prior score-calibration commit's full CI includes that installati
 Successor CI is pending. No private owner data or service was inspected or changed.
 No new dependency, application database or submission authority was introduced.
 
+Subsequent CI 38168943996 at fb2a4c7a0f41382b6b713e3315f2a1183a352ac1
+passes Windows, Ubuntu and PostgreSQL, including the full browser suite and
+production-only Windows installation. This verifies the bounded maintainer
+workflow, not automatic correction capture or the successor diagnostics workspace.
+
 Remaining: audited automatic private proposal capture and review/export workflow,
 broader corrected-fact coverage, misclassified form and adapter-drift cases,
 tracking accepted/rejected proposals and ensuring every supported correction

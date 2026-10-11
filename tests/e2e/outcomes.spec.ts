@@ -17,11 +17,15 @@ test("outcome history preserves corrections and synthetic cohorts refuse live fr
   await expect(page.getByText("No recorded outcome", { exact: true })).toBeVisible();
   for (const kind of ["UNKNOWN", "INTERVIEW"]) {
     await page.getByLabel("Outcome", { exact: true }).selectOption(kind);
-    const local = await page.evaluate(() => {
-      const d = new Date();
+    const { asOf } = await json("/v1/operations/summary");
+    const local = await page.evaluate((serverTime: string) => {
+      const d = new Date(serverTime);
       const p = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-    });
+      const input = document.createElement("input");
+      input.type = "datetime-local";
+      input.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, "0")}`;
+      return input.value;
+    }, asOf);
     await page.getByLabel("Occurred at", { exact: true }).fill(local);
     await page
       .getByLabel("Evidence reference", { exact: true })

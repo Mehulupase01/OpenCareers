@@ -1454,3 +1454,37 @@ guards, plus private regression proposal capture. P15 dependencies, P08 genuine
 receipt, P13/P15 real-duration soaks, server/hybrid and P18 breadth remain open.
 Private services and documents remain untouched; preview stays stopped after
 execution-policy denial, and no automatic follow-up was created.
+
+## 2026-10-11: Complete Fixed-Review Workspace Workflow
+
+Regression-import commit fb2a4c7a0f41382b6b713e3315f2a1183a352ac1 is green in
+CI 38168943996 on Windows, Ubuntu and PostgreSQL, including full browser
+regressions and extracted production-only Windows installation. P16 remote
+verification records this evidence without closing another gate.
+
+The successor delivers the calibration owner workflow in Outcomes: strict
+120 KiB local JSON import, explicit reviewed-label confirmation, exact-identity
+save/retry, persisted dataset selection and responsive advisory diagnostics.
+The authenticated catalog is owner-isolated, verifies snapshot hashes/IDs and
+refuses overflow beyond 1,000 datasets rather than truncating. No labels or
+private source content are returned in catalog entries. Ranking diagnostics
+remain separate from employer outcomes and never mutate authorization or scores.
+See docs/evidence/P16-score-calibration.md for input format, ceilings and limits.
+
+Runtime pnpm check: 678 passed / 233 skipped in 90 files; lint/types/ledger/build
+pass. Final full desktop/mobile suite: 66/66 passed (3.9 minutes). Production-only
+Windows installation: 1/1 passed (26.58 seconds total). The browser test invokes
+production API handlers/migrations with private in-memory synthetic state through
+intercepted requests; the measured-report display is an explicit presentation
+fixture, not live ranking evidence. Inspected screenshots/overflow checks pass.
+Initial full-suite fixture interference and fractional-time normalization were
+fixed before the final passing run; final lint/types were rerun afterwards.
+Successor CI is pending. No private runtime, mailbox, model call or live action
+was touched; preview remains policy-blocked/stopped and no follow-up is scheduled.
+
+Counts remain 12/19 phases and 91/128 gates. P16-03/G4 are in progress, not closed.
+Next larger milestone: immutable grouped outcome cohorts with compatible-window
+comparison refusal, then pre-dispatch experiment assignment/stop guards. Scoring
+code-version compatibility, private regression proposal capture and broader form/
+adapter learning remain. Keep real receipts, Windows physical/logon drills,
+24/72-hour soaks and server/hybrid acceptance separate from synthetic evidence.

@@ -57,6 +57,15 @@ describe("API trust boundary", () => {
         .statusCode,
     ).toBe(401);
     const authenticated = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    expect(
+      (await app.inject({ url: "/v1/outcomes/calibration/datasets", headers })).statusCode,
+    ).toBe(401);
+    const catalog = await app.inject({
+      url: "/v1/outcomes/calibration/datasets",
+      headers: authenticated,
+    });
+    expect(catalog.statusCode).toBe(200);
+    expect(catalog.json()).toEqual([]);
     const fixedDataset = {
       id: randomUUID(),
       from: "2026-01-01T00:00:00.000Z",

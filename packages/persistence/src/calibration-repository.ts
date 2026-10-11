@@ -12,6 +12,29 @@ import { OwnerScope } from "./owner-scope.js";
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export class CalibrationRepository extends OwnerScope {
+  async list() {
+    const rows = await this.db.query(
+      "SELECT id,data,sha256 FROM calibration_datasets WHERE owner_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1001",
+      [this.ownerId],
+    );
+    if (rows.length > 1000)
+      throw new DomainError("STATE_INVALID", "Dataset catalog exceeds the bounded read size.");
+    return rows.map((row) => {
+      if (hash(String(row.data)) !== row.sha256)
+        throw new DomainError("STATE_INVALID", "Fixed dataset integrity check failed.");
+      const dataset = fixedCalibrationSchema.parse(JSON.parse(String(row.data)));
+      if (dataset.id !== row.id)
+        throw new DomainError("STATE_INVALID", "Fixed dataset attribution check failed.");
+      const report = scoreCalibration(dataset);
+      return {
+        id: dataset.id,
+        window: report.window,
+        status: report.status,
+        sampleSize: report.sampleSize,
+        synthetic: report.exclusions.synthetic,
+      };
+    });
+  }
   async record(raw: unknown) {
     const input = calibrationDatasetSchema.parse(raw);
     input.labels.sort((a, b) => a.assessmentId.localeCompare(b.assessmentId));

@@ -965,6 +965,29 @@ td:last-child {
   margin: 0 0 10px;
 }
 .email-workspace h3,
+.calibration-workspace {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 12px;
+  min-width: 0;
+}
+.calibration-import {
+  margin: 12px 0;
+}
+.calibration-review {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.calibration-id,
+.calibration-workspace dd,
+.calibration-workspace p {
+  overflow-wrap: anywhere;
+}
+.calibration-workspace select {
+  max-width: 100%;
+}
 .outcomes-workspace h3 {
   margin-top: 24px;
 }

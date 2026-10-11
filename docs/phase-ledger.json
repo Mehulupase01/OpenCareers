@@ -1908,7 +1908,8 @@
           "evidence": [
             "docs/evidence/P16-score-calibration.md",
             "tests/unit/score-calibration.test.ts",
-            "tests/integration/calibration.test.ts"
+            "tests/integration/calibration.test.ts",
+            "tests/e2e/calibration.spec.ts"
           ],
           "nextAction": "P16-03"
         },
@@ -1962,8 +1963,8 @@
         {
           "id": "P16-G4",
           "requirement": "No UI uses match score as a fabricated selection probability.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": ["docs/evidence/P16-score-calibration.md", "tests/e2e/calibration.spec.ts"]
         },
         {
           "id": "P16-G5",
@@ -1993,7 +1994,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "ecd45c17d923488a0c036ad4c5dbe9a639977256",
+      "lastVerifiedCommit": "fb2a4c7a0f41382b6b713e3315f2a1183a352ac1",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2006,6 +2007,12 @@
           "commit": "ecd45c17d923488a0c036ad4c5dbe9a639977256",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Fixed owner-reviewed minimized calibration datasets, digest/identity guards, model-route/job compatibility, rank/AUC diagnostics and refusal paths, browser regressions and Windows production-only installation. Not live ranking quality, successor regression import or additional P16 gate closure."
+        },
+        {
+          "runId": "38168943996",
+          "commit": "fb2a4c7a0f41382b6b713e3315f2a1183a352ac1",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
+          "covers": "Reviewed categorical regression importer and real-domain synthetic fixture consumer, privacy and redirected-folder refusals, full browser regressions and production-only Windows installation. Not automatic correction capture, successor diagnostics workspace or additional P16 gate closure."
         }
       ],
       "acceptanceTests": [],

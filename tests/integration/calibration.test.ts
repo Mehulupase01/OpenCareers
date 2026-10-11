@@ -93,6 +93,15 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const input = dataset([label(sample.id)]);
         const before = await repo.getControl();
         const report = await calibration.record(input);
+        expect(await calibration.list()).toEqual([
+          {
+            id: input.id,
+            window: report.window,
+            status: report.status,
+            sampleSize: 0,
+            synthetic: 1,
+          },
+        ]);
         expect(report).toMatchObject({
           status: "insufficient_data",
           sampleSize: 0,
@@ -184,13 +193,44 @@ for (const engine of ["sqlite", "postgres"] as const) {
           report,
         );
         const other = new CalibrationRepository(db, `other-${owner}`, now);
+        expect(await other.list()).toEqual([]);
         await expect(other.report(input.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
         await db.query("UPDATE calibration_datasets SET data='{}' WHERE owner_id=$1 AND id=$2", [
           owner,
           input.id,
         ]);
         await expect(calibration.report(input.id)).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(calibration.list()).rejects.toMatchObject({ code: "STATE_INVALID" });
         await expect(calibration.record(input)).rejects.toMatchObject({ code: "STATE_INVALID" });
+      });
+      it("refuses misattributed catalog entries and overflow instead of truncating", async () => {
+        const input = dataset([label((await assessment()).id)]);
+        await calibration.record(input);
+        const stored = (
+          await db.query("SELECT data FROM calibration_datasets WHERE owner_id=$1 AND id=$2", [
+            owner,
+            input.id,
+          ])
+        )[0];
+        const original = JSON.parse(String(stored?.data));
+        const changed = JSON.stringify({ ...original, id: randomUUID() });
+        await db.query(
+          "UPDATE calibration_datasets SET data=$1,sha256=$2 WHERE owner_id=$3 AND id=$4",
+          [changed, hash(changed), owner, input.id],
+        );
+        await expect(calibration.list()).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await db.query("DELETE FROM calibration_datasets WHERE owner_id=$1", [owner]);
+        await db.transaction(async (tx) => {
+          for (let index = 0; index < 1001; index++) {
+            const id = randomUUID();
+            const data = JSON.stringify({ ...original, id });
+            await tx.query(
+              "INSERT INTO calibration_datasets(owner_id,id,binding,data,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6)",
+              [owner, id, hash(id), data, hash(data), now().toISOString()],
+            );
+          }
+        });
+        await expect(calibration.list()).rejects.toMatchObject({ code: "STATE_INVALID" });
       });
     },
   );

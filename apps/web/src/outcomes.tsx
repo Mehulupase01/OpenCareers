@@ -8,6 +8,7 @@ import {
   outcomeKindSchema,
 } from "../../../packages/contracts/src/outcome.js";
 import { request } from "./api.js";
+import { CalibrationWorkspace } from "./calibration.js";
 
 export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
   const [applicationId, setApplicationId] = useState("");
@@ -212,7 +213,7 @@ export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
               Occurred at
               <input
                 type="datetime-local"
-                step="1"
+                step="0.001"
                 required
                 value={occurredAt}
                 onChange={(event) => setOccurredAt(event.target.value)}
@@ -344,6 +345,7 @@ export function OutcomesWorkspace({ summary }: { summary: OperationsSummary }) {
           </dl>
         </div>
       )}
+      <CalibrationWorkspace />
     </section>
   );
 }
