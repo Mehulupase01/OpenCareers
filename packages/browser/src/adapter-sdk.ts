@@ -7,6 +7,7 @@ import type { PacketSnapshot } from "../../contracts/src/documents.js";
 import { DomainError, FormDriftError } from "../../contracts/src/index.js";
 import type { ReceiptEvidence } from "../../contracts/src/submission.js";
 import { startMockAts } from "../../mock-ats/src/server.js";
+import { assertPacketBackedValues } from "./adapter.js";
 import type { FormAnswerGuard } from "./answer-guard.js";
 import { commitPreparedMockPacket, DefinitiveMockRejection } from "./commit-mock.js";
 import {
@@ -148,6 +149,7 @@ class MockSubmissionAdapter implements SubmissionAdapter {
 
   async prepare(input: AdapterPrepareInput) {
     const target = mockTargetSchema.parse(input.target);
+    assertPacketBackedValues(input.packet, input.approvedValues);
     return prepareMockPacket(
       input.packet,
       input.cvPdf,
@@ -206,8 +208,10 @@ class RecruiteeSubmissionAdapter implements SubmissionAdapter {
   }
 
   async prepare(input: AdapterPrepareInput) {
+    const target = this.parseTarget(input.target);
+    assertPacketBackedValues(input.packet, input.approvedValues);
     return prepareRecruiteePacket(
-      this.parseTarget(input.target),
+      target,
       input.packet,
       input.cvPdf,
       input.approvedValues,
@@ -253,8 +257,10 @@ class GreenhouseSubmissionAdapter implements SubmissionAdapter {
   }
 
   async prepare(input: AdapterPrepareInput) {
+    const target = this.parseTarget(input.target);
+    assertPacketBackedValues(input.packet, input.approvedValues);
     return prepareGreenhousePacket(
-      this.parseTarget(input.target),
+      target,
       input.packet,
       input.cvPdf,
       input.approvedValues,

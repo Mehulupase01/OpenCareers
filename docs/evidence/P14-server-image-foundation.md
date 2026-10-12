@@ -62,3 +62,12 @@ test covered policy, not transport. Probes and synthetic CI clients now use
 native node:http with bounded timeouts/body sizes, which preserves the configured
 Host. The API test includes an actual bound loopback socket and passes; focused
 API/context suite is 23/23. Corrected container execution remains pending.
+
+Observed successor: CI 38276279477 at
+97ea23dc252a12654fa4db81559ddee5a6d72c9f passes server-image, Ubuntu and
+PostgreSQL. The image lane actually builds/inspects the image, runs isolated
+SQLite mock receipts, and boots PostgreSQL/API/worker with passing health,
+owner authentication and unpublished database ports. This closes the previous
+health-probe execution uncertainty, not P14's full PostgreSQL workflow, TLS,
+hybrid, migration or deployment gates. Windows in that run failed bounded
+census/adapter-test deadlines; its successor verification is recorded separately.

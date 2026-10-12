@@ -33,4 +33,4 @@ it("measures a real owned child and removes it after closure without reading nam
     if (child.exitCode === null && child.signalCode === null) child.kill();
     await closed;
   }
-}, 30000);
+}, 60000);

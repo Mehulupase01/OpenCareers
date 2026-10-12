@@ -60,3 +60,23 @@ closing a gate. Manifest verification does not certify dependencies, browser or
 publisher authenticity. This is not a complete 72-hour outage/quota/fairness fault
 matrix, real live ramp or physical Windows reboot/suspend test. Counts remain
 12/19 phases and 95/128 gates.
+
+## Windows Verification Follow-Up
+
+CI 38276279477 passes Linux process-census coverage, PostgreSQL and server-image;
+Windows failed two 10-second CIM helper deadlines and the 15-second six-browser
+override rejection test. The observed evidence establishes timeouts, not a
+proven underlying hosted-runner cause. Windows census now uses the qualified
+CIM command, requests only PID/parent/birth/working-set properties and allows
+20 seconds per helper; the 30-second sampling continuity bound is unchanged.
+The native two-census test is bounded at 60 seconds. Fresh-install test overhead
+is bounded at 360 seconds with individual subprocess deadlines unchanged.
+
+Packet-backed overrides now fail at each adapter's entry before browser/HTTP
+work, retaining the planning-time checks. Eighteen rejection cases across mock,
+Recruitee and Greenhouse assert zero browser launches and zero injected HTTP
+requests. Focused process/monitored/SDK tests pass 9/9; expanded SDK 3/3 and types
+pass. Full local check passes 742 / 261 skips in 100 files, including build,
+lint/types/ledger. A fresh production-only Windows install passes 1/1 in 131.21
+seconds. Public-source scan passes 463 selected files before these evidence
+updates. Successor Windows CI remains pending; no soak or additional gate closes.

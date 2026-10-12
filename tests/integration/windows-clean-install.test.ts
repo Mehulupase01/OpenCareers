@@ -391,5 +391,5 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
       }),
     );
   },
-  240000,
+  360000,
 );

@@ -1836,3 +1836,30 @@ trace/qualification prerequisites. Continue unrelated deployment/hybrid, backup/
 restore, portal breadth and outcome engineering meanwhile. Private ports/data/
 secrets and real model/mail/employer operations were not used. No background
 coding task or goal exists; do not mistake capacity measurement for one.
+
+## 2026-10-12: Windows Census Deadlines And Early Adapter Rejection
+
+CI 38276279477 at 97ea23dc252a12654fa4db81559ddee5a6d72c9f passes server-image,
+Ubuntu and PostgreSQL. Actual container health/auth/isolation now passes after
+the native HTTP Host correction. This is not a full PostgreSQL-backed mock
+workflow, TLS/hybrid deployment or any live receipt. Windows failed bounded
+10-second census helpers and the six-browser override test's 15-second deadline.
+The underlying runner slowness is not established beyond those timeouts.
+
+Census requests only the four numeric/birth properties via qualified CIM,
+with a 20-second helper deadline; collection failure still fails closed and
+30-second continuity is unchanged. Native two-census test is bounded at 60s,
+fresh installation at 360s with existing subprocess bounds. Each registered
+adapter now rejects conflicting packet-backed overrides before any browser/HTTP
+work; planning-time validation stays. Eighteen override cases across three
+adapters assert zero launches and zero injected requests.
+
+Full local check: 742 passed / 261 skipped, 100 files, lint/types/ledger/build
+pass. Expanded SDK 3/3 and typecheck pass. Fresh extracted production-only Windows
+installation 1/1 in 131.21s, including compiled monitored capacity, mock workflow,
+recovery and independent boot/stop. Public scan 463 before these evidence updates.
+Successor CI pending. Counts remain 12/19 phases, 95/128 gates. No actual
+qualifying soak is started/completed at this checkpoint; private runtime,
+secrets and real employer/model/mail operations remain untouched. Continue with
+the frozen installed elapsed resource candidate and independent production work;
+never mark its resource trace as the complete P15 outage/quota/fairness matrix.

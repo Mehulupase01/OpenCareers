@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdapterRegistry } from "../../packages/browser/src/adapter-sdk.js";
 import type { RecruiteeRequest } from "../../packages/browser/src/recruitee.js";
+import { browserResources } from "../../packages/browser/src/resources.js";
 import type { BrowserPreparation, DryRunResult } from "../../packages/contracts/src/browser.js";
 import type { PacketSnapshot } from "../../packages/contracts/src/documents.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
@@ -45,19 +46,34 @@ afterAll(async () => {
 });
 
 describe("submission adapter SDK", () => {
-  it("rejects caller overrides of packet-backed fields before dispatch", async () => {
-    const adapter = createAdapterRegistry(root).get("mock-ats");
-    for (const key of ["full_name", "email", "phone", "motivation", "portfolio", "cv"]) {
-      await expect(
-        adapter.prepare({
-          packet,
-          cvPdf,
-          target: { fixture: "standard" },
-          approvedValues: { [key]: "unreviewed replacement" },
-          validateAnswers: async (_snapshot, plan) => plan,
-        }),
-      ).rejects.toThrow(`packet-backed field: ${key}`);
+  it("rejects caller overrides of packet-backed fields before browser or HTTP work", async () => {
+    const launchedBefore = browserResources.snapshot().launches;
+    let requests = 0;
+    const registry = createAdapterRegistry(root, {
+      recruiteeRequest: async () => {
+        requests++;
+        throw new Error("Invalid overrides must not issue HTTP requests.");
+      },
+    });
+    for (const [id, target] of [
+      ["mock-ats", { fixture: "standard" }],
+      ["recruitee", { tenant: "synthetic", offerSlug: "software-engineer" }],
+      ["greenhouse", { board: "synthetic", postingId: "123", formFingerprint: "a".repeat(64) }],
+    ] as const) {
+      for (const key of ["full_name", "email", "phone", "motivation", "portfolio", "cv"]) {
+        await expect(
+          registry.get(id).prepare({
+            packet,
+            cvPdf,
+            target,
+            approvedValues: { [key]: "unreviewed replacement" },
+            validateAnswers: async (_snapshot, plan) => plan,
+          }),
+        ).rejects.toThrow(`packet-backed field: ${key}`);
+      }
     }
+    expect(browserResources.snapshot().launches).toBe(launchedBefore);
+    expect(requests).toBe(0);
   });
 
   it("runs mock ATS through the common prepare and commit contract", async () => {

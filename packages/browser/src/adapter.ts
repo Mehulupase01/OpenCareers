@@ -113,13 +113,7 @@ export async function inspectForm(page: Page): Promise<FormSnapshot> {
   });
 }
 
-export function planFields(
-  snapshot: FormSnapshot,
-  packet: PacketSnapshot,
-  approvedValues: Record<string, string | boolean> = {},
-): FieldPlan {
-  if (snapshot.jobId !== packet.manifest.jobId)
-    throw new Error("Form and packet job identities do not match.");
+function packetBackedValues(packet: PacketSnapshot) {
   const identity = packet.content.cv.identity;
   const cv = packet.manifest.artifacts.find((artifact) => artifact.kind === "cv_pdf");
   const known: Record<string, { value: string | boolean; evidence: string[] }> = {
@@ -138,14 +132,29 @@ export function planFields(
     },
     ...(cv ? { cv: { value: cv.filename, evidence: [cv.sha256] } } : {}),
   };
-  const packetBackedKeys = new Set([
-    "full_name",
-    "email",
-    "phone",
-    "motivation",
-    "portfolio",
-    "cv",
-  ]);
+  return known;
+}
+const packetBackedKeys = new Set(["full_name", "email", "phone", "motivation", "portfolio", "cv"]);
+
+export function assertPacketBackedValues(
+  packet: PacketSnapshot,
+  approvedValues: Record<string, string | boolean> = {},
+) {
+  const known = packetBackedValues(packet);
+  for (const [key, value] of Object.entries(approvedValues)) {
+    if (packetBackedKeys.has(key) && known[key]?.value !== value)
+      throw new Error(`Approved value conflicts with packet-backed field: ${key}`);
+  }
+}
+
+export function planFields(
+  snapshot: FormSnapshot,
+  packet: PacketSnapshot,
+  approvedValues: Record<string, string | boolean> = {},
+): FieldPlan {
+  if (snapshot.jobId !== packet.manifest.jobId)
+    throw new Error("Form and packet job identities do not match.");
+  const known = packetBackedValues(packet);
   for (const answer of packet.content.answers) {
     if (packetBackedKeys.has(answer.semanticKey))
       throw new Error(`Answer conflicts with packet-backed field: ${answer.semanticKey}`);

@@ -30,11 +30,11 @@ let pageBytes: Promise<number> | undefined;
 export async function readProcessMemory(): Promise<ProcessMemoryRecord[]> {
   if (process.platform === "win32") {
     const script =
-      "$ErrorActionPreference='Stop'; Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -gt 0 -and $null -ne $_.CreationDate } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; ppid=[int]$_.ParentProcessId; start=[string]$_.CreationDate.ToUniversalTime().Ticks; rss=[double]$_.WorkingSetSize } } | ConvertTo-Json -Depth 3 -Compress";
+      "$ErrorActionPreference='Stop'; CimCmdlets\\Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate,WorkingSetSize | Where-Object { $_.ProcessId -gt 0 -and $null -ne $_.CreationDate } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; ppid=[int]$_.ParentProcessId; start=[string]$_.CreationDate.ToUniversalTime().Ticks; rss=[double]$_.WorkingSetSize } } | ConvertTo-Json -Depth 3 -Compress";
     const output = await execute(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", script],
-      { windowsHide: true, env: helperEnvironment(), timeout: 10000, maxBuffer: 4 * 1024 * 1024 },
+      { windowsHide: true, env: helperEnvironment(), timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
     );
     const raw: unknown = JSON.parse(output.stdout.trim());
     return recordsSchema.parse(Array.isArray(raw) ? raw : [raw]).filter((record) => record.pid > 0);
