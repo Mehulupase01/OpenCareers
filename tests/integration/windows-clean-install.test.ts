@@ -229,6 +229,50 @@ it.skipIf(process.env.AUTOPILOT_TEST_CLEAN_INSTALL !== "1")(
       }),
     ).rejects.toMatchObject({ code: 1 });
     const socket = createServer();
+    const measured = await execute(
+      process.execPath,
+      [
+        "dist/scripts/monitored-capacity.js",
+        "--duration",
+        "1",
+        "--interval",
+        "1",
+        "--sample",
+        "1",
+        "--cycles",
+        "1",
+      ],
+      {
+        cwd: installation,
+        env: {
+          ...installationEnvironment,
+          AUTOPILOT_PROFILE: "server",
+          AUTOPILOT_DATABASE_URL: "must-not-connect-to-private-database",
+          AUTOPILOT_DATA_DIR: "must-not-open-private-data",
+        },
+        timeout: 120000,
+        maxBuffer: 1024 * 1024,
+      },
+    );
+    const measuredResult = JSON.parse(measured.stdout);
+    expect(measuredResult).toMatchObject({
+      status: "finished",
+      stable: true,
+      cycles: 1,
+      durationSatisfied: true,
+      resourceCollectionFailed: false,
+      productionSoakGateSatisfied: false,
+    });
+    const measurementRows = (await readFile(measuredResult.report, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(measurementRows[0]).toMatchObject({
+      buildScope: "installed_manifest_artifacts",
+      commit: "unavailable_installed_artifact",
+      memoryExcludesChromiumProcesses: false,
+    });
+    expect(measuredResult.processTree.peakRssBytes).toBeGreaterThan(0);
     await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
     const address = socket.address();
     if (!address || typeof address === "string") throw new Error("Missing fixture port.");

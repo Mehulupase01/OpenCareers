@@ -110,6 +110,20 @@ checkpoint; it does not solve real challenges or submit the challenge fixture.
 It accepts no options and ignores private configuration. This is not a physical
 reboot, production deployment, live application or qualifying soak.
 
+For installed synthetic capacity measurement, run:
+
+    node dist/scripts/monitored-capacity.js --duration 60 --cycles 1
+
+This driver needs no Git, TypeScript or owner configuration. It verifies the
+installed manifest repeatedly, creates fresh mock-only storage and samples
+observed owned-process RSS/working sets, including Chromium lifecycle snapshots.
+It excludes system/GPU memory, notifies no employer and makes no real model call.
+Source/dependency/browser authenticity and full fault coverage are not certified.
+Duration can be 86400 or 259200 for actual elapsed runs; interruptions, clock
+gaps, artifact changes and resource limits fail measurement. A completed short
+run is not a soak. productionSoakGateSatisfied stays false pending independent
+review of duration, stable-build scope, complete traces and required fault evidence.
+
 The default start is synthetic demo mode; it cannot apply to real employers.
 Use node dist/scripts/runtime.js start with a clean environment and no private
 key for a demo. The API and compiled dashboard share the configured API port.

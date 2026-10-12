@@ -1803,3 +1803,36 @@ capacity measurement before claiming whole-process or actual-duration soaks.
 No qualifying soak is running, and no 24/72-hour evidence exists. Continue
 directly after this commit; private ports, profile/secrets and real model/mail/
 employer actions remain untouched.
+
+## 2026-10-12: Installed Capacity, Process Census And Actual HTTP Probes
+
+Commit 87d61d7e17fa381b2a6268dd0f47da58a2bc5b77 is pushed; CI 38271280270 has
+green Windows, Ubuntu and PostgreSQL, but the separate image lane failed health.
+Local socket reproduction confirms Node fetch ignores custom Host; native HTTP
+now supplies that exact Host in image/worker health and synthetic CI requests,
+without widening trust. API regression tests include a real bound socket (not
+only injection), focused API/context 23/23. Corrected image execution pending.
+
+The installed distribution now includes compiled capacity/monitored-capacity
+and owned-process census helpers. Installed measurement checks manifest bytes
+repeatedly, needs no Git/tsx/private env and uses fresh synthetic storage only.
+Mock-only opened/closing callbacks capture live Chromium trees; observer failure
+still closes browsers. PID birth fencing/observed orphan tracking, RSS sums,
+report/clock/resource bounds, final drain and explicit terminal records are
+implemented. Source/dependency/browser authenticity and never-observed/system/
+GPU memory are not certified. See P13-installed-process-measurement.md.
+
+Focused process tests 3/3; monitored/capacity/bundle 15/15; full batch 742 / 261
+skips in 100 files. Final terminal/drain refinement: monitored 3/3, production
+rebuild passes; extracted fresh-browser production-only Windows installation
+1/1 in 185.22 seconds, including compiled installed-manifest/no-Git measurement.
+Public scan 462 before the new evidence entry. No new UI source changed.
+Successor CI pending. Counts remain 12/19 phases, 95/128 gates; no full phase or
+soak gate closes. No actual qualifying 24/72-hour run is running or completed.
+
+Continue directly: verify corrected image CI, then arrange a frozen installed
+actual-duration resource candidate with truthful scope and independently reviewed
+trace/qualification prerequisites. Continue unrelated deployment/hybrid, backup/
+restore, portal breadth and outcome engineering meanwhile. Private ports/data/
+secrets and real model/mail/employer operations were not used. No background
+coding task or goal exists; do not mistake capacity measurement for one.

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { get as httpGet } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -158,28 +159,43 @@ it.skipIf(process.env.AUTOPILOT_TEST_SERVER_IMAGE !== "1")(
       expect(Number.isInteger(port) && port > 0).toBe(true);
       const endpoint = `http://127.0.0.1:${port}`;
       const headers = { host: "owned.synthetic.example" };
-      expect(
-        (await fetch(`${endpoint}/health/ready`, { headers, signal: AbortSignal.timeout(5000) }))
-          .status,
-      ).toBe(200);
-      expect(
-        (await fetch(`${endpoint}/health/runtime`, { headers, signal: AbortSignal.timeout(5000) }))
-          .status,
-      ).toBe(200);
-      expect(
-        (
-          await fetch(`${endpoint}/v1/operations/summary`, {
-            headers,
-            signal: AbortSignal.timeout(5000),
-          })
-        ).status,
-      ).toBe(401);
-      const authorized = await fetch(`${endpoint}/v1/operations/summary`, {
-        headers: { ...headers, authorization: `Bearer ${ownerToken}` },
-        signal: AbortSignal.timeout(5000),
-      });
+      const probe = (path: string, authenticated = false) =>
+        new Promise<{ status: number | undefined; body: string }>((resolve, reject) => {
+          const request = httpGet(
+            `${endpoint}${path}`,
+            {
+              headers: {
+                ...headers,
+                ...(authenticated ? { authorization: `Bearer ${ownerToken}` } : {}),
+              },
+            },
+            (response) => {
+              const chunks: Buffer[] = [];
+              let bytes = 0;
+              response.on("data", (chunk) => {
+                bytes += chunk.length;
+                if (bytes > 1024 * 1024)
+                  response.destroy(new Error("Synthetic probe response exceeded its bound."));
+                else chunks.push(Buffer.from(chunk));
+              });
+              response.once("end", () =>
+                resolve({
+                  status: response.statusCode,
+                  body: Buffer.concat(chunks).toString("utf8"),
+                }),
+              );
+              response.once("error", reject);
+            },
+          );
+          request.setTimeout(5000, () => request.destroy(new Error("Synthetic probe timed out.")));
+          request.once("error", reject);
+        });
+      expect((await probe("/health/ready")).status).toBe(200);
+      expect((await probe("/health/runtime")).status).toBe(200);
+      expect((await probe("/v1/operations/summary")).status).toBe(401);
+      const authorized = await probe("/v1/operations/summary", true);
       expect(authorized.status).toBe(200);
-      expect(await authorized.json()).toMatchObject({ profile: "server" });
+      expect(JSON.parse(authorized.body)).toMatchObject({ profile: "server" });
       const dbContainer = services.find(
         (service: { Service: string }) => service.Service === "database",
       );

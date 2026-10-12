@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { get as httpGet } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -62,6 +63,21 @@ describe("API trust boundary", () => {
       (await app.inject({ url: "/health/runtime", headers: { host: "owned.synthetic.example" } }))
         .statusCode,
     ).toBe(200);
+    const endpoint = await app.listen({ host: "127.0.0.1", port: 0 });
+    const wireStatus = await new Promise<number | undefined>((resolve, reject) => {
+      const request = httpGet(
+        `${endpoint}/health/runtime`,
+        { headers: { host: "owned.synthetic.example" } },
+        (response) => {
+          response.resume();
+          response.once("end", () => resolve(response.statusCode));
+          response.once("error", reject);
+        },
+      );
+      request.setTimeout(5000, () => request.destroy(new Error("Synthetic probe timed out.")));
+      request.once("error", reject);
+    });
+    expect(wireStatus).toBe(200);
     expect(
       (
         await app.inject({

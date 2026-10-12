@@ -8,7 +8,9 @@ import { z } from "zod";
 import { browserResources } from "../packages/browser/src/resources.js";
 import { loadConfig } from "../packages/config/src/index.js";
 import { connect } from "../packages/persistence/src/index.js";
+import { verifyWindowsBundle } from "./bundle-verification.js";
 import { capacityScenarios, createCapacityFixture } from "./capacity-fixture.js";
+import type { OwnedProcessTracker } from "./owned-processes.js";
 
 export const capacityOptions = z
   .object({
@@ -39,6 +41,7 @@ export async function capacityDirectorySize(directory: string, maxFiles = 20000)
 }
 
 export async function capacityBuildFingerprint(root: string) {
+  if (import.meta.filename.endsWith(".js")) return (await verifyWindowsBundle(root)).manifestSha256;
   const paths = execFileSync(
     "git",
     [
@@ -53,6 +56,10 @@ export async function capacityBuildFingerprint(root: string) {
       "scripts/capacity-fixture.ts",
       "scripts/capacity-run.ts",
       "scripts/capacity.ts",
+      "scripts/owned-processes.ts",
+      "scripts/monitored-capacity-run.ts",
+      "scripts/monitored-capacity.ts",
+      "packages/browser/src/runtime.ts",
       "tests/fixtures/document-packets.ts",
       "package.json",
       "pnpm-lock.yaml",
@@ -82,13 +89,17 @@ export async function runCapacity(
     report: string;
     fingerprint: string;
     commit: string;
-  }) => void,
+  }) => void | Promise<void>,
+  processProbe?: () => Promise<ReturnType<OwnedProcessTracker["sample"]>>,
 ) {
   // Validate before opening storage; no env file, credentials, target URL or private path is accepted.
   const options = capacityOptions.parse(raw);
-  const root = await realpath(resolve(import.meta.dirname, ".."));
+  const installed = import.meta.filename.endsWith(".js");
+  const root = await realpath(resolve(import.meta.dirname, installed ? "../.." : ".."));
   const fingerprint = await capacityBuildFingerprint(root);
-  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const commit = installed
+    ? "unavailable_installed_artifact"
+    : execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   const directory = await mkdtemp(join(await realpath(tmpdir()), "opencareers-capacity-"));
   const config = {
     ...loadConfig({ AUTOPILOT_E2E_RUN_ID: randomUUID() }, root),
@@ -146,11 +157,13 @@ export async function runCapacity(
     const storage = await capacityDirectorySize(directory);
     const memory = process.memoryUsage();
     const browser = browserResources.snapshot();
+    const processTree = processProbe ? await processProbe() : null;
     if (
       summary.counts.pendingTasks > 50 ||
       retries > 4 ||
       storage.bytes > 512 * 1024 * 1024 ||
-      memory.rss > 1024 * 1024 * 1024
+      memory.rss > 1024 * 1024 * 1024 ||
+      (processTree && (processTree.peakRssBytes > 2 * 1024 ** 3 || processTree.peakProcesses > 128))
     )
       throw new Error("Synthetic capacity resource bound exceeded.");
     await append({
@@ -168,6 +181,7 @@ export async function runCapacity(
       storage,
       memory: { scope: "node_driver_process_only", ...memory },
       browser,
+      processTree,
     });
   };
   try {
@@ -182,9 +196,10 @@ export async function runCapacity(
       realModelCalls: false,
       letterMethod: "deterministic_synthetic_fixture",
       matchingMethod: "reviewed_synthetic_assessment_replay",
-      memoryExcludesChromiumProcesses: true,
+      memoryExcludesChromiumProcesses: !processProbe,
+      buildScope: installed ? "installed_manifest_artifacts" : "runtime_source",
     });
-    onStart?.({ directory, report, fingerprint, commit });
+    await onStart?.({ directory, report, fingerprint, commit });
     const cycle = signal.aborted ? null : await createCapacityFixture(repository, directory);
     while (!signal.aborted && cycle && (cycles === 0 || performance.now() < deadline)) {
       if (performance.now() >= nextSample) {

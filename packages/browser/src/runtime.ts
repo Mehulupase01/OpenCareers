@@ -2,6 +2,24 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { classifyHandoffRequest, type HandoffPolicy } from "./handoff-policy.js";
 import { browserResources } from "./resources.js";
 
+const mockObservers = new Set<(phase: "opened" | "closing") => Promise<void>>();
+export function observeOwnedMockBrowsers(observer: (phase: "opened" | "closing") => Promise<void>) {
+  mockObservers.add(observer);
+  return () => {
+    mockObservers.delete(observer);
+  };
+}
+async function observeMock(phase: "opened" | "closing") {
+  for (const observer of mockObservers) await observer(phase);
+}
+async function closeMock(browser: Browser) {
+  try {
+    await observeMock("closing");
+  } finally {
+    await browser.close();
+  }
+}
+
 export interface OwnedBrowser {
   browser: Browser;
   context: BrowserContext;
@@ -48,6 +66,7 @@ async function launchOwnedBrowser(
       return route.continue();
     });
     const page = await context.newPage();
+    await observeMock("opened");
     return {
       browser,
       context,
@@ -55,7 +74,7 @@ async function launchOwnedBrowser(
       get blockedCommitCount() {
         return blockedCommitCount;
       },
-      close: () => browser.close(),
+      close: () => closeMock(browser),
     };
   } catch (error) {
     await browser.close();

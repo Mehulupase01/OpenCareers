@@ -54,3 +54,11 @@ rejected by the exact server host guard. Image/worker probes and synthetic CI
 client now send the configured HTTPS Host instead; allowed hosts are not widened.
 The focused API/context suite passes 23/23. Corrected container execution remains
 pending until observed, so no additional deployment gate closes.
+
+Wire follow-up: 38271280270 at 87d61d7 passes Windows, Ubuntu and PostgreSQL,
+but its image lane still fails health. A real local Node socket reproduction
+shows pinned Node fetch ignores a custom Host header; the earlier injection
+test covered policy, not transport. Probes and synthetic CI clients now use
+native node:http with bounded timeouts/body sizes, which preserves the configured
+Host. The API test includes an actual bound loopback socket and passes; focused
+API/context suite is 23/23. Corrected container execution remains pending.
