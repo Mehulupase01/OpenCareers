@@ -2,6 +2,18 @@ import { z } from "zod";
 import { idSchema } from "./index.js";
 import { cohortInputSchema, outcomeKindSchema } from "./outcome.js";
 
+export const submissionCohortMetadataSchema = z
+  .object({
+    method: z.literal("frozen_job_at_intent_v1"),
+    jobId: idSchema,
+    jobSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    source: z.string().min(1).max(100),
+    roleFamily: z.string().min(1).max(80),
+    synthetic: z.boolean(),
+  })
+  .strict();
+export type SubmissionCohortMetadata = z.infer<typeof submissionCohortMetadataSchema>;
+
 export const cohortDimensionSchema = z.enum([
   "source",
   "roleFamily",
@@ -38,6 +50,7 @@ export const fixedCohortSchema = z
               .regex(/^[a-f0-9]{64}$/)
               .nullable(),
             metadataSha256: z.string().regex(/^[a-f0-9]{64}$/),
+            metadataOrigin: z.literal("submission_intent").optional(),
             experiment: z
               .object({
                 id: z.uuid(),

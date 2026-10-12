@@ -25,6 +25,7 @@ import { assertExperimentDispatch } from "./experiment-repository.js";
 import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
 import { assertNoRestoreReplay } from "./restore-repository.js";
+import { captureSubmissionMetadata } from "./submission-metadata.js";
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
@@ -188,6 +189,7 @@ export class SubmissionRepository extends Repository {
       );
       const snapshot = {
         experiment,
+        cohortMetadata: await captureSubmissionMetadata(tx, this.ownerId, manifest.jobId),
         applicationId,
         taskId: task.id,
         adapter: task.domain,

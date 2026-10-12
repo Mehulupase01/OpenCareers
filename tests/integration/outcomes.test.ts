@@ -12,6 +12,7 @@ import { EmailRepository } from "../../packages/persistence/src/email-repository
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { OutcomeRepository } from "../../packages/persistence/src/outcome-repository.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
+import { captureSubmissionMetadata } from "../../packages/persistence/src/submission-metadata.js";
 import { documentGenerationInput, documentJob } from "../fixtures/document-packets.js";
 
 for (const engine of ["sqlite", "postgres"] as const) {
@@ -229,6 +230,69 @@ for (const engine of ["sqlite", "postgres"] as const) {
           code: "REVISION_STALE",
         });
       });
+      it("uses intent-time metadata after job edits and rejects corrupt or misbound metadata", async () => {
+        const app = await application(false, "source-at-submission");
+        const id = await receipt(app.id, "greenhouse");
+        const jobId = String(
+          (
+            await db.query("SELECT job_id FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              app.id,
+            ])
+          )[0]?.job_id,
+        );
+        const metadata = await captureSubmissionMetadata(db, owner, jobId);
+        const snapshot = { applicationId: app.id, jobId, packetId: id, cohortMetadata: metadata };
+        const persist = async (value: unknown, checksum?: string) => {
+          const raw = JSON.stringify(value);
+          await db.query("UPDATE intents SET snapshot=$1,sha256=$2 WHERE owner_id=$3 AND id=$4", [
+            raw,
+            checksum ?? createHash("sha256").update(raw).digest("hex"),
+            owner,
+            id,
+          ]);
+        };
+        await persist(snapshot);
+        const job = JSON.parse(
+          String(
+            (await db.query("SELECT data FROM jobs WHERE owner_id=$1 AND id=$2", [owner, jobId]))[0]
+              ?.data,
+          ),
+        );
+        await db.query("UPDATE jobs SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify({ ...job, source: "later-source" }),
+          owner,
+          jobId,
+        ]);
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const report = await cohorts.record(fixedInput());
+        expect(report.metadataOrigins).toEqual({ submissionIntent: 1, legacySnapshot: 0 });
+        expect(report.groups.filter((group) => group.dimension === "source")).toMatchObject([
+          { value: "source-at-submission", denominator: 1 },
+        ]);
+        for (const value of [
+          { ...snapshot, applicationId: "wrong-application" },
+          { ...snapshot, jobId: "wrong-job" },
+          { ...snapshot, packetId: "wrong-packet" },
+          { ...snapshot, cohortMetadata: { ...metadata, jobId: "wrong-job" } },
+          { ...snapshot, cohortMetadata: null },
+        ]) {
+          await persist(value);
+          await expect(cohorts.record(fixedInput())).rejects.toMatchObject({
+            code: "STATE_INVALID",
+          });
+        }
+        await persist(snapshot, "f".repeat(64));
+        await expect(cohorts.record(fixedInput())).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await persist({ ...snapshot, cohortMetadata: { ...metadata, synthetic: true } });
+        expect(await cohorts.record(fixedInput())).toMatchObject({
+          denominator: 0,
+          exclusions: { synthetic: 1 },
+        });
+        expect(await cohorts.report(report.snapshotId)).toEqual(report);
+      });
+
       it("excludes synthetic, mock, malformed, unresolved, duplicate and recent evidence", async () => {
         const cohorts = new CohortRepository(db, owner, () => now);
         await receipt((await application()).id, "greenhouse");

@@ -1468,6 +1468,23 @@ for (const engine of ["sqlite", "postgres"] as const) {
           expectedRevision: Number(app?.revision),
         });
         expect(handle.fence).toBe(task.fence);
+        const intent = (
+          await db.query("SELECT snapshot,sha256 FROM intents WHERE owner_id=$1 AND id=$2", [
+            owner,
+            handle.intentId,
+          ])
+        )[0];
+        if (!intent) throw new Error("Expected persisted submission intent.");
+        expect(JSON.parse(String(intent.snapshot)).cohortMetadata).toMatchObject({
+          method: "frozen_job_at_intent_v1",
+          jobId: packet.manifest.jobId,
+          source: documentJob.source,
+          roleFamily: "unknown",
+          synthetic: true,
+        });
+        expect(createHash("sha256").update(String(intent.snapshot)).digest("hex")).toBe(
+          intent.sha256,
+        );
         const candidates = new CandidateRepository(db, owner, clock);
         await candidates.saveAnswer({
           semanticKey: "sponsorship_required",

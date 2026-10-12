@@ -1,4 +1,5 @@
-import { readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, it } from "vitest";
 import { browserResources } from "../../packages/browser/src/resources.js";
 import {
@@ -16,6 +17,27 @@ it("records OS-owned browser lifecycle memory without qualifying a short source 
     maxCycles: 1,
   });
   try {
+    if (result.status !== "finished") {
+      // Only this fresh synthetic harness is retained; never collect process names or env.
+      const evidence = join(process.cwd(), "test-results", "monitored-capacity");
+      await mkdir(evidence, { recursive: true });
+      for (const [name, path] of [
+        ["capacity.jsonl", result.report],
+        ["process-memory.jsonl", result.processMemoryReport],
+      ] as const) {
+        const bytes = await readFile(path);
+        await writeFile(join(evidence, name), bytes);
+      }
+      console.error(
+        JSON.stringify({
+          status: result.status,
+          cycles: result.cycles,
+          stable: result.stable,
+          resourceCollectionFailed: result.resourceCollectionFailed,
+          processSamples: result.processSamples,
+        }),
+      );
+    }
     expect(result).toMatchObject({
       status: "finished",
       cycles: 1,

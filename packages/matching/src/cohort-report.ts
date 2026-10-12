@@ -50,11 +50,17 @@ export function fixedCohortReport(raw: FixedCohort) {
     window: snapshot.window,
     recordedAt: snapshot.recordedAt,
     exclusions: snapshot.exclusions,
+    metadataOrigins: {
+      submissionIntent: snapshot.members.filter(
+        (member) => member.metadataOrigin === "submission_intent",
+      ).length,
+      legacySnapshot: snapshot.members.filter((member) => !member.metadataOrigin).length,
+    },
     ...summarize(snapshot.members, snapshot.window.minimumSample),
     groups,
     limits: [
       "Current recorded outcome at the fixed observation horizon, not cumulative conversion.",
-      "Groups use metadata captured at snapshot creation, not reconstructed submission-time metadata.",
+      "New source/role groups use intent-time metadata; legacy groups retain snapshot-time metadata and are not backfilled.",
       "Unknown metadata is not inferred. Comparisons are descriptive, not causal or hiring probabilities.",
       "Experiment groups require pre-dispatch assignment evidence; legacy records stay unassigned.",
     ],
@@ -92,6 +98,14 @@ export function compareFixedCohorts(
     (member) => (member.groups[dimension] ?? "unassigned") === rightValue,
   );
   if (!a.length || !b.length) throw new DomainError("NOT_FOUND", "Comparison group not found.");
+  if (
+    ["source", "roleFamily"].includes(dimension) &&
+    new Set([...a, ...b].map((member) => member.metadataOrigin ?? "legacy_snapshot")).size > 1
+  )
+    throw new DomainError(
+      "STATE_INVALID",
+      "Source/role comparisons require consistent metadata provenance.",
+    );
   if (dimension === "experimentVariant") {
     const reference = a[0]?.experiment;
     if (

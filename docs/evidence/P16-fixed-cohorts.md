@@ -110,3 +110,9 @@ honest calibration report. G3 stays in progress because this is not cumulative
 conversion reporting. Controlled pre-dispatch experiments, private correction
 proposal capture, broader regression cases and scoring-code compatibility remain.
 P15 dependencies and genuine live/24-hour/72-hour acceptance remain open.
+
+2026-10-12 follow-up: new intents now freeze source/role/synthetic provenance,
+while legacy records keep snapshot-time meaning and mixed source/role provenance
+cannot be compared. See P16-intent-time-metadata.md for bindings, current tests
+and remaining scope. Seniority/sponsorship remain unknown; this does not close
+the whole metadata, conversion or P16 acceptance requirement.

@@ -39,6 +39,25 @@ const fixture = (): FixedCohort => ({
   })),
 });
 describe("fixed horizon cohort reporting", () => {
+  it("distinguishes intent-time metadata and refuses mixing it with legacy source attribution", () => {
+    const snapshot = fixture();
+    snapshot.members = snapshot.members.map((member, index) =>
+      index < 20 ? { ...member, metadataOrigin: "submission_intent" } : member,
+    );
+    expect(fixedCohortReport(snapshot)).toMatchObject({
+      metadataOrigins: { submissionIntent: 20, legacySnapshot: 20 },
+    });
+    expect(() => compareFixedCohorts(snapshot, snapshot, "source", "source-a", "source-b")).toThrow(
+      "consistent metadata provenance",
+    );
+    snapshot.members = snapshot.members.map((member) => ({
+      ...member,
+      metadataOrigin: "submission_intent",
+    }));
+    expect(compareFixedCohorts(snapshot, snapshot, "source", "source-a", "source-b")).toMatchObject(
+      { status: "measured" },
+    );
+  });
   it("compares only variants of one frozen definition at its declared horizon", () => {
     const snapshot = fixture(),
       id = randomUUID();

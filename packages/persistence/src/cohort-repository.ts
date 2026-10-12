@@ -4,6 +4,8 @@ import {
   cohortSnapshotInputSchema,
   type FixedCohort,
   fixedCohortSchema,
+  type SubmissionCohortMetadata,
+  submissionCohortMetadataSchema,
 } from "../../contracts/src/cohort.js";
 import { normalizedJobSchema } from "../../contracts/src/discovery.js";
 import { packetManifestSchema } from "../../contracts/src/documents.js";
@@ -212,6 +214,28 @@ export class CohortRepository extends OwnerScope {
           exclusions.unverified++;
           continue;
         }
+        const intent = parseOptional(receipt.intent_snapshot);
+        let frozenMetadata: SubmissionCohortMetadata | undefined;
+        if (intent && typeof intent === "object" && "cohortMetadata" in intent) {
+          const parsed = submissionCohortMetadataSchema.safeParse(intent.cohortMetadata);
+          if (
+            !parsed.success ||
+            hash(String(receipt.intent_snapshot)) !== receipt.intent_sha256 ||
+            !("applicationId" in intent) ||
+            intent.applicationId !== row.id ||
+            !("jobId" in intent) ||
+            intent.jobId !== row.job_id ||
+            !("packetId" in intent) ||
+            intent.packetId !== receipt.packet_id ||
+            parsed.data.jobId !== row.job_id
+          )
+            throw new DomainError("STATE_INVALID", "Submission cohort metadata integrity failed.");
+          frozenMetadata = parsed.data;
+          if (frozenMetadata.synthetic) {
+            exclusions.synthetic++;
+            continue;
+          }
+        }
         const received = Date.parse(String(receipt.observed_at)),
           horizon = received + input.observationDays * 86400000;
         if (received < from || received > through) {
@@ -242,8 +266,10 @@ export class CohortRepository extends OwnerScope {
             ? `${manifest.data.templateVersions.cv}/${manifest.data.templateVersions.letter}/${manifest.data.letterGeneration?.method ?? "unknown"}`
             : "unknown";
         const groups = {
-          source: job.source,
-          roleFamily: families?.size === 1 ? ([...families][0] as string) : "unknown",
+          source: frozenMetadata?.source ?? job.source,
+          roleFamily:
+            frozenMetadata?.roleFamily ??
+            (families?.size === 1 ? ([...families][0] as string) : "unknown"),
           seniority: "unknown" as const,
           sponsorship: "unknown" as const,
           documentTemplate,
@@ -320,7 +346,16 @@ export class CohortRepository extends OwnerScope {
           outcome: event ? outcomeKindSchema.parse(event.kind) : "UNKNOWN",
           outcomeEventId: event ? String(event.id) : null,
           outcomeEvidenceSha256: event ? String(event.evidence_sha256) : null,
-          metadataSha256: hash(JSON.stringify(experiment ? { groups, experiment } : groups)),
+          metadataSha256: hash(
+            JSON.stringify(
+              frozenMetadata
+                ? { groups, experiment: experiment ?? null, frozenMetadata }
+                : experiment
+                  ? { groups, experiment }
+                  : groups,
+            ),
+          ),
+          ...(frozenMetadata ? { metadataOrigin: "submission_intent" as const } : {}),
           groups,
           ...(experiment ? { experiment } : {}),
         });

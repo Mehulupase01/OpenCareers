@@ -1863,3 +1863,44 @@ qualifying soak is started/completed at this checkpoint; private runtime,
 secrets and real employer/model/mail operations remain untouched. Continue with
 the frozen installed elapsed resource candidate and independent production work;
 never mark its resource trace as the complete P15 outage/quota/fairness matrix.
+
+## 2026-10-12: Frozen Resource Candidate And Intent-Time Attribution
+
+Windows repair 11f793929eb00499434f72fb093f287620c36fdd is pushed. CI 38280309801
+passes server-image, Ubuntu and PostgreSQL. Windows native census and adapter
+rejection now pass, but monitored capacity returns failed/resource collection
+failed before its first cycle. No underlying cause is established by that log;
+the successor retains only synthetic aggregate traces for diagnosis. Do not
+relax resource/continuity bounds or label Windows CI green.
+
+A hidden compiled 72-hour resource candidate is genuinely running from a frozen
+production-only installation, not the repo. See P13-resource-candidate-launch.md
+for immutable archive/manifest fingerprints, TEMP-relative recovery paths,
+process birth and actual UTC start. First guarded standard receipt and periodic
+memory samples are observed; no duration or soak gate is complete. This is an
+old-build resource candidate, not the P15 full fault matrix or proof of later
+metadata changes. Preserve its installation/evidence. No coding automation was
+created: the host's continuation scheduling tool is unavailable. Only this
+standalone benchmark can outlive the turn.
+
+New intents now freeze source, normalized role family and synthetic provenance
+under their existing digest/owner lock. Cohorts validate intent checksum and
+application/job/packet bindings; later job edits do not rewrite new history.
+Resolved original listing IDs are supported, conflicting families stay unknown,
+legacy records are not backfilled and mixed-provenance source/role comparisons
+are refused. Seniority/sponsorship stay unknown. No scoring/policy/agent authority
+changes. See P16-intent-time-metadata.md.
+
+Final frozen check 745 passed / 262 skipped in 101 files, lint/types/ledger/build
+pass. Final focused reporting/metadata/outcomes 19 / 14 skips. Desktop/mobile
+outcome/mock-submission checks 24/24. Fresh compiled production-only Windows
+install 1/1 in 139.68s. Earlier broad run overlapped source edits and failed;
+only the subsequent frozen full pass counts. Public scan 465 before evidence
+updates. Successor CI pending; PostgreSQL cases are not claimed locally. Counts
+remain 12/19 phases and 95/128 gates. Private runtime/secrets and real employer,
+model and mailbox operations were untouched.
+
+Next: inspect successor Windows failure traces without guessing a cause; keep
+independent shared-form integration, server/hybrid, backup/restore and portal
+breadth engineering moving. Review the candidate's actual terminal evidence
+when available, and rerun affected acceptance on a qualifying stable release.
