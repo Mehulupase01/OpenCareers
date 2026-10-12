@@ -1,5 +1,30 @@
 import { expect, it } from "vitest";
-import { OwnedProcessTracker } from "../../scripts/owned-processes.js";
+import { OwnedProcessTracker, processCensusEnvironment } from "../../scripts/owned-processes.js";
+
+it("retains Windows launcher OS prerequisites without forwarding application or provider secrets", () => {
+  const input = {
+    PATH: "synthetic-path",
+    SYSTEMDRIVE: "C:",
+    APPDATA: "synthetic-appdata",
+    LOCALAPPDATA: "synthetic-local-appdata",
+    PROGRAMFILES: "synthetic-program-files",
+    "PROGRAMFILES(X86)": "synthetic-program-files-x86",
+    AUTOPILOT_OWNER_TOKEN: "private-sentinel",
+    AUTOPILOT_VAULT_KEY: "private-sentinel",
+    OPENROUTER_API_KEY: "private-sentinel",
+    GITHUB_TOKEN: "private-sentinel",
+    PSModulePath: "unreviewed-module-search-path",
+  };
+  expect(processCensusEnvironment(input)).toEqual({
+    PATH: input.PATH,
+    SYSTEMDRIVE: input.SYSTEMDRIVE,
+    APPDATA: input.APPDATA,
+    LOCALAPPDATA: input.LOCALAPPDATA,
+    PROGRAMFILES: input.PROGRAMFILES,
+    "PROGRAMFILES(X86)": input["PROGRAMFILES(X86)"],
+  });
+  expect(input.AUTOPILOT_OWNER_TOKEN).toBe("private-sentinel");
+});
 
 const row = (pid: number, ppid: number, start: string, rss = 100) => ({ pid, ppid, start, rss });
 it("counts only the owned tree, retains observed orphans and never adopts PID reuse", () => {

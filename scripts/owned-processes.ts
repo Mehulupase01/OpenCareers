@@ -18,10 +18,12 @@ const processRecordSchema = z
   .strict();
 export type ProcessMemoryRecord = z.infer<typeof processRecordSchema>;
 const recordsSchema = z.array(processRecordSchema).max(20000);
-function helperEnvironment() {
+export function processCensusEnvironment(source: NodeJS.ProcessEnv = process.env) {
   return Object.fromEntries(
-    Object.entries(process.env).filter(([key]) =>
-      /^(PATH|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|TEMP|TMP|HOME|USERPROFILE)$/i.test(key),
+    Object.entries(source).filter(([key]) =>
+      /^(SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|PATHEXT|PATH|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|PROGRAMFILES|PROGRAMFILES\(X86\))$/i.test(
+        key,
+      ),
     ),
   );
 }
@@ -34,7 +36,12 @@ export async function readProcessMemory(): Promise<ProcessMemoryRecord[]> {
     const output = await execute(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", script],
-      { windowsHide: true, env: helperEnvironment(), timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
+      {
+        windowsHide: true,
+        env: processCensusEnvironment(),
+        timeout: 20000,
+        maxBuffer: 4 * 1024 * 1024,
+      },
     );
     const raw: unknown = JSON.parse(output.stdout.trim());
     return recordsSchema.parse(Array.isArray(raw) ? raw : [raw]).filter((record) => record.pid > 0);
@@ -42,7 +49,7 @@ export async function readProcessMemory(): Promise<ProcessMemoryRecord[]> {
   if (process.platform !== "linux")
     throw new Error("Owned-process memory measurement supports Windows and Linux only.");
   pageBytes ??= execute("getconf", ["PAGESIZE"], {
-    env: helperEnvironment(),
+    env: processCensusEnvironment(),
     timeout: 5000,
     maxBuffer: 1024,
   }).then((result) =>

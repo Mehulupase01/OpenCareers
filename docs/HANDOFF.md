@@ -1904,3 +1904,37 @@ Next: inspect successor Windows failure traces without guessing a cause; keep
 independent shared-form integration, server/hybrid, backup/restore and portal
 breadth engineering moving. Review the candidate's actual terminal evidence
 when available, and rerun affected acceptance on a qualifying stable release.
+
+## 2026-10-12: Hosted Windows Census Startup Investigation
+
+At c8879630bc4fd14b08b935054d2ba602b1e67d95, CI 38282492705 passes server-image,
+Ubuntu and PostgreSQL, including new intent/cohort parity cases. Windows fails
+both native and monitored census at their initial 20-second helper invocation.
+That happens before synthetic trace creation, so no Windows artifact exists;
+the absence is explained, not successful measurement. Root cause remains unknown.
+
+The census now preserves the same OS-only prerequisites as the established
+Windows startup host: SYSTEMDRIVE, APPDATA/LOCALAPPDATA and PROGRAMFILES variants
+in addition to the earlier subset. Application/provider/GitHub secrets and custom
+module-search paths remain excluded, with an explicit pure filtering test.
+Helper deadline stays 20s and monitored continuity stays 30s. A bounded Windows
+CI preflight records startup-only timings under the old and launcher OS subsets,
+then one full census timing. It retains no environment values or process records,
+and cannot substitute its probe result for native contract tests. Timing JSON is
+saved before the full suite for artifact collection even if later census fails.
+
+Focused process/native/monitored tests pass 7/7; types, lint and production build
+pass. Local startup probes 186.42ms / 177.38ms, census 407.10ms, all passed under
+Node v24.14.0. These local observations do not diagnose hosted-runner latency.
+Full 745-test and 24-browser baseline belongs to c887963, not this small helper
+successor; CI pending. No fresh installed or qualifying soak claim is added.
+Counts unchanged at 12/19, 95/128. Existing frozen candidate remains untouched.
+
+Next inspect the startup timing artifact and native-test results from successor
+CI. Shared hosted-form integration also needs explicit owner-reviewed origin
+permission (none exists in current authorization contracts), a DNS-pinned public
+load transport, a permanent network seal before candidate filling, canonical
+answer checks, preparation-only persistence and operator readback. Do not simply
+reuse handoff GET routing for arbitrary origins or register a generic submitter.
+No generic integration code was committed at this checkpoint. Continuation
+scheduling remains unavailable; no coding task runs outside this agent turn.

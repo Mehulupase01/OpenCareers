@@ -80,3 +80,12 @@ pass. Full local check passes 742 / 261 skips in 100 files, including build,
 lint/types/ledger. A fresh production-only Windows install passes 1/1 in 131.21
 seconds. Public-source scan passes 463 selected files before these evidence
 updates. Successor Windows CI remains pending; no soak or additional gate closes.
+
+Observed c887963 successor CI 38282492705 passes Ubuntu/PostgreSQL/server-image,
+but Windows initial census calls still hit 20 seconds before traces exist. The
+next helper preserves the established launcher's OS-only environment prerequisites
+while continuing to exclude application/provider credentials. Focused process
+tests pass 7/7, types/lint/build pass. Local bounded startup probes are 186.42ms
+and 177.38ms; census 407.10ms, with no environment values or process records
+retained. Bounded CI startup-versus-census timing evidence is added; it does not
+replace the native tests or prove a hosted cause/fix. Deadlines are unchanged.
