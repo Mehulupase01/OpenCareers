@@ -45,3 +45,12 @@ e04d8d26b876abcc45e45e116e284eedf6087e42118fe359499d9e67ed71846e.
 This is actual context preparation, not an image build. Windows installation
 and full browser behavior were unchanged; recovery successor CI is separately
 pending in run 38182786548.
+
+Follow-up: 38182786548 passed every original lane. Image runs 38183327763 and
+38183718653 built the non-root image and executed network-isolated mock receipts,
+but Compose health failed. Bounded synthetic logs show API startup succeeded.
+Focused API reproduction proves the supplied probes' loopback/service Host is
+rejected by the exact server host guard. Image/worker probes and synthetic CI
+client now send the configured HTTPS Host instead; allowed hosts are not widened.
+The focused API/context suite passes 23/23. Corrected container execution remains
+pending until observed, so no additional deployment gate closes.

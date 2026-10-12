@@ -22,6 +22,7 @@ import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, SqlExecutor } from "./database.js";
 import { assertExperimentDispatch } from "./experiment-repository.js";
+import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
 import { assertNoRestoreReplay } from "./restore-repository.js";
 
@@ -151,7 +152,13 @@ export class SubmissionRepository extends Repository {
       )
         throw new DomainError("FORM_CHANGED", "Browser preparation is stale.");
       const result = dryRunResultSchema.parse(JSON.parse(String(preparation.result)));
-      if (result.status !== "ready" || result.serverApplicationCount !== 0)
+      if (
+        result.status !== "ready" ||
+        result.serverApplicationCount !== 0 ||
+        result.snapshots.some((snapshot) =>
+          snapshot.fields.some((field) => field.kind === "unsupported"),
+        )
+      )
         throw new DomainError("FORM_CHANGED", "Browser preparation is not commit-ready.");
       if (result.adapter?.id !== task.domain)
         throw new DomainError("FORM_CHANGED", "Task adapter does not match its preparation.");
@@ -297,6 +304,10 @@ export class SubmissionRepository extends Repository {
           reason: "FORM_CHANGED",
           driftReason,
         },
+      );
+      await new RegressionRepository(this.db, this.ownerId, this.clock).capturePreDispatchDrift(
+        tx,
+        driftReason,
       );
     });
   }

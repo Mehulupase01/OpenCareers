@@ -27,6 +27,7 @@ import { ExceptionRepository } from "../../packages/persistence/src/exception-re
 import { ExperimentRepository } from "../../packages/persistence/src/experiment-repository.js";
 import { HandoffRepository } from "../../packages/persistence/src/handoff-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
+import { RegressionRepository } from "../../packages/persistence/src/regression-repository.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { SubmissionRepository } from "../../packages/persistence/src/submission-repository.js";
 import { DocumentStorage } from "../../packages/security/src/document-storage.js";
@@ -1101,6 +1102,13 @@ for (const engine of ["sqlite", "postgres"] as const) {
         if (!field) throw new Error("Expected a second-step read-back.");
         field.actual = "yes";
         await expect(browser.save(falseReadBack)).rejects.toThrow("read-back evidence");
+        const unknownReady = structuredClone(result);
+        const unknownField = unknownReady.snapshots[0]?.fields[0];
+        if (!unknownField) throw new Error("Expected form control.");
+        unknownField.kind = "unsupported";
+        await expect(browser.save(unknownReady)).rejects.toThrow("read-back evidence");
+        unknownField.required = false;
+        await expect(browser.save(unknownReady)).rejects.toThrow("read-back evidence");
         expect(await browser.snapshot()).toHaveLength(1);
         const repeated = await browser.save(result);
         expect(repeated.status).toBe("ready");
@@ -1160,6 +1168,105 @@ for (const engine of ["sqlite", "postgres"] as const) {
           tenant: "synthetic",
           offerSlug: "software-engineer",
         });
+      });
+
+      it("captures blocked required controls categorically, deduplicates repeated behavior and requires export approval", async () => {
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        const browser = new BrowserRepository(db, owner, clock);
+        const result = readyBrowserResult(packet);
+        const field = result.snapshots[0]?.fields[0];
+        const plan = result.plans[0];
+        if (!field || !plan) throw new Error("Expected synthetic form.");
+        field.kind = "unsupported";
+        field.label = "Synthetic Private Form Sentinel";
+        result.status = "needs_input";
+        result.issues = ["Synthetic Private Form Sentinel"];
+        plan.unresolved = [field.name];
+        const before = await db.query("SELECT state,revision FROM applications WHERE owner_id=$1", [
+          owner,
+        ]);
+        const capture = vi
+          .spyOn(RegressionRepository.prototype, "captureBlockedForm")
+          .mockRejectedValueOnce(new Error("Synthetic proposal write failure"));
+        await expect(browser.save(result)).rejects.toThrow("Synthetic proposal write failure");
+        capture.mockRestore();
+        expect(
+          await db.query("SELECT state,revision FROM applications WHERE owner_id=$1", [owner]),
+        ).toEqual(before);
+        expect(await browser.snapshot()).toEqual([]);
+        await browser.save(result);
+        await browser.save(result);
+        const regressions = new RegressionRepository(db, owner, clock);
+        const proposals = await regressions.list();
+        expect(proposals).toHaveLength(1);
+        expect(proposals[0]).toMatchObject({
+          state: "proposed",
+          fixture: { kind: "unsupported_form", variant: "unsupported_required_control" },
+        });
+        expect(JSON.stringify(proposals)).not.toContain("Synthetic Private Form Sentinel");
+        expect(JSON.stringify(proposals)).not.toContain(packet.manifest.applicationId);
+        const proposal = proposals[0];
+        if (!proposal) throw new Error("Expected private regression proposal.");
+        await expect(regressions.export(proposal.id)).rejects.toMatchObject({
+          code: "POLICY_REVOKED",
+        });
+        expect(await new RegressionRepository(db, `${owner}-other`, clock).list()).toEqual([]);
+        expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toEqual([]);
+      });
+
+      it("refuses unsupported controls in a legacy ready row and in canonical answer approval", async () => {
+        const clock = () => new Date("2026-09-17T09:00:00.000Z");
+        await seedProfileFacts();
+        const queue = new Repository(db, owner, clock);
+        await queue.setControl({ submissionsPaused: false });
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, { ...documentGenerationInput(), requestedAnswers: [] }),
+        );
+        const result = readyBrowserResult(packet);
+        const preparation = await new BrowserRepository(db, owner, clock).save(result);
+        const snapshot = result.snapshots[0];
+        const plan = result.plans[0];
+        const field = snapshot?.fields[0];
+        if (!snapshot || !plan || !field) throw new Error("Expected synthetic form control.");
+        field.kind = "unsupported";
+        field.required = false;
+        const checked = await new CandidateRepository(db, owner, clock).validateFormPlan(
+          packet,
+          snapshot,
+          plan,
+        );
+        expect(checked.unresolved).toContain(field.name);
+        expect(checked.entries.some((entry) => entry.name === field.name)).toBe(false);
+        await db.query("UPDATE browser_preparations SET result=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify(result),
+          owner,
+          preparation.id,
+        ]);
+        await queue.enqueue({
+          type: "submit",
+          domain: "mock-ats",
+          dedupeKey: "synthetic-legacy-control",
+          applicationId: packet.manifest.applicationId,
+        });
+        const task = await queue.claim("synthetic-control-worker", ["submit"]);
+        if (!task) throw new Error("Expected synthetic submit task.");
+        const application = (
+          await db.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
+            owner,
+            packet.manifest.applicationId,
+          ])
+        )[0];
+        await expect(
+          new SubmissionRepository(db, owner, clock).begin(task, {
+            packetId: packet.manifest.id,
+            preparationId: preparation.id,
+            expectedRevision: Number(application?.revision),
+          }),
+        ).rejects.toMatchObject({ code: "FORM_CHANGED" });
+        expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toEqual([]);
       });
 
       it.each(["before-intent", "before-dispatch", "after-dispatch", "expired"] as const)(
@@ -1516,11 +1623,30 @@ for (const engine of ["sqlite", "postgres"] as const) {
           owner,
           initial.handle.intentId,
         ]);
+        const capture = vi
+          .spyOn(RegressionRepository.prototype, "capturePreDispatchDrift")
+          .mockRejectedValueOnce(new Error("Synthetic drift proposal failure"));
+        await expect(
+          submissions.abortBeforeDispatch(initial.task, initial.handle, "RECRUITEE_FIELDS_CHANGED"),
+        ).rejects.toThrow("Synthetic drift proposal failure");
+        capture.mockRestore();
+        expect(
+          await db.query("SELECT state,dispatch_started_at FROM attempts WHERE owner_id=$1", [
+            owner,
+          ]),
+        ).toEqual([{ state: "IN_FLIGHT", dispatch_started_at: null }]);
+        expect(await new RegressionRepository(db, owner, clock).list()).toEqual([]);
         await submissions.abortBeforeDispatch(
           initial.task,
           initial.handle,
           "RECRUITEE_FIELDS_CHANGED",
         );
+        const driftProposals = await new RegressionRepository(db, owner, clock).list();
+        expect(driftProposals).toHaveLength(1);
+        expect(driftProposals[0]).toMatchObject({
+          state: "proposed",
+          fixture: { kind: "adapter_drift", variant: "changed_form_fingerprint" },
+        });
         expect((await queue.summary("demo")).applications).toContainEqual(
           expect.objectContaining({
             id: packet.manifest.applicationId,

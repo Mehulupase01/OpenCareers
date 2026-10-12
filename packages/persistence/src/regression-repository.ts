@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { DryRunResult } from "../../contracts/src/browser.js";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
-import { DomainError } from "../../contracts/src/index.js";
+import { DomainError, type FormDriftReason } from "../../contracts/src/index.js";
 import {
   compileRegressionFixture,
   parseRegressionFixture,
+  type RegressionCorrection,
   regressionFromFactCorrection,
 } from "../../security/src/regression-fixture.js";
 import type { Row, SqlExecutor } from "./database.js";
@@ -44,10 +46,66 @@ export class RegressionRepository extends OwnerScope {
     if (before.status !== "verified" || !before.reviewedAt) return;
     const correction = regressionFromFactCorrection(before, after);
     if (!correction) return;
-    const compiled = compileRegressionFixture(correction);
     const event = createHash("sha256")
       .update(JSON.stringify({ owner: this.ownerId, before, after }))
       .digest("hex");
+    await this.capture(tx, correction, event, "owner");
+  }
+
+  async captureBlockedForm(tx: SqlExecutor, result: DryRunResult) {
+    if (
+      !["needs_input", "unsupported"].includes(result.status) ||
+      !result.snapshots.some((snapshot, index) =>
+        snapshot.fields.some(
+          (field) =>
+            field.required &&
+            field.kind === "unsupported" &&
+            result.plans[index]?.unresolved.includes(field.name),
+        ),
+      )
+    )
+      return;
+    const correction = {
+      kind: "unsupported_form",
+      reviewed: true,
+      variant: "unsupported_required_control",
+    } as const;
+    const event = createHash("sha256")
+      .update(
+        JSON.stringify({
+          schema: 1,
+          kind: correction.kind,
+          adapter: result.adapter?.id ?? null,
+          version: result.adapter?.version ?? null,
+        }),
+      )
+      .digest("hex");
+    await this.capture(tx, correction, event, "system:regression");
+  }
+
+  async capturePreDispatchDrift(tx: SqlExecutor, reason: FormDriftReason) {
+    if (
+      !["MOCK_FORM_CHANGED", "RECRUITEE_FIELDS_CHANGED", "GREENHOUSE_FORM_CHANGED"].includes(reason)
+    )
+      return;
+    const correction = {
+      kind: "adapter_drift",
+      reviewed: true,
+      variant: "changed_form_fingerprint",
+    } as const;
+    const event = createHash("sha256")
+      .update(JSON.stringify({ schema: 1, kind: correction.kind, reason }))
+      .digest("hex");
+    await this.capture(tx, correction, event, "system:regression");
+  }
+
+  private async capture(
+    tx: SqlExecutor,
+    correction: RegressionCorrection,
+    event: string,
+    actor: string,
+  ) {
+    const compiled = compileRegressionFixture(correction);
     const existing = (
       await tx.query("SELECT * FROM regression_proposals WHERE owner_id=$1 AND event_sha256=$2", [
         this.ownerId,
@@ -55,7 +113,8 @@ export class RegressionRepository extends OwnerScope {
       ])
     )[0];
     if (existing) {
-      decode(existing);
+      if (decode(existing).sha256 !== compiled.sha256)
+        throw new DomainError("STATE_INVALID", "Regression event identity changed.");
       return;
     }
     const id = randomUUID();
@@ -63,7 +122,7 @@ export class RegressionRepository extends OwnerScope {
       "INSERT INTO regression_proposals(owner_id,id,event_sha256,data,sha256,state,revision,created_at) VALUES($1,$2,$3,$4,$5,'proposed',1,$6)",
       [this.ownerId, id, event, JSON.stringify(compiled.fixture), compiled.sha256, this.now()],
     );
-    await this.audit(tx, id, "regression.proposed", 1, { kind: correction.kind }, "owner");
+    await this.audit(tx, id, "regression.proposed", 1, { kind: correction.kind }, actor);
   }
   async list() {
     const rows = await this.db.query(

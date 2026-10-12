@@ -113,5 +113,7 @@ it("keeps the topology private, bounded, separately credentialed and fail-closed
   expect(dockerfile).not.toMatch(/COPY\s+\.\s/);
   expect(dockerfile).toContain("pnpm install --prod --frozen-lockfile");
   expect(dockerfile).toContain("USER 1000:1000");
+  expect(dockerfile).toContain("headers:{host}");
+  expect(compose.services.worker.healthcheck.test.join(" ")).toContain("headers:{host}");
   expect(dockerfile).not.toContain("AUTOPILOT_OWNER_TOKEN");
 });

@@ -47,6 +47,30 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("requires the configured HTTPS host on private server health probes without widening host trust", async () => {
+    const { app, repository } = await setup("local", {
+      profile: "server",
+      host: "0.0.0.0",
+      allowedOrigins: ["https://owned.synthetic.example"],
+    });
+    await repository.heartbeat("synthetic-host-probe-worker", "scheduler");
+    for (const host of ["127.0.0.1:4317", "api:4317", "attacker.example"])
+      expect((await app.inject({ url: "/health/runtime", headers: { host } })).statusCode).toBe(
+        403,
+      );
+    expect(
+      (await app.inject({ url: "/health/runtime", headers: { host: "owned.synthetic.example" } }))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          url: "/v1/operations/summary",
+          headers: { host: "owned.synthetic.example" },
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
   it("keeps regression review and export owner-authenticated and byte-minimized", async () => {
     const { app, headers, repository } = await setup("local");
     const id = randomUUID();

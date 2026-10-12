@@ -1769,3 +1769,37 @@ Continue with the server startup failure using bounded synthetic CI diagnostics,
 then broader deployment/hybrid and elapsed-soak engineering. Private runtime,
 secrets and real model/mail/employer operations remain untouched. No code task
 continues outside the current agent turn.
+
+## 2026-10-12: Automatic Form Regression Capture And Trusted Health Probes
+
+Fresh-browser commit 4e571b8d29e1fff172f4387c868a49149c0e19eb has green Windows,
+Ubuntu and PostgreSQL in 38183718653; the separate server-image lane failed.
+Its redacted logs plus local API reproduction establish a Host-probe mismatch:
+server mode refuses loopback/service Host names. Probes now send the configured
+HTTPS Host, preserving the exact host guard. Container successor CI is pending.
+
+Browser blocks and known pre-dispatch drift now propose categorical regressions
+under existing owner locks/transactions. They retain no private source text or
+IDs, deduplicate behavior rather than every job, and still require owner review
+before public export/import. Capture-write failures roll back caller state.
+Unsupported kinds also block READY storage, canonical answer approval and intent
+creation, including optional controls and legacy ready rows. No agent authority,
+policy or scoring change was introduced. See P16-automatic-form-regressions.md.
+
+Final frozen full check: 736 passed / 261 skipped in 97 files, lint/types/ledger/
+build pass. Initial legacy-row test missed its reviewed fact heads; seeded with
+the existing helper and rerun, with no production relaxation. Desktop/mobile
+review/export: 2/2. Latest compiled production-only Windows install: 1/1 (125.97s)
+with fresh browser download, receipts/recovery and independent boot/stop.
+P17-G1 closes at this documented synthetic installation level. Counts: 12/19
+phases and 95/128 gates. Full P17, live, physical and server/hybrid gates stay open.
+
+Independent next draft (not part of that frozen regression count):
+scripts/owned-processes.ts and its unit/integration tests. Windows CIM/Linux
+proc census retains only PID/parent/birth/RSS metadata, fences PID reuse, counts
+observed owned orphans and never stores process names/commands/env. Focused 3/3
+and a real Windows child census pass. Integrate it into compiled installed
+capacity measurement before claiming whole-process or actual-duration soaks.
+No qualifying soak is running, and no 24/72-hour evidence exists. Continue
+directly after this commit; private ports, profile/secrets and real model/mail/
+employer actions remain untouched.

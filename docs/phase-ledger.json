@@ -1935,6 +1935,7 @@
             "docs/evidence/P16-regression-import.md",
             "docs/evidence/P16-private-regression-proposals.md",
             "docs/evidence/P16-pipeline-history-and-form-regressions.md",
+            "docs/evidence/P16-automatic-form-regressions.md",
             "tests/integration/regression-proposals.test.ts",
             "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
@@ -2144,8 +2145,13 @@
         {
           "id": "P17-G1",
           "requirement": "A new user can install and run the synthetic demo from published instructions.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P17-fresh-browser-install.md",
+            "docs/evidence/P17-packaged-recovery.md",
+            "tests/integration/windows-clean-install.test.ts",
+            "scripts/windows-bundle.ts"
+          ]
         },
         {
           "id": "P17-G2",

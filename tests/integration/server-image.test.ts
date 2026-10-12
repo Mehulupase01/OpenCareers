@@ -157,18 +157,25 @@ it.skipIf(process.env.AUTOPILOT_TEST_SERVER_IMAGE !== "1")(
       const port = ports[ports.length - 1].PublishedPort;
       expect(Number.isInteger(port) && port > 0).toBe(true);
       const endpoint = `http://127.0.0.1:${port}`;
+      const headers = { host: "owned.synthetic.example" };
       expect(
-        (await fetch(`${endpoint}/health/ready`, { signal: AbortSignal.timeout(5000) })).status,
-      ).toBe(200);
-      expect(
-        (await fetch(`${endpoint}/health/runtime`, { signal: AbortSignal.timeout(5000) })).status,
-      ).toBe(200);
-      expect(
-        (await fetch(`${endpoint}/v1/operations/summary`, { signal: AbortSignal.timeout(5000) }))
+        (await fetch(`${endpoint}/health/ready`, { headers, signal: AbortSignal.timeout(5000) }))
           .status,
+      ).toBe(200);
+      expect(
+        (await fetch(`${endpoint}/health/runtime`, { headers, signal: AbortSignal.timeout(5000) }))
+          .status,
+      ).toBe(200);
+      expect(
+        (
+          await fetch(`${endpoint}/v1/operations/summary`, {
+            headers,
+            signal: AbortSignal.timeout(5000),
+          })
+        ).status,
       ).toBe(401);
       const authorized = await fetch(`${endpoint}/v1/operations/summary`, {
-        headers: { authorization: `Bearer ${ownerToken}` },
+        headers: { ...headers, authorization: `Bearer ${ownerToken}` },
         signal: AbortSignal.timeout(5000),
       });
       expect(authorized.status).toBe(200);

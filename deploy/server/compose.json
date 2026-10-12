@@ -94,7 +94,7 @@
           "CMD",
           "node",
           "-e",
-          "fetch('http://api:4317/health/runtime',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          "const host=new URL(process.env.AUTOPILOT_ALLOWED_ORIGINS.split(',')[0].trim()).host; fetch('http://api:4317/health/runtime',{headers:{host},signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
         ],
         "interval": "30s",
         "timeout": "5s",

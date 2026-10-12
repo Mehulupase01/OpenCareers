@@ -27,12 +27,22 @@ compiled self-tests. This closes the previous hidden shared-browser-cache gap,
 not a clean operating-system installation or live private readiness. The machine
 still has the documented Node/pnpm/system prerequisites and registry access.
 No private CV/browser session, live model/mail access or employer action occurred.
-P17-G1 awaits the successor Windows CI proof; no phase closes at this milestone.
+CI 38183718653 at 4e571b8d29e1fff172f4387c868a49149c0e19eb passed its Windows,
+Ubuntu and PostgreSQL lanes, including fresh Chromium installation and full
+browser workflows. Its separate image lane failed and is not called green.
+The subsequent guard/capture batch passes full local check (736 / 261 skips),
+desktop/mobile review flows (2/2) and the newly compiled fresh-cache Windows
+installation (1/1, 125.97 seconds). P17-G1 now closes for the documented
+synthetic installation, with explicit toolchain/system/registry prerequisites.
+No clean-OS, private live, server/hybrid or full P17 phase closure is implied.
 
 The independent server image lane at d03f9c6 built the image and passed its
 network-isolated mock leg, but Compose failed when its worker became unhealthy.
 That run did not capture service logs before cleanup. Bounded synthetic-only,
 token-redacted diagnostics are added for the next lane run; the cause is not
 yet established. It is neither a green deployment claim nor evidence of a
-particular root cause. Remaining TLS, PostgreSQL application-flow and hybrid
-requirements are unchanged.
+particular root cause. Follow-up diagnostics and a focused API reproduction
+show that health probes used a loopback/service Host rejected by the exact
+server host guard. They now send the configured HTTPS Host, without widening
+trusted hosts. The corrected container lane remains pending. Remaining TLS,
+PostgreSQL application-flow and hybrid requirements are unchanged.

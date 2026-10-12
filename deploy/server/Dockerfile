@@ -21,5 +21,5 @@ RUN node node_modules/playwright/cli.js install --with-deps chromium \
     && chown -R node:node /opt/ms-playwright /var/lib/opencareers
 USER 1000:1000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD node -e "fetch('http://127.0.0.1:4317/health/runtime',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+    CMD node -e "const host=new URL(process.env.AUTOPILOT_ALLOWED_ORIGINS.split(',')[0].trim()).host; fetch('http://127.0.0.1:4317/health/runtime',{headers:{host},signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/apps/api/src/main.js"]

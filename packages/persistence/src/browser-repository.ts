@@ -8,6 +8,7 @@ import {
 import { packetManifestSchema } from "../../contracts/src/documents.js";
 import { type ApplicationState, DomainError } from "../../contracts/src/index.js";
 import { assertTransition } from "../../domain/src/state.js";
+import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -31,6 +32,7 @@ export class BrowserRepository extends Repository {
       const plan = result.plans[index];
       const report = result.reports[index];
       if (
+        snapshot.fields.some((field) => field.kind === "unsupported") ||
         !plan ||
         !report ||
         plan.fingerprint !== snapshot.fingerprint ||
@@ -244,6 +246,10 @@ export class BrowserRepository extends Repository {
         ],
       );
       await this.audit(tx, id, "browser.prepared", 1, { status: result.status });
+      await new RegressionRepository(this.db, this.ownerId, this.clock).captureBlockedForm(
+        tx,
+        result,
+      );
       if (ready && options.queueSubmit)
         await this.enqueueIn(tx, {
           type: "submit",

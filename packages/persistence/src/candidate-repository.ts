@@ -803,6 +803,9 @@ export class CandidateRepository extends Repository {
     };
     const entries: FieldPlan["entries"] = [];
     const unresolved = new Set(plan.unresolved);
+    for (const field of snapshot.fields) {
+      if (field.kind === "unsupported") unresolved.add(field.name);
+    }
     const seenNames = new Set<string>();
     const nameParts = identity.fullName.trim().split(/\s+/);
     const given = plan.entries.find((item) => item.semanticKey === "first_name")?.expected;
@@ -821,6 +824,10 @@ export class CandidateRepository extends Repository {
       if (seenNames.has(entry.name))
         throw new DomainError("FORM_CHANGED", "An answer plan repeats an inspected field.");
       seenNames.add(entry.name);
+      if (field.kind === "unsupported") {
+        unresolved.add(field.semanticKey);
+        continue;
+      }
       if (labels[entry.semanticKey] && !labels[entry.semanticKey]?.includes(field.label)) {
         unresolved.add(entry.semanticKey);
         continue;
