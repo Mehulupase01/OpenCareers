@@ -27,6 +27,34 @@ it("retains Windows launcher OS prerequisites without forwarding application or 
 });
 
 const row = (pid: number, ppid: number, start: string, rss = 100) => ({ pid, ppid, start, rss });
+it("refuses older foreign orphans whose parent PID has been reused by an owned process", () => {
+  const tracker = new OwnedProcessTracker(10);
+  expect(
+    tracker.sample([
+      row(10, 1, "300"),
+      row(20, 10, "200"),
+      row(30, 10, "400"),
+      row(40, 30, "350"),
+      row(50, 30, "500"),
+      row(60, 20, "600"),
+    ]),
+  ).toMatchObject({ processCount: 3, rssBytes: 300 });
+  expect(tracker.owns(20)).toBe(false);
+  expect(tracker.owns(40)).toBe(false);
+  expect(tracker.owns(60)).toBe(false);
+  expect(
+    tracker.sample([
+      row(10, 1, "300"),
+      row(30, 10, "6000"),
+      row(50, 30, "500"),
+      row(70, 30, "5500"),
+      row(80, 30, "6500"),
+    ]),
+  ).toMatchObject({ processCount: 4, rssBytes: 400 });
+  expect(tracker.owns(50)).toBe(true);
+  expect(tracker.owns(70)).toBe(false);
+  expect(tracker.owns(80)).toBe(true);
+});
 it("counts only the owned tree, retains observed orphans and never adopts PID reuse", () => {
   const tracker = new OwnedProcessTracker(10);
   expect(

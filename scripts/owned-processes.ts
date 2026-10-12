@@ -32,7 +32,7 @@ let pageBytes: Promise<number> | undefined;
 export async function readProcessMemory(): Promise<ProcessMemoryRecord[]> {
   if (process.platform === "win32") {
     const script =
-      "$ErrorActionPreference='Stop'; CimCmdlets\\Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate,WorkingSetSize | Where-Object { $_.ProcessId -gt 0 -and $null -ne $_.CreationDate } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; ppid=[int]$_.ParentProcessId; start=[string]$_.CreationDate.ToUniversalTime().Ticks; rss=[double]$_.WorkingSetSize } } | ConvertTo-Json -Depth 3 -Compress";
+      "$ErrorActionPreference='Stop'; CimCmdlets\\Get-CimInstance -Query 'SELECT ProcessId,ParentProcessId,CreationDate,WorkingSetSize FROM Win32_Process' -OperationTimeoutSec 10 | Where-Object { $_.ProcessId -gt 0 -and $null -ne $_.CreationDate } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; ppid=[int]$_.ParentProcessId; start=[string]$_.CreationDate.ToUniversalTime().Ticks; rss=[double]$_.WorkingSetSize } } | ConvertTo-Json -Depth 3 -Compress";
     const output = await execute(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", script],
@@ -128,7 +128,8 @@ export class OwnedProcessTracker {
         if (
           !this.owned.has(record.pid) &&
           this.owned.get(record.ppid) === byPid.get(record.ppid)?.start &&
-          byPid.has(record.ppid)
+          byPid.has(record.ppid) &&
+          BigInt(record.start) >= BigInt(byPid.get(record.ppid)?.start ?? "0")
         ) {
           this.owned.set(record.pid, record.start);
           changed = true;

@@ -1938,3 +1938,42 @@ answer checks, preparation-only persistence and operator readback. Do not simply
 reuse handoff GET routing for arbitrary origins or register a generic submitter.
 No generic integration code was committed at this checkpoint. Continuation
 scheduling remains unavailable; no coding task runs outside this agent turn.
+
+## 2026-10-13: Parent Birth Fence And Invalidated Resource Candidate
+
+CI 38283813876 at e63f54e passes Ubuntu/PostgreSQL/server-image, not Windows.
+Its retained timing artifact shows launcher-subset PowerShell startup 181.31ms,
+but full class/property census reaches 20s. Startup is not the demonstrated
+bottleneck; the underlying enumeration cause remains unknown. Census now uses
+an explicit WQL projection of the same four properties and a 10s provider
+operation timeout inside the unchanged 20s child deadline. This is a supported
+query variant, not a proven hosted fix until successor CI is observed. Reference:
+https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1
+
+Inspection also found a real ownership defect: a foreign orphan can retain a
+parent PID later reused by an owned process. Tracker now requires child birth
+at or after the live parent's birth before adoption. Previously observed owned
+orphans remain retained; root/child PID reuse fencing and aggregate-only output
+remain. Regressions cover older root and descendant-parent aliases, legitimate
+new children, and retention of an old owned orphan after its parent PID changes.
+
+The old 72h candidate continued logging; an initial stale snapshot was not proof
+of a sampling gap. It is nevertheless invalidated by the ownership defect.
+Only its recorded root was stopped after exact PID/birth/command matching; raw
+installation/traces remain untouched. There is no qualifying soak running or
+complete. It recorded 21 cycles over about 6.7h, seven mock receipts and no
+confirmed-without-receipt records. Fresh fixed census saw two reachable processes,
+not a recovery of previously observed orphan identities; do not conclude all
+earlier resource growth was foreign. See P13-resource-candidate-launch.md.
+
+Focused process/native/monitored tests 8/8. Final frozen full check 747 passed /
+262 skipped in 101 files, lint/types/ledger/build pass. Local projected census
+434.79ms and startup probes pass; no new installed/remote proof is claimed yet.
+Counts unchanged: 12/19 phases, 95/128 gates. Private ports/configuration,
+candidate data and real employer/model/mail operations were not accessed.
+
+Next inspect successor Windows CI, then freeze a corrected installed resource
+candidate only after appropriate verification. Continue explicit owner-reviewed
+origin permissions and safe hosted preparation integration independently. Never
+add an arbitrary submitter, reuse handoff routing for arbitrary-origin SSRF, or
+grant a model/agent final-action authority.

@@ -1,5 +1,11 @@
 # Frozen Installed Resource Candidate
 
+Invalidated and stopped on 2026-10-13. The original tracker did not reject
+children older than their currently recorded parent when that parent PID was
+reused. Its claimed owned-tree resource scope therefore cannot qualify. Raw
+traces and installation are preserved; no successful finish or missing elapsed
+time has been fabricated. No qualifying resource candidate is running now.
+
 Started 2026-10-12T16:52:22.286Z, requesting 259200 actual seconds (72 hours),
 1200-second workload intervals, 60-second capacity samples and at most 216
 scenario cycles. This is a provisional resource trace, not a qualifying
@@ -42,3 +48,13 @@ reboot evidence and live ramp; 24/72-hour acceptance gates remain open.
 The benchmark can outlive the current coding turn. Continuation scheduling was
 attempted but unavailable on this host; no coding heartbeat or automation was
 created, and the benchmark is not a background coding agent.
+
+At invalidation, the trace had recorded 21 synthetic cycles over approximately
+6.7 hours, including seven correlated mock receipts and no confirmed-without-
+receipt records. Those functional observations are not a completed soak. A fresh
+corrected tracker observed two currently reachable processes, but cannot recover
+the original tracker's previously observed orphan identities: this does not prove
+that every difference was foreign or that all original descendants were drained.
+Only PID 29796 was stopped, after matching birth time and its benchmark command;
+no process-tree kill or private-service operation occurred. Existing preliminary
+memory figures above are unqualified historical observations, not accepted peaks.
