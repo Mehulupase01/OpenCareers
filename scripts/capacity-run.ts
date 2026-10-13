@@ -57,6 +57,7 @@ export async function capacityBuildFingerprint(root: string) {
       "scripts/capacity-run.ts",
       "scripts/capacity.ts",
       "scripts/owned-processes.ts",
+      "scripts/windows-process-census.ts",
       "scripts/monitored-capacity-run.ts",
       "scripts/monitored-capacity.ts",
       "packages/browser/src/runtime.ts",

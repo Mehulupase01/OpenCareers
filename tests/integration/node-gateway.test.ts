@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NodeInput } from "../../packages/contracts/src/agents.js";
+import { type NodeInput, nodeKindSchema } from "../../packages/contracts/src/agents.js";
+import { generatePacketContent } from "../../packages/documents/src/domain.js";
+import { LetterDraftRunner } from "../../packages/documents/src/letter-gateway.js";
 import { runPreparationGraph } from "../../packages/inference/src/graph.js";
 import {
   createPreparationNodeHandler,
@@ -16,7 +18,7 @@ import { GraphRepository } from "../../packages/persistence/src/graph-repository
 import { MatchingRepository } from "../../packages/persistence/src/matching-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
-import { documentFacts } from "../fixtures/document-packets.js";
+import { documentFacts, documentGenerationInput } from "../fixtures/document-packets.js";
 import { agentBinding, agentBudget, agentNode, agentOutput } from "../helpers/agent-fixtures.js";
 import { syntheticCatalogue, syntheticRoutePolicy } from "../helpers/route-fixtures.js";
 
@@ -54,6 +56,64 @@ for (const engine of ["sqlite", "postgres"] as const)
       });
       afterEach(async () => {
         await db?.close();
+      });
+      function repricedTransport() {
+        const fetcher = vi.fn(async (url: string | URL | Request) => {
+          if (!String(url).endsWith("/models")) throw new Error("Unexpected completion POST");
+          const catalogue = syntheticCatalogue(model);
+          const candidate = catalogue.data[0];
+          if (!candidate) throw new Error("Missing synthetic model");
+          candidate.pricing.prompt = "1e-9999";
+          return Response.json(catalogue);
+        });
+        return {
+          fetcher,
+          transport: new OpenRouterTransport(
+            "synthetic-not-a-real-key",
+            fetcher,
+            "strict-zdr-v1",
+            syntheticRoutePolicy(model, provider),
+          ),
+        };
+      }
+      it.each(nodeKindSchema.options)(
+        "refuses a repriced persisted-ready route for node %s before POST",
+        async (kind) => {
+          const { fetcher, transport } = repricedTransport();
+          const handler = createPreparationNodeHandler(ledger, 50, transport, documentFacts);
+          await expect(
+            handler(
+              { ...node, kind },
+              { maxTokens: 4000, maxRequests: 1, signal: new AbortController().signal },
+            ),
+          ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+          expect(fetcher).toHaveBeenCalledOnce();
+          expect(String(fetcher.mock.calls[0]?.[0])).toMatch(/\/models$/);
+          expect(await db.query("SELECT id FROM attempts WHERE owner_id=$1", [owner])).toEqual([]);
+          expect(
+            (
+              await db.query("SELECT state FROM inference_reservations WHERE owner_id=$1", [owner])
+            )[0]?.state,
+          ).toBe("failed");
+        },
+      );
+      it("refuses repricing in mandatory letter drafting without a deterministic or paid fallback", async () => {
+        const { fetcher, transport } = repricedTransport();
+        const input = documentGenerationInput();
+        const repository = new Repository(db, owner);
+        await repository.putJob(input.job);
+        input.assessment.applicationId = (
+          await repository.createApplication(input.job.id, "synthetic-candidate")
+        ).id;
+        await expect(
+          new LetterDraftRunner(ledger, 50, transport).draft(input, generatePacketContent(input)),
+        ).rejects.toMatchObject({ code: "MODEL_ROUTE_INELIGIBLE" });
+        expect(fetcher).toHaveBeenCalledOnce();
+        expect(String(fetcher.mock.calls[0]?.[0])).toMatch(/\/models$/);
+        expect(
+          (await db.query("SELECT state FROM inference_reservations WHERE owner_id=$1", [owner]))[0]
+            ?.state,
+        ).toBe("failed");
       });
       it("charges one class allocation, minimizes disclosure and reuses validated checkpoints", async () => {
         expect(productionGraphEnabled).toBe(false);

@@ -16,6 +16,11 @@ const knownPrices = new Set([
   "audio_output",
 ]);
 
+export function explicitZeroPrice(raw: unknown): boolean {
+  // Numeric JSON may already have underflowed during decoding; require exact decimal evidence.
+  return typeof raw === "string" && /^0+(?:\.0+)?(?:[eE][+-]?\d+)?$/.test(raw);
+}
+
 export function modelReasons(model: CatalogueModel, policy: RoutePolicy): string[] {
   const reasons: string[] = [];
   if (!policy.modelAllowlist.includes(model.id)) reasons.push("Model is not allowlisted.");
@@ -40,7 +45,7 @@ export function modelReasons(model: CatalogueModel, policy: RoutePolicy): string
       reasons.push(`Unknown ${dimension} price.`);
       continue;
     }
-    if (Number(raw) !== 0) reasons.push(`${dimension} price is not zero.`);
+    if (!explicitZeroPrice(raw)) reasons.push(`${dimension} price is not zero.`);
   }
   if (!(model.architecture.input_modalities ?? []).includes("text"))
     reasons.push("Text input is unsupported.");

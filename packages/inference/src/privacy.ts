@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
 import { DomainError } from "../../contracts/src/index.js";
+import { explicitZeroPrice } from "./policy.js";
 
 export type PrivacyRevision = "strict-zdr-v1" | "reviewed-career-facts-v1";
 
@@ -132,10 +133,7 @@ export function assertReviewedEndpoint(raw: unknown, model: string, provider: st
         Object.entries(item.pricing).every(
           ([key, value]) =>
             ["prompt", "completion", "discount"].includes(key) &&
-            (typeof value === "string" || typeof value === "number") &&
-            String(value).trim() !== "" &&
-            Number.isFinite(Number(value)) &&
-            Number(value) === 0,
+            (explicitZeroPrice(value) || (key === "discount" && value === 0)),
         ),
     );
   if (!endpoint)
