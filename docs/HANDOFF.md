@@ -2092,3 +2092,28 @@ user module paths remain excluded. Source/native/monitored 9/9 and types pass;
 local census744.62ms. Dispatch successor focused workflow and inspect its actual
 result before calling this fixed. Counts stay12/19 and97/128; old frozen resource
 candidate continues separately and is not modified.
+
+## 2026-10-13: Hosted Windows Failure Resolved
+
+418d5021c897bf0ebe320f260935b6aac1ba793f is remotely verified. Focused Windows
+38332235491:9/9, census2247.57ms. Full38332234815: all four lanes pass (Windows,
+Ubuntu, PostgreSQL, server-image). Windows810 passed /276 skipped,105 files;
+clean production-only installation1/1 in132.75s and70/70 desktop/mobile cases.
+Full-job census2306.32ms, launcher startup146.55ms. Pinning the OS module path,
+disabling discovery and explicit Utility import fixes the observed pre-compilation
+delay without larger deadlines or skipped contracts. Which individual change was
+decisive is not established. No physical restart/sleep/network or soak closure.
+
+Totals remain12/19 phases,97/128 gates; this turn closed P18-G2/P18-02 and P15-G3.
+The corrected-but-earlier frozen WMI candidate remains provisional, three scenarios
+at01:38Z, one mock receipt, zero missing receipts, no native-code qualification.
+It is not changed by later builds and cannot certify418d502 or a future release.
+Read its launch record and birth identity before attribution; never infer72h from
+process survival. Full fault/backup/restore and server/hybrid/portal breadth remain.
+
+Read-only private readiness probe: configured private settings parse, but loopback
+health connection is refused. No stored candidate/application data was read, no
+service started/restarted, no private database opened/migrated and no actions sent.
+Do not infer current authorization, Gmail consent or suitable live vacancies from
+configuration alone. A safe current-data/backup/readiness preflight is needed before
+private activation or P08 canary; missing live prerequisites need not halt engineering.

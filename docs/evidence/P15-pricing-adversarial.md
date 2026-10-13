@@ -50,3 +50,8 @@ an invented larger full-suite count. P15-G3 closes; P15 itself remains in progre
 CI 38330465431 at 7f63ba3 has passed PostgreSQL/server-image; Windows and Ubuntu were
 still running at this checkpoint. The bundle repair needs successor CI. No live
 model reliability, privacy review renewal or actual billing guarantee is claimed.
+
+Successor full CI38332234815 at418d502 passes Windows/Ubuntu/PostgreSQL/server-image,
+including final packaging and helper initialization changes. Windows810 passed /
+276 skipped, clean installation1/1 in132.75s, desktop/mobile70/70. PostgreSQL is
+verified in its separate lane; no live-provider reliability claim is added.

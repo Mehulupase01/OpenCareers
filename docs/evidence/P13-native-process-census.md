@@ -69,3 +69,18 @@ and explicitly imports the built-in Utility module beneath the executing PSHOME.
 A `utility_loaded` marker separates module import from compilation. This is not
 yet a proven hosted fix. Local contracts 9/9, typecheck pass, census 744.62ms.
 The new environment test rejects relative/network roots and inherited module paths.
+
+## Verified Successor
+
+At 418d5021c897bf0ebe320f260935b6aac1ba793f, focused Windows run 38332235491
+passes all nine contracts; census 2247.57ms, startup 178.19ms on Node24.21.0.
+Full CI 38332234815 passes Windows, Ubuntu, PostgreSQL and server-image. Windows
+has 810 passed /276 skipped, 105 files, production-only clean installation 1/1
+in132.75 seconds and all70 desktop/mobile browser cases. The PostgreSQL lane runs
+its own integration contracts; the Windows skipped cases are not relabeled passes.
+Full Windows diagnostic census2306.32ms, startup146.55ms, reaches serialized.
+
+The combined pinned-path/explicit-import change resolves the observed hosted
+failure without increasing the measurement deadline or skipping any contracts.
+The separate contribution of each module-loading change is not established.
+This does not close physical reboot/sleep/network or actual-duration soak gates.
