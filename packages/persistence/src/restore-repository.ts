@@ -81,6 +81,10 @@ export class RestoreRepository extends Repository {
         JSON.stringify(control),
         this.ownerId,
       ]);
+      await tx.query(
+        "UPDATE hosted_origin_permissions SET state='revoked',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND state='active'",
+        [this.now(), this.ownerId],
+      );
       // Even a pre-intent snapshot can predate an actual dispatch on the old installation.
       await tx.query(
         "INSERT INTO restore_reviews(owner_id,run_id,application_id,disposition) SELECT owner_id,$1,id,'pending' FROM applications WHERE owner_id=$2",

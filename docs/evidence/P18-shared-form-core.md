@@ -1,8 +1,9 @@
 # P18 Shared Hosted-Form Preparation Core
 
-2026-10-11. Fixture-verified preparation primitives, not generic live submission
-support. P18-G2/P18-02 are in progress until owner-policy-bound application/API
-integration and operator views are completed.
+2026-10-11 primitive evidence, followed by the 2026-10-13 owner-policy-bound
+application/API/persistence/operator integration. P18-G2/P18-02 now close for
+native low-risk preparation; see `P18-hosted-preparation-integration.md` for
+current verification and limits. This is not generic live submission support.
 
 `inspectHostedForm` pins the exact approved HTTPS vacancy URL and supplied job
 identity. Exactly one visible native form is required. Labels, aria-label and

@@ -31,8 +31,15 @@ let pageBytes: Promise<number> | undefined;
 
 export async function readProcessMemory(): Promise<ProcessMemoryRecord[]> {
   if (process.platform === "win32") {
-    const script =
-      "$ErrorActionPreference='Stop'; CimCmdlets\\Get-CimInstance -Query 'SELECT ProcessId,ParentProcessId,CreationDate,WorkingSetSize FROM Win32_Process' -OperationTimeoutSec 10 | Where-Object { $_.ProcessId -gt 0 -and $null -ne $_.CreationDate } | ForEach-Object { [pscustomobject]@{ pid=[int]$_.ProcessId; ppid=[int]$_.ParentProcessId; start=[string]$_.CreationDate.ToUniversalTime().Ticks; rss=[double]$_.WorkingSetSize } } | ConvertTo-Json -Depth 3 -Compress";
+    const script = [
+      "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Management;",
+      "$searcher=[System.Management.ManagementObjectSearcher]::new('root\\cimv2','SELECT ProcessId,ParentProcessId,CreationDate,WorkingSetSize FROM Win32_Process');",
+      "$searcher.Options.Timeout=[TimeSpan]::FromSeconds(10); $searcher.Options.Rewindable=$false; $searcher.Options.BlockSize=128; $rows=$null;",
+      "try { $rows=$searcher.Get(); $records=@(foreach($row in $rows) { try { if([int]$row['ProcessId'] -gt 0 -and $null -ne $row['CreationDate']) {",
+      "$born=[System.Management.ManagementDateTimeConverter]::ToDateTime([string]$row['CreationDate']).ToUniversalTime();",
+      "[pscustomobject]@{ pid=[int]$row['ProcessId']; ppid=[int]$row['ParentProcessId']; start=[string]$born.Ticks; rss=[double]$row['WorkingSetSize'] }",
+      "} } finally { $row.Dispose() } }); ConvertTo-Json -InputObject $records -Depth 3 -Compress } finally { if($null -ne $rows) { $rows.Dispose() }; $searcher.Dispose() }",
+    ].join(" ");
     const output = await execute(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", script],

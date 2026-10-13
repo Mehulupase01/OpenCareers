@@ -29,6 +29,29 @@ const aliases: Record<string, string> = {
   portfolio: "portfolio",
   "portfolio url": "portfolio",
 };
+function hostedAlias(label: string) {
+  const key = label.replace(/\s*\*\s*$/, "").toLowerCase();
+  return Object.hasOwn(aliases, key) ? aliases[key] : undefined;
+}
+
+export function canonicalHostedGuardSnapshot(snapshot: FormSnapshot): FormSnapshot {
+  const labels: Record<string, string> = {
+    full_name: "Full name",
+    email: "Email",
+    phone: "Phone",
+    portfolio: "Portfolio",
+  };
+  return {
+    ...snapshot,
+    fields: snapshot.fields.map((field) => ({
+      ...field,
+      label:
+        field.kind !== "unsupported" && hostedAlias(field.label) === field.semanticKey
+          ? (labels[field.semanticKey] ?? field.label)
+          : field.label,
+    })),
+  };
+}
 
 export async function inspectHostedForm(
   page: Page,
@@ -122,7 +145,7 @@ export async function inspectHostedForm(
     new URL(raw.action).origin !== expected.origin ||
     raw.fields.length === 0;
   const fields: FormField[] = raw.fields.map((field) => {
-    const key = aliases[field.label.replace(/\s*\*\s*$/, "").toLowerCase()];
+    const key = hostedAlias(field.label);
     const safe =
       field.labelled &&
       field.visible &&

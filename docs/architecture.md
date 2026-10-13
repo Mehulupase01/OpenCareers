@@ -36,6 +36,16 @@ The same repository contract suite must run against both real engines.
 
 ## ADR-003: Browser commit authority
 
+### Generic Hosted Preparation
+
+Owner-authenticated expiring origin permissions live in the authoritative database.
+API and existing inspection tasks share one canonical-packet preparation workflow.
+Anonymous public-only resources load with scripts disabled; egress is sealed before
+low-risk native fill. Profile, policy, controls and origin revisions are rechecked
+through readback and persistence. Generic preparation never grants READY, queues a
+submit or registers a final-action adapter. Reviewed family submission authority
+remains separate. See `evidence/P18-hosted-preparation-integration.md` for boundaries.
+
 Accepted. Only the deterministic submission engine may arm a one-use commit
 capability. Intent binds owner, application, origin, requisition, form fingerprint,
 answers, artifact hashes, adapter, profile and authorization revision. Persist the

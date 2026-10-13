@@ -2281,3 +2281,59 @@ td:last-child {
   gap: 6px;
   padding: 7px 12px;
 }
+.hosted-preparation {
+  border-top: 1px solid #d9dee5;
+  margin-top: 16px;
+  padding-top: 14px;
+  min-width: 0;
+}
+.hosted-origin {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-bottom: 12px;
+}
+.hosted-permission-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 12px;
+  align-items: end;
+}
+.hosted-permission-row label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.hosted-permission-row .check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hosted-permission-row input[type="date"] {
+  width: 100%;
+  min-width: 0;
+}
+.hosted-preparation .panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.hosted-preparation button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+}
+.hosted-evidence {
+  margin-top: 12px;
+  min-width: 0;
+}
+.hosted-evidence td {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .hosted-permission-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

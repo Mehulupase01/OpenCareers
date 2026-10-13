@@ -164,6 +164,9 @@ export const migrations = [
   [
     "CREATE TABLE regression_proposals (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, event_sha256 TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('proposed','approved','dismissed')), revision INTEGER NOT NULL CHECK(revision > 0), created_at TEXT NOT NULL, reviewed_at TEXT, PRIMARY KEY(owner_id,id), UNIQUE(owner_id,event_sha256))",
   ],
+  [
+    "CREATE TABLE hosted_origin_permissions (owner_id TEXT NOT NULL REFERENCES owners(id), origin TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), state TEXT NOT NULL CHECK(state IN ('active','revoked')), expires_at TEXT NOT NULL, permission_sha256 TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,origin))",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

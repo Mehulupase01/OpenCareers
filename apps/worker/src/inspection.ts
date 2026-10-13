@@ -1,4 +1,5 @@
 import type { AdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
+import type { HostedRead } from "../../../packages/browser/src/hosted-read.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import type { BrowserPreparation } from "../../../packages/contracts/src/browser.js";
 import type { BrowserSessionState } from "../../../packages/contracts/src/browser-session.js";
@@ -9,7 +10,9 @@ import { CandidateRepository } from "../../../packages/persistence/src/candidate
 import type { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import { ExceptionRepository } from "../../../packages/persistence/src/exception-repository.js";
 import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
+import { HostedOriginRepository } from "../../../packages/persistence/src/hosted-origin-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { runHostedInspection } from "./hosted-inspection.js";
 
 export function inspectionTarget(applicationUrl: string, profile: Config["profile"]) {
   if (profile === "demo") {
@@ -37,6 +40,7 @@ export async function runInspectionTask(
     browser: BrowserRepository;
     artifacts: ArtifactStorage;
     adapters: AdapterRegistry;
+    hostedRead?: HostedRead;
     clock?: () => Date;
   },
 ) {
@@ -123,6 +127,28 @@ export async function runInspectionTask(
     route = inspectionTarget(packet.content.job.url, config.profile);
   } catch (error) {
     if (!(error instanceof DomainError) || error.code !== "ADAPTER_UNSUPPORTED") throw error;
+    if (
+      config.profile !== "demo" &&
+      (await new HostedOriginRepository(repository.db, repository.ownerId, clock).active(
+        new URL(packet.content.job.url).origin,
+      ))
+    ) {
+      const preparation = await runHostedInspection(packet, {
+        config,
+        repository,
+        browser,
+        task,
+        clock,
+        read: dependencies.hostedRead,
+      });
+      await new ExceptionRepository(repository.db, repository.ownerId, clock).record({
+        applicationId: task.applicationId,
+        blocker: "unsupported_form",
+        code: "ADAPTER_UNSUPPORTED",
+        reason: preparation.result.issues.join(" ").slice(0, 1800),
+      });
+      return;
+    }
     const app = (
       await repository.db.query(
         "SELECT state,revision FROM applications WHERE owner_id=$1 AND id=$2",

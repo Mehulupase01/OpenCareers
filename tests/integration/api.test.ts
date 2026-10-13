@@ -48,6 +48,41 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it("requires private owner authentication for hosted-origin grants and accepts no caller-supplied authority", async () => {
+    const { app, headers } = await setup("local");
+    const payload = {
+      origin: "https://careers.synthetic.test",
+      expectedRevision: 0,
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      publicReadAndLowRiskFillReviewed: true,
+    };
+    expect(
+      (await app.inject({ method: "POST", url: "/v1/browser/origins/approve", headers, payload }))
+        .statusCode,
+    ).toBe(401);
+    const authorized = { ...headers, authorization: `Bearer ${"a".repeat(32)}` };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/browser/origins/approve",
+          headers: authorized,
+          payload: { ...payload, actor: "agent" },
+        })
+      ).statusCode,
+    ).toBe(400);
+    const granted = await app.inject({
+      method: "POST",
+      url: "/v1/browser/origins/approve",
+      headers: authorized,
+      payload,
+    });
+    expect(granted.statusCode).toBe(200);
+    expect(granted.json()).toMatchObject({ state: "active", revision: 1 });
+    expect(
+      (await app.inject({ url: "/v1/browser/origins", headers: authorized })).json(),
+    ).toHaveLength(1);
+  });
   it("requires the configured HTTPS host on private server health probes without widening host trust", async () => {
     const { app, repository } = await setup("local", {
       profile: "server",

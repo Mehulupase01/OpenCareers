@@ -1977,3 +1977,35 @@ candidate only after appropriate verification. Continue explicit owner-reviewed
 origin permissions and safe hosted preparation integration independently. Never
 add an arbitrary submitter, reuse handoff routing for arbitrary-origin SSRF, or
 grant a model/agent final-action authority.
+
+## 2026-10-13: Owner-Bound Hosted Preparation Milestone
+
+P18-G2/P18-02 complete. Exact origin permissions now have owner-only approval,
+expiry/CAS/integrity, audit and restore revocation in the same database. API and
+existing inspection tasks share immutable-packet/canonical-policy preparation;
+guard checks precede navigation, surround native fill/readback and run again at
+persistence. Anonymous public DNS-pinned GET resources, scripts disabled, same-origin
+and size/time bounds, no subframes and sealed fill egress. Unsupported/challenged
+controls stop; generic preparation never reaches READY, queues submit or gains an
+adapter capability. Private Documents approval/prepare/revoke/readback controls
+are desktop/mobile verified. See P18-hosted-preparation-integration.md.
+
+Frozen full check: 775 passed /269 skipped, 104 files; lint/types/ledger/build pass.
+Full desktop/mobile: 70 passed. Scan 478 files before new evidence documentation;
+production dependency audit clean. Synthetic only, including explicit LLM-draft
+stubs. PostgreSQL parity awaits successor CI; no employer/model/Gmail calls.
+Counts now 12/19 phases, 96/128 gates. No whole phase closed by this milestone.
+
+CI 38323537121 at b3b0e27 passed Ubuntu/PostgreSQL/server-image but failed Windows:
+both initial census calls reached 20s; startup probe was 187.29ms. WQL did not fix
+the hosted issue. Reader now uses local .NET System.Management four-property WMI
+enumeration, disposable rows/searcher and unchanged 10s provider/20s child bounds.
+Local diagnostic under full test load: census 599.66ms, startup 204.68/194.39ms.
+No raw process/env records retained. Remote success remains unproven until new CI.
+
+Fresh opt-in Windows installation verification is running on this frozen code.
+Do not infer a qualifying soak from it; the prior candidate remains invalidated,
+and no 24h/72h soak is running. Next record installed/remote results, then correct
+stable-build resource measurement while continuing independent P18 breadth and
+server/hybrid engineering. Files/custom/sensitive/multi-step/logged-in variants,
+20 automated boards and genuine receipt evidence remain open.

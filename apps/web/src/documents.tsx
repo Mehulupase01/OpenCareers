@@ -15,6 +15,7 @@ import type { MatchingSnapshot } from "../../../packages/contracts/src/matching.
 import { AccountsPanel } from "./accounts.js";
 import { request } from "./api.js";
 import { BrowserPreparationPanel } from "./browser-preparation.js";
+import { HostedPreparationPanel } from "./hosted-preparation.js";
 import { PdfPreview } from "./pdf-preview.js";
 
 const words = (value: string) => value.replaceAll("_", " ");
@@ -191,7 +192,11 @@ export function DocumentsWorkspace({ jobs, demo }: { jobs: Job[]; demo: boolean 
                 ))}
               </nav>
 
-              {demo && <BrowserPreparationPanel key={packet.manifest.id} packet={packet} />}
+              {demo ? (
+                <BrowserPreparationPanel key={packet.manifest.id} packet={packet} />
+              ) : (
+                <HostedPreparationPanel key={packet.manifest.id} packet={packet} />
+              )}
 
               <details className="pdf-preview-panel">
                 <summary>

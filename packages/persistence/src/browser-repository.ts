@@ -1,13 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
+import { canonicalHostedGuardSnapshot } from "../../browser/src/hosted-form.js";
 import {
   type BrowserPreparation,
   browserPreparationSchema,
   type DryRunResult,
   dryRunResultSchema,
 } from "../../contracts/src/browser.js";
-import { packetManifestSchema } from "../../contracts/src/documents.js";
+import { packetContentSchema, packetManifestSchema } from "../../contracts/src/documents.js";
 import { type ApplicationState, DomainError } from "../../contracts/src/index.js";
 import { assertTransition } from "../../domain/src/state.js";
+import { CandidateRepository } from "./candidate-repository.js";
+import { assertHostedOriginPermission } from "./hosted-origin-repository.js";
 import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
 
@@ -20,11 +23,20 @@ export class BrowserRepository extends Repository {
       queueSubmit?: { adapterId: string; target: Record<string, unknown> };
       expectedRevision?: number;
       handoffId?: string;
+      originPermission?: { origin: string; revision: number };
     } = {},
   ): Promise<BrowserPreparation> {
     if (options.queueSubmit && !/^[a-z][a-z0-9-]{0,79}$/.test(options.queueSubmit.adapterId))
       throw new DomainError("CONFIG_INVALID", "Invalid submission adapter ID.");
     const result = dryRunResultSchema.parse(resultInput);
+    if (
+      result.adapter?.id === "hosted-readonly" &&
+      (!options.originPermission || options.queueSubmit || result.status === "ready")
+    )
+      throw new DomainError(
+        "CONFIG_INVALID",
+        "Generic hosted preparation requires current origin permission and cannot gain submission readiness.",
+      );
     if (options.queueSubmit && result.adapter?.id !== options.queueSubmit.adapterId)
       throw new DomainError("FORM_CHANGED", "Queued adapter does not match the preparation.");
     const ready = result.status === "ready";
@@ -105,6 +117,26 @@ export class BrowserRepository extends Repository {
       );
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
+      if (result.adapter?.id === "hosted-readonly" && options.originPermission) {
+        await assertHostedOriginPermission(
+          tx,
+          this.ownerId,
+          options.originPermission.origin,
+          options.originPermission.revision,
+          this.now(),
+        );
+        if (
+          result.snapshots.some(
+            (snapshot) =>
+              snapshot.origin !== options.originPermission?.origin ||
+              new URL(snapshot.url).origin !== options.originPermission.origin,
+          )
+        )
+          throw new DomainError(
+            "FORM_CHANGED",
+            "Hosted preparation origin does not match its permission.",
+          );
+      }
       const row = (
         await tx.query(
           "SELECT a.state,a.revision,p.manifest,c.active_profile_id,c.active_authorization_id FROM applications a JOIN packets p ON p.owner_id=a.owner_id AND p.application_id=a.id JOIN candidates c ON c.owner_id=a.owner_id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE a.owner_id=$1 AND a.id=$2 AND p.id=$3 AND v.packet_id IS NULL",
@@ -113,6 +145,40 @@ export class BrowserRepository extends Repository {
       )[0];
       if (!row)
         throw new DomainError("NOT_FOUND", "A valid packet is required for browser preparation.");
+      if (result.adapter?.id === "hosted-readonly") {
+        const content = (
+          await tx.query("SELECT content FROM packet_contents WHERE owner_id=$1 AND packet_id=$2", [
+            this.ownerId,
+            result.packetId,
+          ])
+        )[0];
+        if (!content) throw new DomainError("NOT_FOUND", "Hosted packet content is missing.");
+        const packet = {
+          manifest: packetManifestSchema.parse(JSON.parse(String(row.manifest))),
+          content: packetContentSchema.parse(JSON.parse(String(content.content))),
+          valid: true,
+          invalidReason: null,
+        };
+        for (const [index, snapshot] of result.snapshots.entries()) {
+          if (
+            new URL(snapshot.url).href !== new URL(packet.content.job.url).href ||
+            snapshot.jobId !== packet.manifest.jobId
+          )
+            throw new DomainError(
+              "FORM_CHANGED",
+              "Hosted evidence does not match its packet vacancy.",
+            );
+          const plan = result.plans[index];
+          if (!plan)
+            throw new DomainError("FORM_CHANGED", "Hosted preparation has missing plan evidence.");
+          await new CandidateRepository(this.db, this.ownerId, this.clock).validateFormPlanIn(
+            tx,
+            packet,
+            canonicalHostedGuardSnapshot(snapshot),
+            plan,
+          );
+        }
+      }
       if (
         options.expectedRevision !== undefined &&
         Number(row.revision) !== options.expectedRevision

@@ -2258,8 +2258,17 @@
         {
           "id": "P18-G2",
           "requirement": "An arbitrary approved-origin hosted form can be inspected and its recognized low-risk fields filled and read back, and an ambiguous control stops preparation as unsupported.",
-          "status": "in_progress",
-          "evidence": ["docs/evidence/P18-shared-form-core.md", "tests/unit/hosted-form.test.ts"]
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P18-shared-form-core.md",
+            "docs/evidence/P18-hosted-preparation-integration.md",
+            "tests/unit/hosted-form.test.ts",
+            "tests/unit/hosted-prepare.test.ts",
+            "tests/unit/hosted-read.test.ts",
+            "tests/integration/hosted-origins.test.ts",
+            "tests/integration/documents.test.ts",
+            "tests/e2e/hosted-preparation.spec.ts"
+          ]
         },
         {
           "id": "P18-G3",
@@ -2325,10 +2334,17 @@
         {
           "id": "P18-02",
           "text": "Universal hosted-form engine. Inspect an arbitrary approved-origin career page, map labelled controls to semantic keys, fill only recognized low-risk fields, and stop as unsupported at ambiguity while sharing primitives with the family adapters.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T03", "T31", "T32"],
-          "evidence": ["docs/evidence/P18-shared-form-core.md", "tests/unit/hosted-form.test.ts"],
-          "nextAction": "P18-02"
+          "evidence": [
+            "docs/evidence/P18-shared-form-core.md",
+            "docs/evidence/P18-hosted-preparation-integration.md",
+            "tests/unit/hosted-form.test.ts",
+            "tests/unit/hosted-prepare.test.ts",
+            "tests/integration/documents.test.ts",
+            "tests/e2e/hosted-preparation.spec.ts"
+          ],
+          "nextAction": null
         },
         {
           "id": "P18-03",

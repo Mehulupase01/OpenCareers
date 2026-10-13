@@ -1,13 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
+import type { HostedRead } from "../../../packages/browser/src/hosted-read.js";
 import type { Config } from "../../../packages/config/src/index.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
 import { createArtifactStore } from "../../../packages/documents/src/s3-artifact-store.js";
 import { BrowserRepository } from "../../../packages/persistence/src/browser-repository.js";
 import { CandidateRepository } from "../../../packages/persistence/src/candidate-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
+import { HostedOriginRepository } from "../../../packages/persistence/src/hosted-origin-repository.js";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
+import { runHostedInspection } from "../../worker/src/hosted-inspection.js";
 
 const dryRunInput = z
   .object({
@@ -44,7 +47,12 @@ const recruiteeInput = z
   })
   .strict();
 
-export async function browserRoutes(app: FastifyInstance, config: Config, repository: Repository) {
+export async function browserRoutes(
+  app: FastifyInstance,
+  config: Config,
+  repository: Repository,
+  dependencies: { hostedRead?: HostedRead } = {},
+) {
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
   const candidates = new CandidateRepository(repository.db, repository.ownerId);
@@ -53,6 +61,39 @@ export async function browserRoutes(app: FastifyInstance, config: Config, reposi
   const adapters = createAdapterRegistry(config.dataDir);
   await store.initialize();
   app.get("/v1/browser", () => browser.snapshot());
+  const origins = new HostedOriginRepository(repository.db, repository.ownerId);
+  app.get("/v1/browser/origins", () => origins.list());
+  app.post("/v1/browser/origins/approve", async (request) => {
+    if (config.profile === "demo")
+      throw new DomainError(
+        "NOT_FOUND",
+        "Public hosted preparation permissions are unavailable in demo mode.",
+      );
+    return origins.approve(request.body, `owner:${repository.ownerId}`);
+  });
+  app.post("/v1/browser/origins/revoke", async (request) => {
+    if (config.profile === "demo")
+      throw new DomainError(
+        "NOT_FOUND",
+        "Public hosted preparation permissions are unavailable in demo mode.",
+      );
+    return origins.revoke(request.body, `owner:${repository.ownerId}`);
+  });
+  app.post("/v1/browser/hosted/prepare", async (request) => {
+    if (config.profile === "demo" || !config.externalSubmissionEnabled)
+      throw new DomainError(
+        "UNAUTHORIZED",
+        "Public hosted preparation requires private enabled execution.",
+      );
+    const input = z.object({ packetId: idSchema }).strict().parse(request.body);
+    const packet = await documents.get(input.packetId);
+    return runHostedInspection(packet, {
+      config,
+      repository,
+      browser,
+      read: dependencies.hostedRead,
+    });
+  });
   app.post("/v1/browser/dry-run", async (request) => {
     if (config.profile !== "demo")
       throw new DomainError("NOT_FOUND", "Mock ATS dry runs are available in demo mode only.");

@@ -3,6 +3,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runHostedInspection } from "../../apps/worker/src/hosted-inspection.js";
 import { runInspectionTask } from "../../apps/worker/src/inspection.js";
 import { AdapterRegistry, createAdapterRegistry } from "../../packages/browser/src/adapter-sdk.js";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
@@ -26,6 +27,7 @@ import { EmailRepository } from "../../packages/persistence/src/email-repository
 import { ExceptionRepository } from "../../packages/persistence/src/exception-repository.js";
 import { ExperimentRepository } from "../../packages/persistence/src/experiment-repository.js";
 import { HandoffRepository } from "../../packages/persistence/src/handoff-repository.js";
+import { HostedOriginRepository } from "../../packages/persistence/src/hosted-origin-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { RegressionRepository } from "../../packages/persistence/src/regression-repository.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
@@ -272,6 +274,160 @@ for (const engine of ["sqlite", "postgres"] as const) {
         vi.restoreAllMocks();
         await db?.close();
         if (dir) await rm(dir, { recursive: true, force: true });
+      });
+
+      const hostedClock = () => new Date("2026-09-17T09:00:00.000Z");
+      const hostedHtml =
+        '<form method="post"><label>Full name<input required></label><label>Email address<input type="email" required></label><button>Apply</button></form>';
+      async function hostedPacket() {
+        await seedProfileFacts();
+        const input = documentGenerationInput();
+        input.requestedAnswers = [];
+        input.job.url = "https://careers.synthetic.test/jobs/123";
+        await db.query("UPDATE jobs SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify(input.job),
+          owner,
+          input.job.id,
+        ]);
+        const packet = await documents.savePacket(
+          await buildPacket(artifacts, input, {
+            letter: generatePacketContent(input).letter,
+            modelId: "synthetic/model:free",
+            provider: "synthetic-provider",
+            responseHash: "b".repeat(64),
+          }),
+        );
+        const origins = new HostedOriginRepository(db, owner, hostedClock);
+        const permission = await origins.approve(
+          {
+            origin: new URL(input.job.url).origin,
+            expectedRevision: 0,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+            publicReadAndLowRiskFillReviewed: true,
+          },
+          `owner:${owner}`,
+        );
+        return { packet, origins, permission };
+      }
+
+      it("persists canonical hosted readback through automatic inspection without submission authority", async () => {
+        const { packet } = await hostedPacket();
+        const repository = new Repository(db, owner, hostedClock);
+        const browser = new BrowserRepository(db, owner, hostedClock);
+        await documents.queueInspection(packet);
+        const task = await repository.claim("hosted-inspector", ["inspect"]);
+        if (!task) throw new Error("Missing inspection task");
+        const read = vi.fn(async () => ({
+          body: Buffer.from(hostedHtml),
+          contentType: "text/html",
+        }));
+        await runInspectionTask(task, {
+          config: { profile: "local", externalSubmissionEnabled: true },
+          repository,
+          documents,
+          browser,
+          artifacts,
+          adapters: new AdapterRegistry([]),
+          hostedRead: read,
+          clock: hostedClock,
+        });
+        await repository.complete(task);
+        expect(read).toHaveBeenCalledOnce();
+        const preparations = await browser.snapshot();
+        expect(preparations).toHaveLength(1);
+        expect(preparations[0]?.result).toMatchObject({
+          status: "unsupported",
+          adapter: { id: "hosted-readonly" },
+          reports: [{ status: "ready" }],
+        });
+        expect(preparations[0]?.result.reports[0]?.readBack.every((row) => row.matches)).toBe(true);
+        expect(
+          await db.query("SELECT id FROM tasks WHERE owner_id=$1 AND type='submit'", [owner]),
+        ).toEqual([]);
+        expect(
+          (
+            await db.query("SELECT state FROM applications WHERE owner_id=$1 AND id=$2", [
+              owner,
+              packet.manifest.applicationId,
+            ])
+          )[0]?.state,
+        ).toBe("UNSUPPORTED");
+      });
+
+      it("rolls back hosted persistence after revocation and rejects forced readiness or submit queues", async () => {
+        const { packet, origins, permission } = await hostedPacket();
+        const browser = new BrowserRepository(db, owner, hostedClock);
+        const repository = new Repository(db, owner, hostedClock);
+        const save = vi.spyOn(browser, "save").mockImplementationOnce(async (result, options) => {
+          await origins.revoke(
+            { origin: permission.origin, expectedRevision: permission.revision },
+            `owner:${owner}`,
+          );
+          return BrowserRepository.prototype.save.call(browser, result, options);
+        });
+        await expect(
+          runHostedInspection(packet, {
+            config: { profile: "local", externalSubmissionEnabled: true },
+            repository,
+            browser,
+            clock: hostedClock,
+            read: async () => ({ body: Buffer.from(hostedHtml), contentType: "text/html" }),
+          }),
+        ).rejects.toMatchObject({ code: "POLICY_REVOKED" });
+        expect(await browser.snapshot()).toEqual([]);
+        const result = save.mock.calls[0]?.[0];
+        if (!result) throw new Error("Missing prepared evidence");
+        await expect(
+          BrowserRepository.prototype.save.call(
+            browser,
+            { ...result, status: "ready" },
+            { originPermission: permission },
+          ),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        await expect(
+          BrowserRepository.prototype.save.call(browser, result, {
+            originPermission: permission,
+            queueSubmit: { adapterId: "hosted-readonly", target: {} },
+          }),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+      });
+
+      it("rejects paused or unknown applications before hosted resource loading", async () => {
+        const { packet } = await hostedPacket();
+        const repository = new Repository(db, owner, hostedClock);
+        const browser = new BrowserRepository(db, owner, hostedClock);
+        const read = vi.fn(async () => ({
+          body: Buffer.from(hostedHtml),
+          contentType: "text/html",
+        }));
+        await db.query("UPDATE applications SET state='UNKNOWN' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          packet.manifest.applicationId,
+        ]);
+        await expect(
+          runHostedInspection(packet, {
+            config: { profile: "local", externalSubmissionEnabled: true },
+            repository,
+            browser,
+            clock: hostedClock,
+            read,
+          }),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await db.query("UPDATE applications SET state='PACKET_READY' WHERE owner_id=$1 AND id=$2", [
+          owner,
+          packet.manifest.applicationId,
+        ]);
+        await repository.setControl({ stopped: true }, `owner:${owner}`);
+        await expect(
+          runHostedInspection(packet, {
+            config: { profile: "local", externalSubmissionEnabled: true },
+            repository,
+            browser,
+            clock: hostedClock,
+            read,
+          }),
+        ).rejects.toThrow();
+        expect(read).not.toHaveBeenCalled();
       });
 
       it("automatically queues inspection, persists readiness and queues the bound final action", async () => {
