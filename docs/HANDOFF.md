@@ -2026,3 +2026,47 @@ matrix. No coding continuation scheduler is available or claimed.
 
 CI 38328631548 at ca0c4c9 has passed server-image; Windows, Ubuntu and PostgreSQL
 lanes were still running at this checkpoint. Do not label them successful yet.
+
+## 2026-10-13: Free-Only Firewall And Native Census
+
+P15-G3 complete; totals now 12/19 phases, 97/128 gates. The positive coefficient
+in 1e-9999 previously underflowed to zero; numeric JSON loses it before validation.
+Catalogue and reviewed endpoint monetary evidence now requires exact decimal
+strings with zero coefficients, not coercion. Zero numeric discount remains a
+non-cost marker only. Unknown/tiered/paid/unpriced routes, tools, fallbacks and
+manual privacy relaxation still fail. New adversarial tests cover all recognized
+cost dimensions and repricing before POST for matching/letters; actual persisted
+ready route tests exercise all six node kinds and mandatory LetterDraftRunner.
+No real calls, deterministic-letter fallback or additional submission authority.
+See P15-pricing-adversarial.md. P15 phase dependencies/other gates remain open.
+
+CI 38328631548 finished: Ubuntu/PostgreSQL/server-image pass, Windows fails two
+WMI census tests at 20s. Docs-only successor also fails Windows. The deeper WMI
+hosted cause is unknown. Native query-only Toolhelp/process-times/working-set
+reader now replaces it, keeps 20s/4MiB bounds, emits only PID/parent/birth/RSS and
+does not decode names/commands. Snapshot-time birth fence rejects recycled entries.
+Its source participates in capacity fingerprints. Primary interfaces and limits
+are in P13-native-process-census.md; local native contracts 8/8, census 459.12ms.
+
+Final pricing/native full check 808 passed /276 skipped, 105 files; lint/types/
+ledger/build pass. This preceded the packaging repair: a new clean install
+correctly failed because the new helper was absent from the explicit bundle list.
+Input and verifier lists repaired, fixture updated, archive inclusion and missing
+helper refusal asserted. Final bundle suite 23 passed /one Linux-specific skip;
+corrected production-only installation 1/1 in 140.99 seconds. Final lint/types/build
+pass. Do not invent a full 809 run or combine these scopes. Source security batch
+pushed as 7f63ba3; packaging/evidence follow-up must also be pushed.
+
+CI 38330465431 at 7f63ba3: PostgreSQL/server-image passed; Windows and Ubuntu still
+running when recorded. That commit lacks the subsequent bundle repair and may
+fail clean installation even if the native census tests pass. Record exact cause,
+then verify successor CI; never skip contracts or call all lanes green prematurely.
+Current root candidate PID 28712 remains the earlier frozen WMI installation,
+two scenarios observed at 01:09Z with one mock receipt and zero missing receipts.
+It stays provisional and cannot certify new pricing/native code; no 24/72-hour
+gate is complete. Private state/services and real employer/mail/model calls untouched.
+
+Next: verify native/packaging CI, preserve candidate measurement attribution,
+complete full fault/backup drills and server/hybrid or portal breadth as independent
+engineering. Keep the 20-board target, genuine receipt, physical Windows restart/
+sleep/network evidence, complete fault matrix and actual qualifying soaks open.

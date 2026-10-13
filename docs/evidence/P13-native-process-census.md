@@ -30,6 +30,15 @@ Focused owned-process/native-child/monitored-browser contracts: 8/8 passed local
 Diagnostic: native census 459.12ms, startup 177.13/174.05ms. Full successor results
 and remote Windows evidence must be recorded before claiming hosted success.
 
+Local full pricing/native check passed 808 tests /276 skipped before the final
+packaging repair. The fresh install caught the helper missing from the explicit
+bundle input/verification lists; both now include it. Updated synthetic packaging
+fixture asserts archive inclusion and fails when the helper is absent. Final
+bundle suite 23 passed /one Linux-specific skip; corrected production-only clean
+installation passed in 140.99 seconds, including compiled monitored capacity.
+No remote Windows result is inferred from that local pass. Existing long resource
+candidate remains on its immutable WMI build and cannot certify this newer code.
+
 Primary interface references: [PROCESSENTRY32W](https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/ns-tlhelp32-processentry32w),
 [GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo),
 and [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).

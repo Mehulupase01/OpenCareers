@@ -40,9 +40,13 @@ The letter test seeds an actual synthetic application so reservation attribution
 enforced; it does not bypass the foreign-key contract.
 
 Final focused pricing/route/privacy/matching/letter/node/batch/packet suite: 116
-passed, 38 PostgreSQL cases skipped locally across ten files. Types/build pass.
-Before the final numeric-price refinement and direct persisted-dispatch additions,
-the frozen full check passed 800 tests /269 skipped, 105 files. Do not relabel that
-as a full run of the final code. Final full check and installed verification are
-running; P15-G3 remains open until milestone evidence is recorded. Remote database
-parity and hosted Windows verification require successor CI, not a local mock claim.
+passed, 38 PostgreSQL cases skipped locally across ten files. Final pricing/native
+full check: 808 passed /276 skipped, 105 files; lint/types/ledger/build pass. This
+preceded the final bundle-list repair and missing-helper packaging regression.
+Final bundle-specific suite: 23 passed /one Linux-specific case skipped. Corrected
+production-only installed verification passed in 140.99 seconds, including compiled
+native measurement. Final lint/types/build pass. These scopes are not summed into
+an invented larger full-suite count. P15-G3 closes; P15 itself remains in progress.
+CI 38330465431 at 7f63ba3 has passed PostgreSQL/server-image; Windows and Ubuntu were
+still running at this checkpoint. The bundle repair needs successor CI. No live
+model reliability, privacy review renewal or actual billing guarantee is claimed.

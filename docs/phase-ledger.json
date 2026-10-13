@@ -1837,8 +1837,15 @@
         {
           "id": "P15-G3",
           "requirement": "All free-only adversarial pricing/fallback tests pass.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P15-pricing-adversarial.md",
+            "tests/unit/pricing-adversarial.test.ts",
+            "tests/unit/agent-routing.test.ts",
+            "tests/unit/inference-privacy.test.ts",
+            "tests/integration/node-gateway.test.ts",
+            "tests/integration/agent-packet.test.ts"
+          ]
         },
         {
           "id": "P15-G4",

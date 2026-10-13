@@ -26,6 +26,7 @@ export const bundleInputPaths = [
   "dist/scripts/monitored-capacity.js",
   "dist/scripts/monitored-capacity-run.js",
   "dist/scripts/owned-processes.js",
+  "dist/scripts/windows-process-census.js",
   "dist/tests/fixtures/document-packets.js",
   "dist/apps/api/src/main.js",
   "dist/apps/worker/src/main.js",
@@ -54,6 +55,7 @@ const scriptNames = new Set([
   "monitored-capacity.js",
   "monitored-capacity-run.js",
   "owned-processes.js",
+  "windows-process-census.js",
   "verify-bundle.js",
   "bundle-verification.js",
 ]);

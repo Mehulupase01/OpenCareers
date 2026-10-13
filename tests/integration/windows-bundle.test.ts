@@ -34,6 +34,7 @@ describe("Windows runtime bundle", () => {
       "dist/scripts/monitored-capacity.js",
       "dist/scripts/monitored-capacity-run.js",
       "dist/scripts/owned-processes.js",
+      "dist/scripts/windows-process-census.js",
       "dist/tests/fixtures/document-packets.js",
       "dist/apps/api/src/main.js",
       "dist/apps/worker/src/main.js",
@@ -90,6 +91,7 @@ describe("Windows runtime bundle", () => {
       archive.close();
     }
     expect(files.has(".env")).toBe(false);
+    expect(files.has("dist/scripts/windows-process-census.js")).toBe(true);
     expect([...files.keys()].some((path) => path.startsWith("private/"))).toBe(false);
     for (const [path, content] of files) expect(publicSourceFindings(path, content)).toEqual([]);
     const manifest = JSON.parse(files.get("bundle-manifest.json")?.toString() ?? "{}");
@@ -114,6 +116,10 @@ describe("Windows runtime bundle", () => {
     const again = await buildWindowsBundle(root);
     output.push(again.directory);
     expect(again.checksum).toBe(result.checksum);
+  });
+  it("refuses packaging when the native census helper is missing", async () => {
+    await rm(join(root, "dist/scripts/windows-process-census.js"));
+    await expect(buildWindowsBundle(root)).rejects.toMatchObject({ code: "ENOENT" });
   });
   it("rejects credential-like bytes even in an allowed compiled file", async () => {
     await writeFile(
