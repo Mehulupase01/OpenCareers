@@ -39,15 +39,28 @@ for (const [name, env] of [
 }
 const started = performance.now();
 let census = "passed";
+let lastCompletedPhase: string | null = null;
+let helperKilled = false;
 try {
   await readProcessMemory();
-} catch {
+  lastCompletedPhase = "serialized";
+} catch (error) {
   census = "failed_or_timed_out";
+  const phases = new Set(["started", "compiled", "snapshot_created", "enumerated", "serialized"]);
+  if (error && typeof error === "object") {
+    helperKilled = "killed" in error && error.killed === true;
+    if ("stderr" in error && typeof error.stderr === "string")
+      for (const line of error.stderr.split(/\r?\n/))
+        if (line.startsWith("oc-census:") && phases.has(line.slice("oc-census:".length)))
+          lastCompletedPhase = line.slice("oc-census:".length);
+  }
 }
 observations.push({
   phase: "process_census",
   environment: "launcher_os_subset",
   status: census,
+  lastCompletedPhase,
+  helperKilled,
   elapsedMs: performance.now() - started,
 });
 const directory = join(process.cwd(), "test-results", "process-census-diagnostic");

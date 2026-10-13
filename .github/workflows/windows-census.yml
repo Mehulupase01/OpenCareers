@@ -1,0 +1,30 @@
+name: Windows Census Diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-native-census:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    env:
+      AUTOPILOT_SKIP_ENV_FILE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - run: pnpm exec tsx scripts/process-census-diagnostic.ts
+      - run: pnpm exec vitest run tests/unit/owned-processes.test.ts tests/integration/owned-processes.test.ts tests/integration/monitored-capacity.test.ts
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bounded-native-census
+          path: test-results/
+          retention-days: 7

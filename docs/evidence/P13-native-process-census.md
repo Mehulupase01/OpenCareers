@@ -44,3 +44,19 @@ Primary interface references: [PROCESSENTRY32W](https://learn.microsoft.com/en-u
 and [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
 The small interop reader is original project code against these documented APIs,
 not copied upstream implementation or an undocumented NT information layout.
+
+## Hosted Follow-Up
+
+CI 38330465431 at 7f63ba3 passed Ubuntu/PostgreSQL/server-image but failed the
+initial monitored census at 20s; the later native child test passed slowly
+(36.81 seconds overall). The startup diagnostic also timed out. Removing WMI
+therefore did not establish hosted performance; do not claim the reader fixed CI.
+
+Fixed phase markers now identify started, compiled, snapshot-created, enumerated
+and serialized boundaries on the helper's stderr. The diagnostic retains only the
+last recognized marker and a helper-killed boolean on failure, never arbitrary
+stderr or process rows. Source contracts remain 8/8, typecheck passes, local census
+607.87ms. Normal helper output stays JSON-only and its deadline is unchanged.
+A manual eight-minute Windows-only workflow runs that diagnostic and the actual
+native/monitored contracts with pinned actions, without replacing full CI or skipping
+failures. This isolates the next investigation rather than guessing another API.

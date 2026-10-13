@@ -1,6 +1,7 @@
 // Documented Toolhelp snapshot layout; executable-name bytes are never decoded or retained.
 export const windowsProcessCensus = `
 $ErrorActionPreference='Stop';
+[Console]::Error.WriteLine('oc-census:started');
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -31,6 +32,7 @@ namespace OpenCareers {
       long snapshotAt = DateTime.UtcNow.Ticks;
       IntPtr snapshot = CreateToolhelp32Snapshot(2, 0);
       if (snapshot == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      Console.Error.WriteLine("oc-census:snapshot_created");
       int size = IntPtr.Size == 8 ? 568 : 556;
       int parentOffset = IntPtr.Size == 8 ? 32 : 24;
       IntPtr entry = IntPtr.Zero;
@@ -62,6 +64,7 @@ namespace OpenCareers {
         } while (Process32NextW(snapshot, entry));
         int error = Marshal.GetLastWin32Error();
         if (error != 18) throw new Win32Exception(error);
+        Console.Error.WriteLine("oc-census:enumerated");
         return records.ToArray();
       } finally {
         if (entry != IntPtr.Zero) Marshal.FreeHGlobal(entry);
@@ -71,5 +74,7 @@ namespace OpenCareers {
   }
 }
 '@;
-$records=@([OpenCareers.ProcessCensus]::Read()); ConvertTo-Json -InputObject $records -Depth 3 -Compress
+[Console]::Error.WriteLine('oc-census:compiled');
+$records=@([OpenCareers.ProcessCensus]::Read()); ConvertTo-Json -InputObject $records -Depth 3 -Compress;
+[Console]::Error.WriteLine('oc-census:serialized');
 `;

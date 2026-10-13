@@ -2070,3 +2070,16 @@ Next: verify native/packaging CI, preserve candidate measurement attribution,
 complete full fault/backup drills and server/hybrid or portal breadth as independent
 engineering. Keep the 20-board target, genuine receipt, physical Windows restart/
 sleep/network evidence, complete fault matrix and actual qualifying soaks open.
+
+### Hosted Native Performance Still Open
+
+CI 38330465431 finished: Ubuntu/PostgreSQL/server-image pass, Windows still fails
+initial monitored census at 20s. Native child test passed later in 36.81 seconds.
+Thus Toolhelp correctness works locally but the hosted delay is not diagnosed.
+Do not blame WMI exclusively or claim a successful fix. Last helper markers and a
+bounded manual Windows-only diagnostic workflow now isolate compilation, snapshot,
+enumeration and serialization. It uses pinned actions and the original 20s bound;
+only fixed labels/killed boolean cross the diagnostic error boundary. Local source
+native/monitored 8/8 and typecheck pass, diagnostic 607.87ms. No extra gate closes.
+Next dispatch/inspect the focused workflow and successor full CI before altering
+initialization or sampling deadlines. Physical frozen candidate is not mutated.
