@@ -2,6 +2,9 @@
 export const windowsProcessCensus = `
 $ErrorActionPreference='Stop';
 [Console]::Error.WriteLine('oc-census:started');
+$PSModuleAutoLoadingPreference='None';
+Import-Module ([System.IO.Path]::Combine($PSHOME,'Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1')) -ErrorAction Stop;
+[Console]::Error.WriteLine('oc-census:utility_loaded');
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;

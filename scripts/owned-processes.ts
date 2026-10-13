@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
+import { win32 } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { windowsProcessCensus } from "./windows-process-census.js";
@@ -20,13 +21,17 @@ const processRecordSchema = z
 export type ProcessMemoryRecord = z.infer<typeof processRecordSchema>;
 const recordsSchema = z.array(processRecordSchema).max(20000);
 export function processCensusEnvironment(source: NodeJS.ProcessEnv = process.env) {
-  return Object.fromEntries(
+  const environment = Object.fromEntries(
     Object.entries(source).filter(([key]) =>
       /^(SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|PATHEXT|PATH|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|PROGRAMFILES|PROGRAMFILES\(X86\))$/i.test(
         key,
       ),
     ),
   );
+  const root = Object.entries(environment).find(([key]) => /^SYSTEMROOT$/i.test(key))?.[1];
+  if (root && /^[a-z]:[\\/]/i.test(root))
+    environment.PSModulePath = win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules");
+  return environment;
 }
 let pageBytes: Promise<number> | undefined;
 

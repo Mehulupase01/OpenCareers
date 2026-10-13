@@ -25,6 +25,23 @@ it("retains Windows launcher OS prerequisites without forwarding application or 
   });
   expect(input.AUTOPILOT_OWNER_TOKEN).toBe("private-sentinel");
 });
+it("derives only the built-in module directory and never inherits an arbitrary search path", () => {
+  expect(
+    processCensusEnvironment({
+      SystemRoot: "C:\\Windows",
+      PSModulePath: "private-user-module-path",
+    }),
+  ).toEqual({
+    SystemRoot: "C:\\Windows",
+    PSModulePath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules",
+  });
+  expect(
+    processCensusEnvironment({ SYSTEMROOT: "relative-root", PSModulePath: "unreviewed" }),
+  ).not.toHaveProperty("PSModulePath");
+  expect(
+    processCensusEnvironment({ SYSTEMROOT: "\\\\unreviewed\\network", PSModulePath: "unreviewed" }),
+  ).not.toHaveProperty("PSModulePath");
+});
 
 const row = (pid: number, ppid: number, start: string, rss = 100) => ({ pid, ppid, start, rss });
 it("refuses older foreign orphans whose parent PID has been reused by an owned process", () => {

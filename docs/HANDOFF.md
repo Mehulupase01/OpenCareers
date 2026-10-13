@@ -2083,3 +2083,12 @@ only fixed labels/killed boolean cross the diagnostic error boundary. Local sour
 native/monitored 8/8 and typecheck pass, diagnostic 607.87ms. No extra gate closes.
 Next dispatch/inspect the focused workflow and successor full CI before altering
 initialization or sampling deadlines. Physical frozen candidate is not mutated.
+
+Focused hosted diagnostic 38331690969 failed: last marker `started`, killed at20s,
+so native enumeration never began. Pin OS-derived built-in PSModulePath, disable
+module auto-discovery and explicitly import Utility from the executing PSHOME;
+new utility_loaded marker now distinguishes import from compilation. Inherited
+user module paths remain excluded. Source/native/monitored 9/9 and types pass;
+local census744.62ms. Dispatch successor focused workflow and inspect its actual
+result before calling this fixed. Counts stay12/19 and97/128; old frozen resource
+candidate continues separately and is not modified.

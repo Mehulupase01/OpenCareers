@@ -46,7 +46,14 @@ try {
   lastCompletedPhase = "serialized";
 } catch (error) {
   census = "failed_or_timed_out";
-  const phases = new Set(["started", "compiled", "snapshot_created", "enumerated", "serialized"]);
+  const phases = new Set([
+    "started",
+    "utility_loaded",
+    "compiled",
+    "snapshot_created",
+    "enumerated",
+    "serialized",
+  ]);
   if (error && typeof error === "object") {
     helperKilled = "killed" in error && error.killed === true;
     if ("stderr" in error && typeof error.stderr === "string")

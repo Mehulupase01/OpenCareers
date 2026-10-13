@@ -60,3 +60,12 @@ stderr or process rows. Source contracts remain 8/8, typecheck passes, local cen
 A manual eight-minute Windows-only workflow runs that diagnostic and the actual
 native/monitored contracts with pinned actions, without replacing full CI or skipping
 failures. This isolates the next investigation rather than guessing another API.
+
+Focused hosted run 38331690969 failed with last completed phase `started` and
+helperKilled=true at 20s, before Add-Type completed; enumeration was never reached.
+The next revision derives PSModulePath only from an absolute drive-qualified OS
+SystemRoot, never forwards the parent's user module path, disables auto-discovery
+and explicitly imports the built-in Utility module beneath the executing PSHOME.
+A `utility_loaded` marker separates module import from compilation. This is not
+yet a proven hosted fix. Local contracts 9/9, typecheck pass, census 744.62ms.
+The new environment test rejects relative/network roots and inherited module paths.
