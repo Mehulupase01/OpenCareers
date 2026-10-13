@@ -1783,10 +1783,15 @@
         {
           "id": "P15-01",
           "text": "Threat review. Test malicious job descriptions, email instructions, document payloads, unsafe imported URLs, untrusted model output, and attempts to widen execution authority.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": [],
-          "nextAction": "P15-01"
+          "evidence": [
+            "docs/evidence/P18-hosted-preparation-integration.md",
+            "tests/unit/hosted-read.test.ts",
+            "tests/unit/hosted-prepare.test.ts",
+            "docs/evidence/P15-pricing-adversarial.md"
+          ],
+          "nextAction": "Complete the integrated malicious-input, document, mailbox and authority-widening threat matrix; URL and pricing boundaries alone do not close G1."
         },
         {
           "id": "P15-02",

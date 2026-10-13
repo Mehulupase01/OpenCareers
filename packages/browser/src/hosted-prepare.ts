@@ -9,7 +9,7 @@ import { DomainError } from "../../contracts/src/index.js";
 import { planFields } from "./adapter.js";
 import type { FormAnswerGuard } from "./answer-guard.js";
 import { fillHostedForm, inspectHostedForm } from "./hosted-form.js";
-import { type HostedRead, readHostedPublic } from "./hosted-read.js";
+import { assertHostedPublicUrl, type HostedRead, readHostedPublic } from "./hosted-read.js";
 import { browserResources } from "./resources.js";
 
 export async function prepareHostedPacket(
@@ -33,6 +33,7 @@ export async function prepareHostedPacket(
       "POLICY_REVOKED",
       "Hosted preparation requires a valid packet and current origin approval.",
     );
+  assertHostedPublicUrl(target.url, permission.origin);
   const browser = await browserResources.launch({ headless: true });
   const signal = AbortSignal.timeout(60000);
   const closeOnAbort = () => {
@@ -64,6 +65,7 @@ export async function prepareHostedPacket(
       const url = new URL(request.url());
       if (
         url.origin !== permission.origin ||
+        !["document", "stylesheet", "image", "font"].includes(request.resourceType()) ||
         (request.isNavigationRequest() &&
           (request.frame() !== context.pages()[0]?.mainFrame() ||
             request.url() !== navigation.href)) ||
@@ -74,6 +76,7 @@ export async function prepareHostedPacket(
         return;
       }
       try {
+        assertHostedPublicUrl(request.url(), permission.origin);
         const resource = await read(request.url(), permission.origin, signal);
         bytes += resource.body.length;
         if (resource.body.length > 8 * 1024 * 1024 || bytes > 32 * 1024 * 1024)

@@ -126,3 +126,35 @@ it("rejects revoked, expired or wrong-origin permission before any browser or re
     ).rejects.toMatchObject({ code: "POLICY_REVOKED" });
   expect(browserResources.snapshot().launches).toBe(launches);
 });
+it("rejects account-action targets before creating a browser or invoking its reader", async () => {
+  const launches = browserResources.snapshot().launches;
+  let reads = 0;
+  const unsafe = structuredClone(packet);
+  unsafe.content.job.url = `${origin}/verify?token=synthetic-private`;
+  await expect(
+    prepareHostedPacket(unsafe, permission(), packetEvidenceGuard(unsafe), async () => {
+      reads++;
+      return { body: Buffer.from(html), contentType: "text/html" };
+    }),
+  ).rejects.toMatchObject({ code: "ORIGIN_DENIED" });
+  expect(reads).toBe(0);
+  expect(browserResources.snapshot().launches).toBe(launches);
+});
+it("does not fetch signed asset URLs even through the injected reader and stops filling", async () => {
+  let reads = 0;
+  const result = await prepareHostedPacket(
+    packet,
+    permission(),
+    packetEvidenceGuard(packet),
+    async () => {
+      reads++;
+      return {
+        body: Buffer.from(`${html}<link rel="stylesheet" href="/verify?token=synthetic-private">`),
+        contentType: "text/html",
+      };
+    },
+  );
+  expect(reads).toBe(1);
+  expect(result.reports[0]?.readBack).toEqual([]);
+  expect(result.status).toBe("unsupported");
+});

@@ -72,3 +72,25 @@ multi-step and logged-in variants remain unsupported pending reviewed family ada
 No real employer, Gmail account or model provider is contacted. The result's zero
 application count is a client contract, not an independently observed employer ledger.
 The 20-job-board target and genuine receipt gates are not closed by this work.
+
+## Credential And Account-Action URL Boundary
+
+The shared public-URL check now rejects credential/signed query fields, explicit
+state-changing action parameters and account/verification/callback/submission
+paths. Percent encoding, nested encoding and malformed paths cannot bypass the
+known-action check; decoded slash/backslash separators are inspected. Targets are
+checked before browser creation, and every resource is checked before even the
+trusted injected reader is invoked. Only document, stylesheet, image and font
+resource types are accepted. Ordinary vacancy IDs, source tracking, locale queries
+and public apply pages remain supported. Signed or account-gated variants require
+separately reviewed adapters, not credential stripping or generic GET verification.
+
+These checks reject known unsafe URL classes; they cannot prove an arbitrary
+employer implements GET without side effects. Exact public-read review remains
+necessary, and no independent zero-employer-record claim is added.
+
+Broader local check before the last encoded-separator cases:826 passed /276 skipped,
+105 files; lint/types/ledger/build pass. Final hosted loader/driver/core/origin suite:
+58 passed /four PostgreSQL skipped, four files. Three canonical persisted workflow
+cases also pass. Final types/build pass. Do not claim a full828 run; successor CI
+must verify the final security change separately from the green418d502 milestone.

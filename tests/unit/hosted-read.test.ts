@@ -94,3 +94,35 @@ it("rejects unapproved origins, credentials and private destination shapes befor
     );
   expect(transport.request).not.toHaveBeenCalled();
 });
+it.each([
+  "/jobs?access_token=private",
+  "/jobs?%74oken=private",
+  "/jobs?%2574oken=private",
+  "/jobs?X-Amz-Signature=private",
+  "/jobs?code=private",
+  "/jobs?action=submit",
+  "/oauth/callback",
+  "/verify",
+  "/%76erify",
+  "/%2576erify",
+  "/jobs%2Fverify/synthetic-private",
+  "/jobs%5Cverify/synthetic-private",
+  "/jobs/%",
+  "/submit.php",
+  "/logout",
+])("rejects credential and state-changing URLs before transport: %s", async (path) => {
+  await expect(
+    readHostedPublic(origin + path, origin, new AbortController().signal),
+  ).rejects.toMatchObject({ code: "ORIGIN_DENIED" });
+  expect(transport.request).not.toHaveBeenCalled();
+});
+it("preserves ordinary vacancy selectors, tracking and locale queries", async () => {
+  respond();
+  await expect(
+    readHostedPublic(
+      `${origin}/apply?job_id=123&source=linkedin&lang=en`,
+      origin,
+      new AbortController().signal,
+    ),
+  ).resolves.toMatchObject({ body: Buffer.from("public form") });
+});

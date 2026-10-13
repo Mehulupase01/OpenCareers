@@ -2117,3 +2117,21 @@ service started/restarted, no private database opened/migrated and no actions se
 Do not infer current authorization, Gmail consent or suitable live vacancies from
 configuration alone. A safe current-data/backup/readiness preflight is needed before
 private activation or P08 canary; missing live prerequisites need not halt engineering.
+
+### Hosted Credential/Callback Boundary
+
+Shared hosted public URL guard rejects signed/credential queries and known account,
+verification, callback and submission paths, including malformed/nested percent
+encoding and decoded separators. Every resource is checked before the reader;
+only document/styles/image/fonts load. Unsafe targets open no browser. Ordinary
+vacancy/locale/tracking links remain supported; no credential stripping or generic
+account verification. Public-origin review is still needed because URL syntax does
+not prove remote GET purity. No independent employer-record claim is made.
+
+Full local check before final separator cases826 passed /276 skipped,105 files;
+final hosted contracts58 passed /four PostgreSQL skipped. Canonical persisted3/3
+also passes, final types/build pass. These are not a fictional full828 result.
+Successor CI is needed for this security delta;418d502 all-four-lane green remains
+the prior verified milestone. P15-01 moves toin_progress for partial threat review,
+not G1 closure. Totals12/19 and97/128 unchanged. Private runtime remains offline;
+no private DB migration, real application, mailbox or inference action occurred.
