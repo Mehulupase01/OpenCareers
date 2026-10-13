@@ -4,7 +4,8 @@ Invalidated and stopped on 2026-10-13. The original tracker did not reject
 children older than their currently recorded parent when that parent PID was
 reused. Its claimed owned-tree resource scope therefore cannot qualify. Raw
 traces and installation are preserved; no successful finish or missing elapsed
-time has been fabricated. No qualifying resource candidate is running now.
+time has been fabricated. It is no longer running. A separate corrected provisional
+candidate started on 2026-10-13; see `P13-corrected-resource-candidate.md`.
 
 Started 2026-10-12T16:52:22.286Z, requesting 259200 actual seconds (72 hours),
 1200-second workload intervals, 60-second capacity samples and at most 216

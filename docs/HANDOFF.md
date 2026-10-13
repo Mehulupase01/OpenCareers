@@ -2009,3 +2009,20 @@ and no 24h/72h soak is running. Next record installed/remote results, then corre
 stable-build resource measurement while continuing independent P18 breadth and
 server/hybrid engineering. Files/custom/sensitive/multi-step/logged-in variants,
 20 automated boards and genuine receipt evidence remain open.
+
+### Installed Verification And Corrected Candidate
+
+Fresh installed verification finished: 1/1 in 132.21 seconds, production dependencies
+only, compiled runtime/dashboard, standard mock receipt, response-loss correlated
+reconciliation, changed-question stop and graceful drain. No logon/reboot/live proof.
+The separately frozen bundle's corrected provisional 72h resource trace started
+2026-10-13T00:46:02.614Z. First standard scenario confirmed a mock receipt; initial
+periodic census is advancing without stderr. Root PID 28712 is recorded with full
+UTC birth ticks 639274491605896490, not merely a second-precision timestamp.
+See P13-corrected-resource-candidate.md for archive/manifest identities, recovery
+paths and limitations. This supersedes "no candidate running" above, not the old
+candidate invalidation. It cannot close actual 24/72-hour gates or the full fault
+matrix. No coding continuation scheduler is available or claimed.
+
+CI 38328631548 at ca0c4c9 has passed server-image; Windows, Ubuntu and PostgreSQL
+lanes were still running at this checkpoint. Do not label them successful yet.
