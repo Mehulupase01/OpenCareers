@@ -1,5 +1,13 @@
 # Production Completion, 2026-10-09
 
+## 2026-10-14 Delivery Scope Update
+
+The owner now requests Windows-only delivery and asks to skip Android and other
+targets. Finish Windows workflows first; defer new server/hybrid and Android
+expansion. Preserve existing cross-platform code and regression coverage. Original
+ledger requirements remain visible and are not counted complete by deferral. The
+server/hybrid steps below are historical scope, not the current execution priority.
+
 Owner-approved continuation of the 18 masterplan phases P00-P17 and added P18.
 Execution milestones group work without replacing phase gates or reducing scope.
 The audit started at dda7862 with 72/128 gates, ten phases recorded complete,

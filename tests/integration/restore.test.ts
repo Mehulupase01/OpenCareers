@@ -69,6 +69,30 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await db.close();
       });
 
+      it("requires external history from the immutable backup boundary rather than just restore startup", async () => {
+        const boundary = "2026-01-01T00:00:00.000Z";
+        const run = await restores.block(snapshot, "system:restore", boundary);
+        await expect(
+          restores.block(snapshot, "system:restore", "2026-02-01T00:00:00.000Z"),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(
+          restores.block(snapshot, "system:restore", new Date(Date.now() + 86400000).toISOString()),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        await restores.review(
+          run,
+          appId,
+          { disposition: "quarantined", note: "Synthetic boundary review." },
+          actor,
+        );
+        const started = String((await restores.status()).runs[0]?.started_at);
+        await expect(
+          restores.release(run, actor, { ...gapEvidence(), from: started }),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        expect((await repo.getControl()).restoreBlocked).toBe(true);
+        await restores.release(run, actor, gapEvidence());
+        expect((await repo.getControl()).restoreBlocked).toBe(false);
+      });
+
       it("revokes restored signup handles and locks even accounts without recorded attempts", async () => {
         const candidateId = randomUUID(),
           policyId = randomUUID();

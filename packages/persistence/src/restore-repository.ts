@@ -92,9 +92,15 @@ export class RestoreRepository extends Repository {
   }
 
   // Call on the restored database while every old/new worker and browser is offline.
-  async block(snapshotSha256: string, actor = "system:restore") {
+  async block(snapshotSha256: string, actor = "system:restore", snapshotCreatedAt?: string) {
     if (!/^[a-f0-9]{64}$/.test(snapshotSha256))
       throw new DomainError("CONFIG_INVALID", "A restore snapshot checksum is required.");
+    if (
+      snapshotCreatedAt !== undefined &&
+      (!z.iso.datetime().safeParse(snapshotCreatedAt).success ||
+        Date.parse(snapshotCreatedAt) > this.clock().getTime())
+    )
+      throw new DomainError("CONFIG_INVALID", "A non-future backup capture boundary is required.");
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const active = (
@@ -105,14 +111,25 @@ export class RestoreRepository extends Repository {
       if (active) {
         if (active.snapshot_sha256 !== snapshotSha256)
           throw new DomainError("STATE_INVALID", "Another restore review is already open.");
+        if (snapshotCreatedAt !== undefined) {
+          if (active.snapshot_created_at && active.snapshot_created_at !== snapshotCreatedAt)
+            throw new DomainError(
+              "STATE_INVALID",
+              "The recorded backup boundary cannot be replaced.",
+            );
+          await tx.query(
+            "UPDATE restore_runs SET snapshot_created_at=$1 WHERE owner_id=$2 AND id=$3",
+            [snapshotCreatedAt, this.ownerId, String(active.id)],
+          );
+        }
         // Reassert fences when upgrading a quarantine created by an older build.
         await this.revokeExternalCapabilities(tx);
         return String(active.id);
       }
       const id = randomUUID();
       await tx.query(
-        "INSERT INTO restore_runs(owner_id,id,snapshot_sha256,state,started_at) VALUES($1,$2,$3,'open',$4)",
-        [this.ownerId, id, snapshotSha256, this.now()],
+        "INSERT INTO restore_runs(owner_id,id,snapshot_sha256,state,started_at,snapshot_created_at) VALUES($1,$2,$3,'open',$4,$5)",
+        [this.ownerId, id, snapshotSha256, this.now(), snapshotCreatedAt ?? null],
       );
       const control = {
         ...(await this.readControl(tx)),
@@ -283,15 +300,15 @@ export class RestoreRepository extends Repository {
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
       const run = (
-        await tx.query("SELECT state,started_at FROM restore_runs WHERE owner_id=$1 AND id=$2", [
-          this.ownerId,
-          runId,
-        ])
+        await tx.query(
+          "SELECT state,started_at,snapshot_created_at FROM restore_runs WHERE owner_id=$1 AND id=$2",
+          [this.ownerId, runId],
+        )
       )[0];
       if (run?.state !== "open")
         throw new DomainError("STATE_INVALID", "No matching open restore review.");
       if (
-        Date.parse(gap.from) > Date.parse(String(run.started_at)) ||
+        Date.parse(gap.from) > Date.parse(String(run.snapshot_created_at ?? run.started_at)) ||
         Date.parse(gap.through) < Date.parse(String(run.started_at)) ||
         Date.parse(gap.through) > this.clock().getTime() ||
         Date.parse(gap.from) > Date.parse(gap.through)

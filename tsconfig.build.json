@@ -5,6 +5,7 @@
     "apps/worker/**/*.ts",
     "packages/**/*.ts",
     "scripts/runtime.ts",
+    "scripts/backup.ts",
     "scripts/release-smoke.ts",
     "scripts/verify-bundle.ts",
     "scripts/release-recovery.ts",

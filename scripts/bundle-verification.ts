@@ -10,9 +10,11 @@ export const bundleInputPaths = [
   "pnpm-workspace.yaml",
   ".node-version",
   ".env.example",
+  "docs/WINDOWS-BACKUP.md",
   "scripts/windows-runtime.ps1",
   "scripts/windows-startup-host.ps1",
   "dist/scripts/runtime.js",
+  "dist/scripts/backup.js",
   "dist/scripts/verify-bundle.js",
   "dist/scripts/bundle-verification.js",
   "dist/scripts/release-smoke.js",
@@ -33,6 +35,7 @@ export const bundleInputPaths = [
   "dist/web/index.html",
 ] as const;
 const rootFiles = new Set([
+  "docs/WINDOWS-BACKUP.md",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
@@ -44,6 +47,7 @@ const rootFiles = new Set([
 ]);
 const scriptNames = new Set([
   "runtime.js",
+  "backup.js",
   "release-smoke.js",
   "release-smoke-run.js",
   "release-recovery.js",

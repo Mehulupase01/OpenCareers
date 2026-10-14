@@ -167,6 +167,7 @@ export const migrations = [
   [
     "CREATE TABLE hosted_origin_permissions (owner_id TEXT NOT NULL REFERENCES owners(id), origin TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), state TEXT NOT NULL CHECK(state IN ('active','revoked')), expires_at TEXT NOT NULL, permission_sha256 TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,origin))",
   ],
+  ["ALTER TABLE restore_runs ADD COLUMN snapshot_created_at TEXT"],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

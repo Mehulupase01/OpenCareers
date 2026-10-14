@@ -1812,7 +1812,7 @@
             "docs/evidence/P15-sqlite-snapshot-foundation.md",
             "tests/integration/sqlite-snapshot.test.ts"
           ],
-          "nextAction": "Complete encrypted whole-installation archives, artifact consistency, reviewed account recovery, vault rekey and PostgreSQL backup/restore. Database capture and restored signup/mailbox/source fencing are partial evidence, not gate closure."
+          "nextAction": "Windows encrypted archive/restore and immutable review-gap boundary are verified. Finish reviewed account recovery, vault rekey, credential rotation and interruption/reboot drills. New PostgreSQL/server expansion is deferred by the owner's Windows-only instruction; no phase closure."
         },
         {
           "id": "P15-04",
@@ -1866,8 +1866,11 @@
         {
           "id": "P15-G5",
           "requirement": "Backup restoration verifies database consistency and artifact checksums.",
-          "status": "not_started",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            "docs/evidence/P15-Windows-backup.md",
+            "tests/integration/sqlite-backup.test.ts"
+          ]
         },
         {
           "id": "P15-G6",

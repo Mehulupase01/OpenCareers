@@ -75,3 +75,9 @@ at `497ca21`:
 12. The owner's OpenRouter key was pasted into chat and must be rotated before any
     live route work. The repository never contains it.
 
+13. On 2026-10-14 the owner explicitly prioritizes Windows only and asks to skip
+    Android and other targets. Current delivery is the independently running Windows
+    application. New Android/server/hybrid expansion is deferred, not completed or
+    silently deleted from the original masterplan ledger. Preserve existing
+    cross-platform contracts/tests while completing Windows workflows.
+

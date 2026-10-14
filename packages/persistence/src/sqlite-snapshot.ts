@@ -35,7 +35,7 @@ async function canonical(path: string, directory: boolean) {
     throw new DomainError("STORAGE_UNAVAILABLE", "Database snapshot exceeds its byte bound.");
   return physical;
 }
-function schemaVersion(db: BetterSqlite3.Database) {
+export function snapshotSchemaVersion(db: BetterSqlite3.Database) {
   const rows = db
     .prepare("SELECT version,checksum FROM schema_migrations ORDER BY version LIMIT 1001")
     .all() as Array<{ version: number; checksum: string }>;
@@ -76,7 +76,7 @@ function assertQuiescent(db: BetterSqlite3.Database, ownerId: string, now: Date,
       "Active workers, leases or dispatches must be drained before capture.",
     );
 }
-function integrity(db: BetterSqlite3.Database) {
+export function assertSnapshotIntegrity(db: BetterSqlite3.Database) {
   const foreignKeys = db.pragma("foreign_key_check");
   if (
     db.pragma("quick_check(1)", { simple: true }) !== "ok" ||
@@ -88,6 +88,7 @@ function integrity(db: BetterSqlite3.Database) {
 
 export async function captureQuiescentSqliteSnapshot(raw: z.input<typeof inputSchema>) {
   const input = inputSchema.parse(raw);
+  const capturedAt = new Date().toISOString();
   let source: BetterSqlite3.Database | undefined;
   let directory: string | undefined;
   let complete = false;
@@ -101,8 +102,8 @@ export async function captureQuiescentSqliteSnapshot(raw: z.input<typeof inputSc
     };
     if (!sqliteVersionSafe(engine.version))
       throw new DomainError("STORAGE_UNAVAILABLE", "Snapshot engine lacks the required WAL fix.");
-    const version = schemaVersion(source);
-    integrity(source);
+    const version = snapshotSchemaVersion(source);
+    assertSnapshotIntegrity(source);
     assertQuiescent(source, input.ownerId, new Date(), version);
     const dataVersion = source.pragma("data_version", { simple: true });
     const pageSize = Number(source.pragma("page_size", { simple: true }));
@@ -128,8 +129,8 @@ export async function captureQuiescentSqliteSnapshot(raw: z.input<typeof inputSc
     await canonical(path, false);
     const copied = new BetterSqlite3(snapshotPath, { readonly: true, fileMustExist: true });
     try {
-      integrity(copied);
-      if (schemaVersion(copied) !== version)
+      assertSnapshotIntegrity(copied);
+      if (snapshotSchemaVersion(copied) !== version)
         throw new DomainError("MIGRATION_UNSUPPORTED", "Snapshot schema changed.");
     } finally {
       copied.close();
@@ -149,7 +150,7 @@ export async function captureQuiescentSqliteSnapshot(raw: z.input<typeof inputSc
       migrationVersion: version,
       databaseSha256: hash.digest("hex"),
       databaseBytes: bytes,
-      createdAt: new Date().toISOString(),
+      createdAt: capturedAt,
       encrypted: false,
       productionBackupAccepted: false,
     };

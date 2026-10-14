@@ -64,6 +64,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
     scripts: {
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
+      backup: "node dist/scripts/backup.js",
       "self-test": "node dist/scripts/release-smoke.js",
       "self-test:recovery": "node dist/scripts/release-recovery.js",
       "verify:bundle": "node dist/scripts/verify-bundle.js",
@@ -144,7 +145,11 @@ Upgrade/rollback: stop the old runtime first and verify no active worker remains
 Keep one authoritative data directory. Never restore an older DB merely to roll
 back code; use the documented restore-blocked reconciliation process for a real
 restore. Do not run old code against a newer unsupported schema. This bundle
-does not automate migration, backup or rollback.
+does not automate migration or rollback. The offline backup command captures and
+restores a stopped local SQLite installation's referenced encrypted source and
+artifact files. It requires a separate backup key and protected local staging;
+restore always enters review quarantine and never starts the runtime. See the
+included docs/WINDOWS-BACKUP.md guide before use.
 `),
   );
   for (const [path, content] of files) {

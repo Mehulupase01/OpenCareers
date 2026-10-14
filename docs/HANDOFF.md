@@ -2180,3 +2180,36 @@ and chunk-size warnings remain. Earlier broad results overlapped edits and are n
 accepted. P15-03 evidence/next action updated, no gate closure. Successor CI is pending.
 Prior provisional PID28712 is gone; last preserved sample covered about5.08 hours,
 16 cycles and five mock receipts. No24/72-hour acceptance; preserve the old traces.
+
+## 2026-10-14: Windows Encrypted Backup Workflow
+
+Owner now requests Windows-only delivery and skips Android/other targets. New
+server/hybrid/Android work is deferred, not completed or removed from the original
+ledger. Preserve existing regression contracts. Amendments13 and the completion
+plan record the change. Prior85dbce1 CI38489655882 passes all four lanes.
+
+Delivered actual offline capture/restore CLI and bundled instructions, separate-key
+AES-GCM encrypted archive, complete referenced local encrypted document inventory,
+vault-key checks, WAL-aware snapshot, bounded ZIP checks and restored-only migrations.
+The command runs a256MiB-heap OS-environment-only worker with a five-minute hard
+deadline and IPC keys. Failures clean only generated staging after worker exit.
+Restore applies durable external-capability quarantine before publishing dataDir;
+no service starts, no source migration, no destination overwrite. Config/keys are
+not archived. The capture boundary precedes source reads and is stored on restore
+runs via an appended migration; review cannot shorten or replace a known boundary.
+
+Full frozen check849 passed /279 skipped,105 passing files /two skipped,283.33s;
+lint/types/ledger/build pass. Focused50 /eight skips, five files. Separate COMPILED
+CLI capture/restore verifies an encrypted artifact and stopped/restoreBlocked=true
+without TypeScript tooling. Scan496 files before this handoff. All fixtures synthetic;
+no private database/config/key/CV/model/Gmail/employer action. See WINDOWS-BACKUP.md
+and evidence/P15-Windows-backup.md for commands, bounds and missing private proof.
+
+P15-G5 complete for supported Windows local backup integrity. Counts12/19 phases,
+98/128 gates; no phase closure. Successor CI pending. Next Windows milestone:
+reviewed employer-account recovery and vault/document rekey/rotation, then fuller
+crash/reboot drills and qualifying soaks. Nested open-restore backups are refused,
+not silently "supported". Protected plaintext staging needs reviewed Windows ACLs
+and encrypted disk; a parent/OS crash can leave staging, and deletion is not secure
+erasure. Current source requires a new column on activation; private source was NOT
+migrated. The archive command supports the prior schema without source mutation.
