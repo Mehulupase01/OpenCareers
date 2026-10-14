@@ -6,6 +6,8 @@
     "packages/**/*.ts",
     "scripts/runtime.ts",
     "scripts/backup.ts",
+    "scripts/commit-crash.ts",
+    "scripts/commit-crash-worker.ts",
     "scripts/release-smoke.ts",
     "scripts/verify-bundle.ts",
     "scripts/release-recovery.ts",

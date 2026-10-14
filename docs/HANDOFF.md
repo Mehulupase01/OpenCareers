@@ -2253,3 +2253,33 @@ and physical reboot/BSOD proof. Then complete the full commit-boundary crash mat
 qualifying24/72-hour stable-build soaks and broader Windows source/portal readiness.
 Do not call rekey remote revocation, owner review an employer receipt, browser
 viewport tests an Android implementation, or the prior stopped5-hour trace a soak.
+
+## 2026-10-14: Six Owned Commit Crash Boundaries
+
+Kept working after the recovery commit:227ed49 CI38533858069 now passes all four
+lanes. New work reuses capacity fixtures and the existing guarded mock adapter/
+repositories; no production submission authority is added. An installed Windows
+`node dist/scripts/commit-crash.js` command accepts no options or private configuration.
+Its six child workers each reach an audited synthetic boundary, release tracked
+browsers, then are killed by the owning supervisor with SIGKILL exits verified.
+Boundaries cover pre-intent claim, durable intent, authorization/no-click, accepted
+before receipt, actual injected receipt-write rollback, and persisted receipt before
+task completion. Distinct-key redelivery/repeated worker claims cannot redispatch
+recorded attempts. Receipt-free uncertainty remains needs-review, never "unsent".
+
+Final focused24 passed /one skipped, three files in34.80s. Full frozen check859
+passed /283 local skips,107 passing files /two skipped,317.90s; lint/types/ledger/
+build pass with existing warnings. Separate COMPILED command passes all six cases:
+three accepted mock records with receipts, two unresolved needs-review and one
+retryable pre-intent task; zero duplicates. Synthetic output cleaned after validating
+its owned canonical TEMP path. New script/worker/runner are explicit bundle inputs
+with required-entry tests. No private data/config/LLM/mail/employer action occurred.
+
+P15-02 and G2 now in_progress with named evidence, not complete. Counts remain12/19
+and98/128. Read P15-Windows-commit-crash.md before extending claims. Lease recovery
+in this matrix uses an explicit logical clock after the stored deadline; the prior
+release-recovery test separately waits actual elapsed expiry. Authorized/no-click
+injects a callback exception before cleanup/kill. Receipt-write failure rolls back
+before kill. Unexpected live-Chromium/transaction kills, the complete outage/worker/
+queue matrix, physical Windows reboot/power-loss and actual24/72-hour soaks remain.
+Do not combine this logical-clock proof with resource traces or treat it as a soak.

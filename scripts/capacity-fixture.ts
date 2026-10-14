@@ -34,6 +34,15 @@ export const capacityScenarios = [
   "account-blocked",
 ] as const;
 export type CapacityScenario = (typeof capacityScenarios)[number];
+export const commitCrashBoundaries = [
+  "claimed_before_intent",
+  "intent_before_dispatch",
+  "authorized_without_click",
+  "accepted_before_receipt",
+  "receipt_write_failed",
+  "receipt_before_task_complete",
+] as const;
+export type CommitCrashBoundary = (typeof commitCrashBoundaries)[number];
 const definitions = [
   { semanticKey: "country", meaning: "Country", answer: "NL", evidenceFactIds: ["fact-work-nl"] },
   {
@@ -65,7 +74,12 @@ const definitions = [
 export async function createCapacityFixture(
   repository: Repository,
   directory: string,
-  hooks: { afterAcceptedResponseLoss?: () => Promise<never> } = {},
+  hooks: {
+    afterAcceptedResponseLoss?: () => Promise<never>;
+    afterCommitBoundary?: (boundary: CommitCrashBoundary) => Promise<void>;
+    interruptAfterAuthorization?: boolean;
+    failReceiptWrite?: boolean;
+  } = {},
 ) {
   const physical = await realpath(directory);
   const canonical = resolve(directory);
@@ -328,6 +342,7 @@ export async function createCapacityFixture(
     });
     const task = await repository.claim("capacity-worker", ["submit"]);
     if (!task) throw new Error("Expected guarded synthetic submit task.");
+    await hooks.afterCommitBoundary?.("claimed_before_intent");
     const revision = Number(
       (
         await tx.query("SELECT revision FROM applications WHERE owner_id=$1 AND id=$2", [
@@ -341,26 +356,53 @@ export async function createCapacityFixture(
       preparationId: preparation.id,
       expectedRevision: revision,
     });
+    await hooks.afterCommitBoundary?.("intent_before_dispatch");
+    let interruptedAfterAuthorization = false,
+      writingReceipt = false;
     try {
       const outcome = await adapter.commit({
         packet,
         cvPdf: cv.buffer,
         target,
         preparation,
-        authorizeDispatch: () => submissions.authorizeDispatch(task, handle),
+        authorizeDispatch: async () => {
+          const permit = await submissions.authorizeDispatch(task, handle);
+          if (hooks.interruptAfterAuthorization) {
+            interruptedAfterAuthorization = true;
+            throw new DomainError(
+              "COMMIT_UNKNOWN",
+              "Synthetic interruption before the final click.",
+            );
+          }
+          return permit;
+        },
         validateAnswers: (snapshot, plan) =>
           candidates.validateFormPlan(packet, snapshot, plan, {
             attemptId: handle.attemptId,
             fence: handle.fence,
           }),
       });
-      if (outcome.status === "confirmed")
+      if (outcome.status === "confirmed") {
+        await hooks.afterCommitBoundary?.("accepted_before_receipt");
+        writingReceipt = true;
         await submissions.confirmReceipt(task, handle, outcome.evidence);
-      else await submissions.recordDefinitiveRejection(task, handle, outcome.reason);
+        writingReceipt = false;
+        await hooks.afterCommitBoundary?.("receipt_before_task_complete");
+      } else await submissions.recordDefinitiveRejection(task, handle, outcome.reason);
       await repository.complete(task);
       stageMs.commit = performance.now() - commitStarted;
       return finish(outcome.status);
     } catch (error) {
+      if (interruptedAfterAuthorization)
+        await hooks.afterCommitBoundary?.("authorized_without_click");
+      if (writingReceipt && hooks.failReceiptWrite) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.includes("Synthetic receipt storage failure")
+        )
+          throw error;
+        await hooks.afterCommitBoundary?.("receipt_write_failed");
+      }
       // Only the declared response-loss scenario may enter read-only reconciliation.
       if (scenario !== "response-loss") throw error;
       const attempt = (

@@ -1796,10 +1796,16 @@
         {
           "id": "P15-02",
           "text": "Crash matrix. Execute every commit boundary under process kill, network loss, worker duplication, lease expiry, queue redelivery, and receipt-write failure.",
-          "status": "not_started",
+          "status": "in_progress",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": [],
-          "nextAction": "P15-02"
+          "evidence": [
+            "docs/evidence/P15-Windows-commit-crash.md",
+            "tests/integration/commit-crash.test.ts",
+            "tests/integration/release-recovery.test.ts",
+            "tests/integration/durability.test.ts",
+            "tests/integration/concurrency.test.ts"
+          ],
+          "nextAction": "Six owned process-kill boundaries now verify receipt/attempt fencing and redelivery. Complete the integrated network/duplicate-worker/expiry matrix, unexpected active-browser/transaction kill coverage and Windows power-loss/reboot evidence; cleanup-then-kill and logical clock expiry are explicitly scoped, not full gate closure."
         },
         {
           "id": "P15-03",
@@ -1846,8 +1852,12 @@
         {
           "id": "P15-G2",
           "requirement": "Zero duplicate external records occur in the supported mock crash suite; unresolved outcomes are retained honestly.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P15-Windows-commit-crash.md",
+            "tests/integration/commit-crash.test.ts",
+            "tests/integration/release-recovery.test.ts"
+          ]
         },
         {
           "id": "P15-G3",

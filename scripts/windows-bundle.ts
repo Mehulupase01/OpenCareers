@@ -65,6 +65,7 @@ export async function buildWindowsBundle(root = resolve(import.meta.dirname, "..
       start: "node dist/scripts/runtime.js start",
       runtime: "node dist/scripts/runtime.js",
       backup: "node dist/scripts/backup.js",
+      "self-test:commit-crash": "node dist/scripts/commit-crash.js",
       "self-test": "node dist/scripts/release-smoke.js",
       "self-test:recovery": "node dist/scripts/release-recovery.js",
       "verify:bundle": "node dist/scripts/verify-bundle.js",
@@ -110,6 +111,14 @@ second final action. It also checks an encrypted, test-only challenge handoff
 checkpoint; it does not solve real challenges or submit the challenge fixture.
 It accepts no options and ignores private configuration. This is not a physical
 reboot, production deployment, live application or qualifying soak.
+
+Run node dist/scripts/commit-crash.js for six additional owned mock process-kill
+boundaries spanning claim, intent, authorization and receipt persistence. It checks
+redelivery fencing and receipt-write rollback without another employer record.
+Lease expiry uses a declared logical clock; the earlier recovery self-test covers
+actual elapsed expiry. Browsers close before these process kills. The authorized
+pre-click case injects a callback error first; this is not a physical Chromium kill,
+power loss, private submission, complete crash matrix or qualifying soak.
 
 For installed synthetic capacity measurement, run:
 
