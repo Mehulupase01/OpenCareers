@@ -12,7 +12,7 @@ import {
   compileRegressionFixture,
   parseRegressionFixture,
   type RegressionCorrection,
-  regressionFromFactCorrection,
+  regressionsFromFactCorrection,
 } from "../../security/src/regression-fixture.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { OwnerScope } from "./owner-scope.js";
@@ -49,12 +49,18 @@ export class RegressionRepository extends OwnerScope {
   // Candidate review owns this transaction and lock. No source text is retained.
   async captureFact(tx: SqlExecutor, before: CandidateFact, after: CandidateFact) {
     if (before.status !== "verified" || !before.reviewedAt) return;
-    const correction = regressionFromFactCorrection(before, after);
-    if (!correction) return;
-    const event = createHash("sha256")
-      .update(JSON.stringify({ owner: this.ownerId, before, after }))
-      .digest("hex");
-    await this.capture(tx, correction, event, "owner");
+    for (const correction of regressionsFromFactCorrection(before, after)) {
+      // Keep legacy workload event identities stable when replaying older reviews.
+      const identity = { owner: this.ownerId, before, after };
+      const event = createHash("sha256")
+        .update(
+          JSON.stringify(
+            correction.kind === "workload_correction" ? identity : { ...identity, correction },
+          ),
+        )
+        .digest("hex");
+      await this.capture(tx, correction, event, "owner");
+    }
   }
 
   // Inference completion owns the transaction/lock; only categorical reasons survive.

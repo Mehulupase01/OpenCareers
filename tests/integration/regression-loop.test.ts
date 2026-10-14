@@ -21,6 +21,7 @@ import {
 } from "../../packages/security/src/regression-fixture.js";
 import { importRegressionFixture } from "../../scripts/regression-import.js";
 import { documentFacts, documentGenerationInput } from "../fixtures/document-packets.js";
+import { verifyFactCorrection } from "../helpers/fact-regression-cases.js";
 import { letterClaimCase } from "../helpers/letter-claim-cases.js";
 
 async function verify(raw: unknown) {
@@ -43,6 +44,8 @@ async function verify(raw: unknown) {
       fullTimeMonths: fixture.after === "full_time" ? 12 : 0,
       partTimeMonths: fixture.after === "part_time" ? 12 : 0,
     });
+  } else if (fixture.kind === "fact_correction") {
+    verifyFactCorrection(fixture.variant);
   } else if (fixture.kind === "unsupported_letter_claim") {
     const { input, content, proposal } = letterClaimCase(fixture.variant);
     expect(() => compileLetterProposal(input, content, proposal)).toThrow(
@@ -194,6 +197,11 @@ describe("correction to executable synthetic regression", () => {
     await verify(JSON.parse(await readFile(file, "utf8")));
   });
   it.each([
+    ...(["employment_period", "language_level", "metric_value"] as const).map((variant) => ({
+      kind: "fact_correction",
+      reviewed: true,
+      variant,
+    })),
     ...letterClaimReasonSchema.options.map((variant) => ({
       kind: "unsupported_letter_claim",
       reviewed: true,

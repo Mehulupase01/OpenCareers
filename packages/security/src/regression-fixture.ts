@@ -18,6 +18,13 @@ export const regressionCorrectionSchema = z.discriminatedUnion("kind", [
     }),
   z
     .object({
+      kind: z.literal("fact_correction"),
+      reviewed: z.literal(true),
+      variant: z.enum(["employment_period", "language_level", "metric_value"]),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal("unsupported_letter_claim"),
       reviewed: z.literal(true),
       variant: letterClaimReasonSchema,
@@ -59,27 +66,51 @@ export function regressionFromFactCorrection(
   rawBefore: unknown,
   rawAfter: unknown,
 ): RegressionCorrection | null {
+  return regressionsFromFactCorrection(rawBefore, rawAfter)[0] ?? null;
+}
+
+export function regressionsFromFactCorrection(
+  rawBefore: unknown,
+  rawAfter: unknown,
+): RegressionCorrection[] {
   const before = factSchema.parse(rawBefore),
     after = factSchema.parse(rawAfter);
   if (
     before.id !== after.id ||
+    before.key !== after.key ||
+    before.value.kind !== after.value.kind ||
     after.revision <= before.revision ||
+    before.status !== "verified" ||
+    !before.reviewedAt ||
     after.status !== "verified" ||
     !after.reviewedAt
   )
-    return null;
+    return [];
+  const corrections: RegressionCorrection[] = [];
+  if (before.value.kind === "employment" && after.value.kind === "employment") {
+    if (before.value.workload !== after.value.workload)
+      corrections.push({
+        kind: "workload_correction",
+        reviewed: true,
+        before: before.value.workload,
+        after: after.value.workload,
+      });
+    if (before.value.start !== after.value.start || before.value.end !== after.value.end)
+      corrections.push({ kind: "fact_correction", reviewed: true, variant: "employment_period" });
+  }
   if (
-    before.value.kind !== "employment" ||
-    after.value.kind !== "employment" ||
-    before.value.workload === after.value.workload
+    before.value.kind === "language" &&
+    after.value.kind === "language" &&
+    before.value.level !== after.value.level
   )
-    return null;
-  return {
-    kind: "workload_correction",
-    reviewed: true,
-    before: before.value.workload,
-    after: after.value.workload,
-  };
+    corrections.push({ kind: "fact_correction", reviewed: true, variant: "language_level" });
+  if (
+    before.value.kind === "metric" &&
+    after.value.kind === "metric" &&
+    before.value.value !== after.value.value
+  )
+    corrections.push({ kind: "fact_correction", reviewed: true, variant: "metric_value" });
+  return corrections;
 }
 
 export function parseRegressionFixture(raw: unknown) {

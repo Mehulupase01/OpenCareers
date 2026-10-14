@@ -34,4 +34,4 @@ it("validates the pinned pnpm production dependency inventory without reading ow
   expect(bom.components.length).toBeGreaterThan(Object.keys(manifest.dependencies).length);
   expect(bom.dependencies).toHaveLength(bom.components.length + 1);
   expect(normalizeReleaseSbom(bom, manifest, lockfile, true)).toEqual(bom);
-});
+}, 45000);

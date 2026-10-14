@@ -2431,3 +2431,40 @@ browser checks6/6 pass42.6s; successor CI pending. Read P16-letter-regressions.m
 broader corrected facts, mail corrections and portal-specific form scenarios remain.
 P16-04/G6 and phaseP16 remain open. No private runtime/config, mailbox/model/employer
 action, real submission or elapsed soak occurred.
+
+Successor cumulative-outcome CI38565734939 at18baba2 passes all four lanes,
+including Windows clean installation and full browser verification. P16-G3 closes:
+99/128 gates,12/19 phases. The rest of P16 and its P15 dependencies remain open.
+
+## 2026-10-14: Broader Reviewed Fact Corrections
+
+Employment period, language level and numeric metric-value edits now flow through
+the existing fact review into strict categorical proposals. Both revisions must be
+verified/reviewed, same ID/key/kind and increasing. The review hook now includes
+language/metric facts rather than silently excluding them. Simultaneous workload
+and date edits create two distinct proposals in one transaction, preserving legacy
+workload event hashes. Public fixtures contain no source dates, values or identities.
+The singular helper remains compatible; persistence consumes the complete array.
+
+Two bounded agents deliver disjoint schema/unit and joined integration tests.
+Actual stale document content is rejected after each synthetic correction; rebuilt
+content validates. Fourteen joined SQLite cases cover review/export/temp-repo
+import, privacy, no-op/unreviewed/dismissed cases, multi-correction identity and
+rollback of fact versions/audits/first proposal on the second INSERT failure.
+Frozen full check1,011 pass /328 local skips,113 passing files /two skipped,340.34s;
+types/lint/ledger/build/native SBOM pass. Candidate/regression browser checks4/4
+pass38.2s; public scan526 files. No private config/data/service or live action used.
+
+Letter CI38567488365 passes PostgreSQL/Ubuntu/server-image but fails Windows on
+the SBOM test's15-second outer deadline while its30-second child downloads pinned
+pnpm (22.95s). The outer deadline alone is now45 seconds; focused SBOM checks8/8
+pass. Full verification above precedes only that test-only change. Successor parity
+remains pending, never count the failed run as passing. Read P16-fact-regressions.md.
+Other fact fields and portal/mail correction scope remain; P16-04/G6 remain open.
+
+Next cohesive milestone: approved letter-wording variant generation for one existing
+pre-READY application, through durable generation identity, mandatory bounded
+draft/critique, atomic fenced publication, fresh inspection, exact review and
+assignment. Existing valid-packet reuse must not substitute a baseline/other variant;
+pending enrollment must block dispatch before assignment, including direct engine
+calls. Preserve legacy manual definitions and the one guarded submission engine.

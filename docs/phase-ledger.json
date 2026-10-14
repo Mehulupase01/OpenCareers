@@ -1991,6 +1991,9 @@
             "docs/evidence/P16-automatic-form-regressions.md",
             "docs/evidence/P16-letter-regressions.md",
             "tests/integration/letter-regression.test.ts",
+            "docs/evidence/P16-fact-regressions.md",
+            "tests/unit/fact-regression.test.ts",
+            "tests/integration/fact-regression.test.ts",
             "tests/integration/regression-proposals.test.ts",
             "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
@@ -2035,7 +2038,7 @@
         {
           "id": "P16-G3",
           "requirement": "Reported conversion rates include numerator, denominator, date range, and relevant exclusions.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P16-fixed-cohorts.md",
             "docs/evidence/P16-cumulative-outcomes.md",

@@ -62,6 +62,11 @@ static review, not independent runtime evidence. Focused desktop/mobile browser
 checks6/6 pass42.6s (regression review/export, outcome history and cumulative reports).
 The preceding full browser baseline78/78 remains separately identified. CI pending.
 
+CI38567488365 at5b8d172 passes PostgreSQL, Ubuntu and server-image. Windows fails
+the separate release SBOM test's15-second outer deadline during a cold pinned-pnpm
+binary download, not the letter workflow. P16-fact-regressions.md records its bounded
+outer-deadline correction and successor verification; this failed run is not parity.
+
 ## Remaining Scope
 
 Verified employment workload corrections and blocked-form/pre-dispatch drift
@@ -71,3 +76,6 @@ mail-classification correction proposals, family-specific form regression
 variants and unmapped packet-validation failures remain explicit work. No claim
 that every possible owner correction is covered, no automatic fixture publication,
 and no new application database or final-submission authority is introduced.
+
+Successor P16-fact-regressions.md expands reviewed employment dates, language
+levels and numeric metric values through the same private proposal boundary.

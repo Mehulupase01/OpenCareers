@@ -66,7 +66,11 @@ uses the existing horizontal scroll container without page overflow. Typecheck/l
 pass with the existing browser-helper warning. Frozen full check:918 passed /295
 local skips,110 passing files /two skipped,365.24s. Lint, types, ledger, production
 build and native237-component SBOM pass. Full desktop/mobile browser suite78/78
-passes in5.3 minutes. Commit18baba2 is pushed; CI38565734939 remains pending.
+passes in5.3 minutes. Commit18baba2 is pushed; CI38565734939 passes all four lanes:
+Windows, Ubuntu, PostgreSQL and server-image. This includes the production-only
+Windows clean installation and full browser checks. P16-G3 closes; totals become
+99/128 gates and12/19 phases. Metadata breadth, experiments, regression scope and
+P15 dependencies still keep the full P16 phase open.
 
 Synthetic repository fixture:21 receipt-qualified members, a30-day horizon,
 receipt window August1 through September30,2026, cutoff October1,2026. Cumulative

@@ -294,7 +294,7 @@ export class CandidateRepository extends Repository {
       await this.writeFact(tx, String(candidate.id), fact);
       if (
         status === "verified" &&
-        fact.value.kind === "employment" &&
+        ["employment", "language", "metric"].includes(fact.value.kind) &&
         existing.status !== "verified"
       ) {
         const history = await tx.query(
