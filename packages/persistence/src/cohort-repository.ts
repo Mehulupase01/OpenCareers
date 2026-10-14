@@ -275,13 +275,17 @@ export class CohortRepository extends OwnerScope {
           manifest.data.id === receipt.packet_id
             ? `${manifest.data.templateVersions.cv}/${manifest.data.templateVersions.letter}/${manifest.data.letterGeneration?.method ?? "unknown"}`
             : "unknown";
-        const groups = {
+        const vacancySignals =
+          frozenMetadata?.method === "frozen_job_at_intent_v2"
+            ? frozenMetadata.vacancySignals
+            : undefined;
+        const groups: FixedCohort["members"][number]["groups"] = {
           source: frozenMetadata?.source ?? job.source,
           roleFamily:
             frozenMetadata?.roleFamily ??
             (families?.size === 1 ? ([...families][0] as string) : "unknown"),
-          seniority: "unknown" as const,
-          sponsorship: "unknown" as const,
+          seniority: vacancySignals?.seniority ?? "unknown",
+          sponsorship: vacancySignals?.sponsorship ?? "unknown",
           documentTemplate,
           experimentVariant: "unassigned",
         };
@@ -367,6 +371,7 @@ export class CohortRepository extends OwnerScope {
             ),
           ),
           ...(frozenMetadata ? { metadataOrigin: "submission_intent" as const } : {}),
+          ...(vacancySignals ? { vacancySignalsMethod: vacancySignals.method } : {}),
           groups,
           ...(experiment ? { experiment } : {}),
         });

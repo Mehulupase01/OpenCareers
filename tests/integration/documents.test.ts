@@ -1632,11 +1632,16 @@ for (const engine of ["sqlite", "postgres"] as const) {
         )[0];
         if (!intent) throw new Error("Expected persisted submission intent.");
         expect(JSON.parse(String(intent.snapshot)).cohortMetadata).toMatchObject({
-          method: "frozen_job_at_intent_v1",
+          method: "frozen_job_at_intent_v2",
           jobId: packet.manifest.jobId,
           source: documentJob.source,
           roleFamily: "unknown",
           synthetic: true,
+          vacancySignals: {
+            method: "explicit_vacancy_signals_v1",
+            seniority: "unknown",
+            sponsorship: "unknown",
+          },
         });
         expect(createHash("sha256").update(String(intent.snapshot)).digest("hex")).toBe(
           intent.sha256,

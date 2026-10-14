@@ -1958,6 +1958,10 @@
             "docs/evidence/P16-outcome-foundation.md",
             "docs/evidence/P16-fixed-cohorts.md",
             "docs/evidence/P16-experiment-attribution.md",
+            "docs/evidence/P16-vacancy-signals.md",
+            "tests/unit/vacancy-signals.test.ts",
+            "tests/unit/submission-metadata.test.ts",
+            "tests/e2e/vacancy-signals.spec.ts",
             "tests/unit/cohort-report.test.ts",
             "tests/integration/outcomes.test.ts",
             "tests/e2e/outcomes.spec.ts"

@@ -2,7 +2,74 @@ import { z } from "zod";
 import { idSchema } from "./index.js";
 import { cohortInputSchema, outcomeKindSchema } from "./outcome.js";
 
-export const submissionCohortMetadataSchema = z
+const vacancySenioritySchema = z.enum(["intern", "junior", "mid", "senior", "lead", "unknown"]);
+const vacancySponsorshipSchema = z.enum([
+  "explicitly_available",
+  "explicitly_unavailable",
+  "unknown",
+]);
+const vacancySignalsMethodSchema = z.literal("explicit_vacancy_signals_v1");
+export const vacancySignalsSchema = z
+  .object({
+    method: vacancySignalsMethodSchema,
+    seniority: vacancySenioritySchema,
+    sponsorship: vacancySponsorshipSchema,
+    evidence: z
+      .array(
+        z
+          .object({
+            dimension: z.enum(["seniority", "sponsorship"]),
+            field: z.enum(["title", "description"]),
+            start: z.number().int().nonnegative(),
+            end: z.number().int().positive(),
+            text: z.string().min(1).max(300),
+          })
+          .strict()
+          .refine(
+            (span) =>
+              span.end > span.start &&
+              span.text.length === span.end - span.start &&
+              span.end <= (span.field === "title" ? 240 : 100000),
+            { message: "Evidence must have a positive exact-length span within field bounds." },
+          ),
+      )
+      .max(8),
+  })
+  .strict()
+  .superRefine((signals, context) => {
+    if (
+      signals.seniority !== "unknown" &&
+      !signals.evidence.some((span) => span.dimension === "seniority" && span.field === "title")
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["evidence"],
+        message: "Known seniority requires title evidence.",
+      });
+    if (
+      signals.sponsorship !== "unknown" &&
+      !signals.evidence.some((span) => span.dimension === "sponsorship")
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["evidence"],
+        message: "Known sponsorship requires sponsorship evidence.",
+      });
+    const spans = new Set<string>();
+    for (const [index, span] of signals.evidence.entries()) {
+      const key = JSON.stringify([span.dimension, span.field, span.start, span.end]);
+      if (spans.has(key))
+        context.addIssue({
+          code: "custom",
+          path: ["evidence", index],
+          message: "Evidence spans must be unique.",
+        });
+      spans.add(key);
+    }
+  });
+export type VacancySignals = z.infer<typeof vacancySignalsSchema>;
+
+const submissionCohortMetadataV1Schema = z
   .object({
     method: z.literal("frozen_job_at_intent_v1"),
     jobId: idSchema,
@@ -12,6 +79,20 @@ export const submissionCohortMetadataSchema = z
     synthetic: z.boolean(),
   })
   .strict();
+export const submissionCohortMetadataSchema = z.discriminatedUnion("method", [
+  submissionCohortMetadataV1Schema,
+  z
+    .object({
+      method: z.literal("frozen_job_at_intent_v2"),
+      jobId: idSchema,
+      jobSha256: z.string().regex(/^[a-f0-9]{64}$/),
+      source: z.string().min(1).max(100),
+      roleFamily: z.string().min(1).max(80),
+      synthetic: z.boolean(),
+      vacancySignals: vacancySignalsSchema,
+    })
+    .strict(),
+]);
 export type SubmissionCohortMetadata = z.infer<typeof submissionCohortMetadataSchema>;
 
 export const cohortDimensionSchema = z.enum([
@@ -89,12 +170,13 @@ export const fixedCohortSchema = z
               .object({
                 source: z.string().min(1).max(100),
                 roleFamily: z.string().min(1).max(80),
-                seniority: z.literal("unknown"),
-                sponsorship: z.literal("unknown"),
+                seniority: vacancySenioritySchema,
+                sponsorship: vacancySponsorshipSchema,
                 documentTemplate: z.string().min(1).max(100),
                 experimentVariant: z.string().min(1).max(100).optional(),
               })
               .strict(),
+            vacancySignalsMethod: vacancySignalsMethodSchema.optional(),
           })
           .strict(),
       )
@@ -103,6 +185,21 @@ export const fixedCohortSchema = z
   .strict()
   .superRefine((snapshot, context) => {
     for (const [index, member] of snapshot.members.entries()) {
+      if (
+        (member.groups.seniority !== "unknown" || member.groups.sponsorship !== "unknown") &&
+        !member.vacancySignalsMethod
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "vacancySignalsMethod"],
+          message: "Known vacancy dimensions require classification provenance.",
+        });
+      if (member.vacancySignalsMethod && member.metadataOrigin !== "submission_intent")
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "metadataOrigin"],
+          message: "Vacancy classification requires submission intent provenance.",
+        });
       const evidence = member.cumulativeEvidence;
       if (Boolean(snapshot.cumulativeMethodology) !== Boolean(evidence))
         context.addIssue({

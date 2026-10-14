@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import type { FixedCohort } from "../../packages/contracts/src/cohort.js";
+import { type FixedCohort, fixedCohortSchema } from "../../packages/contracts/src/cohort.js";
 import {
   compareFixedCohorts,
   fixedCohortReport,
@@ -39,6 +39,75 @@ const fixture = (): FixedCohort => ({
   })),
 });
 describe("fixed horizon cohort reporting", () => {
+  it("preserves legacy snapshot bytes and labels unavailable vacancy classification", () => {
+    const snapshot = fixture();
+    const original = JSON.stringify(snapshot);
+    expect(JSON.stringify(fixedCohortSchema.parse(snapshot))).toBe(original);
+    const report = fixedCohortReport(snapshot);
+    expect(report.vacancySignalOrigins).toEqual({ intentClassified: 0, legacyUnavailable: 40 });
+    expect(report.groups.find((group) => group.dimension === "sponsorship")).toMatchObject({
+      value: "unknown",
+      denominator: 40,
+      vacancySignalOrigins: { intentClassified: 0, legacyUnavailable: 40 },
+    });
+    expect(JSON.stringify(snapshot)).toBe(original);
+  });
+  it.each(["seniority", "sponsorship"] as const)(
+    "compares %s only with compatible frozen signals and retains unknown denominators",
+    (dimension) => {
+      const snapshot = fixture();
+      snapshot.members = snapshot.members.map((member, index) => ({
+        ...member,
+        metadataOrigin: "submission_intent",
+        vacancySignalsMethod: "explicit_vacancy_signals_v1",
+        groups: {
+          ...member.groups,
+          seniority: index < 20 ? "senior" : "unknown",
+          sponsorship: index < 20 ? "explicitly_available" : "unknown",
+        },
+      }));
+      const value = dimension === "seniority" ? "senior" : "explicitly_available";
+      const report = fixedCohortReport(snapshot);
+      expect(report.denominator).toBe(40);
+      expect(report.vacancySignalOrigins).toEqual({ intentClassified: 40, legacyUnavailable: 0 });
+      expect(
+        report.groups.find((group) => group.dimension === dimension && group.value === "unknown"),
+      ).toMatchObject({
+        denominator: 20,
+        vacancySignalOrigins: { intentClassified: 20, legacyUnavailable: 0 },
+      });
+      expect(compareFixedCohorts(snapshot, snapshot, dimension, value, "unknown")).toMatchObject({
+        status: "measured",
+        advisoryOnly: true,
+        left: { denominator: 20 },
+        right: { denominator: 20 },
+        differences: { INTERVIEW: 1 },
+      });
+      const mixed: FixedCohort = {
+        ...snapshot,
+        members: snapshot.members.map((member, index) =>
+          index < 20
+            ? member
+            : {
+                ...member,
+                vacancySignalsMethod: undefined,
+              },
+        ),
+      };
+      expect(fixedCohortReport(mixed).vacancySignalOrigins).toEqual({
+        intentClassified: 20,
+        legacyUnavailable: 20,
+      });
+      expect(() => compareFixedCohorts(mixed, mixed, dimension, value, "unknown")).toThrow(
+        "consistent intent-time classification provenance",
+      );
+      const small = { ...snapshot, members: snapshot.members.slice(1) };
+      expect(compareFixedCohorts(small, small, dimension, value, "unknown")).toMatchObject({
+        status: "insufficient_data",
+        differences: null,
+      });
+    },
+  );
   it("reports separate cumulative milestones without interpreting legacy current status as history", () => {
     const legacy = fixture();
     expect(fixedCohortReport(legacy).cumulative).toMatchObject({

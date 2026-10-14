@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { fixedCohortSchema } from "../../packages/contracts/src/cohort.js";
+import {
+  fixedCohortSchema,
+  submissionCohortMetadataSchema,
+} from "../../packages/contracts/src/cohort.js";
 import type { OutcomeKind } from "../../packages/contracts/src/outcome.js";
 import { generatePacketContent } from "../../packages/documents/src/domain.js";
 import { CohortRepository } from "../../packages/persistence/src/cohort-repository.js";
@@ -489,7 +492,19 @@ for (const engine of ["sqlite", "postgres"] as const) {
             ])
           )[0]?.job_id,
         );
-        const metadata = await captureSubmissionMetadata(db, owner, jobId);
+        // Keep this fixture explicitly v1: new capture must not silently replace legacy coverage.
+        const [originalJob] = await db.query("SELECT data FROM jobs WHERE owner_id=$1 AND id=$2", [
+          owner,
+          jobId,
+        ]);
+        const metadata = submissionCohortMetadataSchema.parse({
+          method: "frozen_job_at_intent_v1",
+          jobId,
+          jobSha256: createHash("sha256").update(String(originalJob?.data)).digest("hex"),
+          source: "source-at-submission",
+          roleFamily: "unknown",
+          synthetic: false,
+        });
         const snapshot = { applicationId: app.id, jobId, packetId: id, cohortMetadata: metadata };
         const persist = async (value: unknown, checksum?: string) => {
           const raw = JSON.stringify(value);
@@ -519,6 +534,33 @@ for (const engine of ["sqlite", "postgres"] as const) {
         expect(report.groups.filter((group) => group.dimension === "source")).toMatchObject([
           { value: "source-at-submission", denominator: 1 },
         ]);
+        const frozen = await storedCohort(report.snapshotId);
+        const member = frozen.snapshot.members[0];
+        expect(member).toMatchObject({
+          metadataOrigin: "submission_intent",
+          groups: { seniority: "unknown", sponsorship: "unknown" },
+        });
+        expect(member).not.toHaveProperty("vacancySignalsMethod");
+        expect(member?.metadataSha256).toBe(
+          createHash("sha256")
+            .update(
+              JSON.stringify({
+                groups: member?.groups,
+                experiment: null,
+                frozenMetadata: metadata,
+              }),
+            )
+            .digest("hex"),
+        );
+        expect(
+          await cohorts.record({
+            id: report.snapshotId,
+            from: report.window.from,
+            through: report.window.through,
+            observationDays: report.window.observationDays,
+          }),
+        ).toEqual(report);
+        expect((await storedCohort(report.snapshotId)).row).toEqual(frozen.row);
         for (const value of [
           { ...snapshot, applicationId: "wrong-application" },
           { ...snapshot, jobId: "wrong-job" },
@@ -539,6 +581,295 @@ for (const engine of ["sqlite", "postgres"] as const) {
           exclusions: { synthetic: 1 },
         });
         expect(await cohorts.report(report.snapshotId)).toEqual(report);
+      });
+
+      it("materializes intent-frozen v2 groups without backfilling legacy or dropping unknown denominators", async () => {
+        const hash = (raw: string) => createHash("sha256").update(raw).digest("hex");
+        const frozenMetadata = new Map<string, unknown>();
+        const apps: Awaited<ReturnType<typeof application>>[] = [];
+        const intents = new Map<string, string>();
+        // These local fixtures exercise receipt arithmetic, not real employer evidence.
+        for (let index = 0; index < 21; index++) {
+          const app = await application(index === 20, "intent-source");
+          apps.push(app);
+          const job = {
+            ...documentJob,
+            id: app.jobId,
+            requisitionId: app.jobId,
+            source: "intent-source",
+            synthetic: index === 20,
+            title:
+              index === 17
+                ? "Junior / Senior Software Engineer"
+                : index === 16
+                  ? "Software Engineer"
+                  : "Senior Software Engineer",
+            description:
+              index === 17
+                ? "We offer visa sponsorship. We do not offer visa sponsorship."
+                : index === 16
+                  ? "Requires 10 years of experience."
+                  : "We offer visa sponsorship.",
+          };
+          await repo.putJob(job);
+          const intentId = await receipt(app.id, "greenhouse");
+          intents.set(app.id, intentId);
+          if (index === 19) continue; // No metadata: legacy remains unknown despite explicit text.
+          const captured = await captureSubmissionMetadata(db, owner, app.jobId);
+          const metadata =
+            index === 18
+              ? submissionCohortMetadataSchema.parse({
+                  method: "frozen_job_at_intent_v1",
+                  jobId: captured.jobId,
+                  jobSha256: captured.jobSha256,
+                  source: captured.source,
+                  roleFamily: captured.roleFamily,
+                  synthetic: captured.synthetic,
+                })
+              : captured;
+          frozenMetadata.set(app.id, metadata);
+          const raw = JSON.stringify({
+            applicationId: app.id,
+            jobId: app.jobId,
+            packetId: intentId,
+            cohortMetadata: metadata,
+          });
+          await db.query("UPDATE intents SET snapshot=$1,sha256=$2 WHERE owner_id=$3 AND id=$4", [
+            raw,
+            hash(raw),
+            owner,
+            intentId,
+          ]);
+        }
+        const first = apps[0];
+        if (!first) throw new Error("Expected frozen application.");
+        await outcomes.recordOwner(input(first.id, "INTERVIEW"));
+        // Add mutable listing and candidate-relative assessment data after intent capture.
+        const listingId = randomUUID(),
+          sourceId = randomUUID(),
+          runId = randomUUID();
+        const listingData = {
+          ...documentJob,
+          id: first.jobId,
+          synthetic: false,
+          title: "Junior Software Engineer",
+          description: "We do not offer visa sponsorship.",
+          postingId: listingId,
+          providerRequisition: null,
+          canonicalUrl: documentJob.url,
+          city: null,
+          remote: "unknown",
+          postedAt: null,
+          updatedAt: null,
+          roleFamily: "design",
+          evidence: { page: 0, locator: "synthetic" },
+        };
+        await db.query(
+          "INSERT INTO sources(id,owner_id,connector,policy,state) VALUES($1,$2,'greenhouse','{}','healthy')",
+          [sourceId, owner],
+        );
+        await db.query(
+          "INSERT INTO source_runs(owner_id,id,source_id,started_at,completed_at,health,job_count,duration_ms,warnings) VALUES($1,$2,$3,$4,$4,'healthy',1,0,'[]')",
+          [owner, runId, sourceId, now.toISOString()],
+        );
+        await db.query(
+          "INSERT INTO discovery_listings(owner_id,id,source_id,posting_id,job_id,original_job_id,canonical_url,data,state,first_seen_at,last_seen_at,last_run_id) VALUES($1,$2,$3,$2,$4,$4,$5,$6,'active',$7,$7,$8)",
+          [
+            owner,
+            listingId,
+            sourceId,
+            first.jobId,
+            documentJob.url,
+            JSON.stringify(listingData),
+            now.toISOString(),
+            runId,
+          ],
+        );
+        const profileId = randomUUID(),
+          assessmentId = randomUUID();
+        await db.query(
+          "INSERT INTO profile_versions(id,owner_id,candidate_id,revision,data,created_at) VALUES($1,$2,'synthetic-candidate',1,'{}',$3)",
+          [profileId, owner, now.toISOString()],
+        );
+        await db.query(
+          "INSERT INTO match_assessments(owner_id,id,job_id,profile_id,application_id,revision,data,sha256,created_at) VALUES($1,$2,$3,$4,$5,1,$6,$7,$8)",
+          [
+            owner,
+            assessmentId,
+            first.jobId,
+            profileId,
+            first.id,
+            JSON.stringify({ gates: [{ code: "sponsorship", status: "pass" }] }),
+            "a".repeat(64),
+            now.toISOString(),
+          ],
+        );
+
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const request = fixedInput(),
+          control = await repo.getControl();
+        const report = await cohorts.record(request);
+        expect(report).toMatchObject({
+          status: "measured",
+          denominator: 20,
+          counts: { INTERVIEW: 1, UNKNOWN: 19 },
+          exclusions: { synthetic: 1 },
+          fractions: { INTERVIEW: { numerator: 1, denominator: 20, fraction: 0.05 } },
+          metadataOrigins: { submissionIntent: 19, legacySnapshot: 1 },
+        });
+        for (const [dimension, value, denominator] of [
+          ["seniority", "senior", 16],
+          ["seniority", "unknown", 4],
+          ["sponsorship", "explicitly_available", 16],
+          ["sponsorship", "unknown", 4],
+        ] as const) {
+          expect(
+            report.groups.find((group) => group.dimension === dimension && group.value === value),
+          ).toMatchObject({ denominator, status: "insufficient_data", fractions: null });
+          expect(
+            report.groups
+              .filter((group) => group.dimension === dimension)
+              .reduce((sum, group) => sum + group.denominator, 0),
+          ).toBe(20);
+        }
+        const frozen = await storedCohort(request.id);
+        for (const member of frozen.snapshot.members) {
+          const metadata = frozenMetadata.get(member.applicationId);
+          const index = apps.findIndex((app) => app.id === member.applicationId);
+          if (index < 18)
+            expect(member).toHaveProperty("vacancySignalsMethod", "explicit_vacancy_signals_v1");
+          else expect(member).not.toHaveProperty("vacancySignalsMethod");
+          if (metadata)
+            expect(member.metadataSha256).toBe(
+              hash(
+                JSON.stringify({
+                  groups: member.groups,
+                  experiment: null,
+                  frozenMetadata: metadata,
+                }),
+              ),
+            );
+        }
+        const firstMember = frozen.snapshot.members.find(
+          (member) => member.applicationId === first.id,
+        );
+        expect(firstMember?.groups).toMatchObject({
+          seniority: "senior",
+          sponsorship: "explicitly_available",
+          roleFamily: "unknown",
+        });
+        await db.query("UPDATE jobs SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify({
+            ...documentJob,
+            id: first.jobId,
+            synthetic: false,
+            title: "Junior Software Engineer",
+            description: "We do not offer visa sponsorship.",
+            source: "later-source",
+          }),
+          owner,
+          first.jobId,
+        ]);
+        await db.query("UPDATE discovery_listings SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify({
+            ...listingData,
+            title: "Lead Software Engineer",
+            roleFamily: "operations",
+          }),
+          owner,
+          listingId,
+        ]);
+        await db.query("UPDATE match_assessments SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify({ gates: [{ code: "sponsorship", status: "fail" }] }),
+          owner,
+          assessmentId,
+        ]);
+        const recaptured = await cohorts.record(fixedInput());
+        const next = await storedCohort(recaptured.snapshotId);
+        expect(next.snapshot.members.find((member) => member.applicationId === first.id)).toEqual(
+          firstMember,
+        );
+        expect(await cohorts.record(request)).toEqual(report);
+        expect(await cohorts.report(request.id)).toEqual(report);
+        expect((await storedCohort(request.id)).row).toEqual(frozen.row);
+        expect(await repo.getControl()).toEqual(control);
+        await expect(
+          new CohortRepository(db, `other-${owner}`, () => now).report(request.id),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        // Frozen synthetic attribution must still exclude a row if its current flag is removed.
+        const synthetic = apps[20];
+        if (!synthetic) throw new Error("Expected synthetic application.");
+        await db.query("UPDATE jobs SET data=$1 WHERE owner_id=$2 AND id=$3", [
+          JSON.stringify({ ...documentJob, id: synthetic.jobId, synthetic: false }),
+          owner,
+          synthetic.jobId,
+        ]);
+        expect(await cohorts.record(fixedInput())).toMatchObject({
+          denominator: 20,
+          exclusions: { synthetic: 1 },
+        });
+        // Canonical aliases cannot contribute a second denominator or rewrite the intent identity.
+        const alias = apps[1];
+        if (!alias) throw new Error("Expected canonical alias.");
+        await db.query(
+          "INSERT INTO identity_resolutions(owner_id,id,from_job_id,to_job_id,reason,created_at) VALUES($1,$2,$3,$4,'synthetic-fixture',$5)",
+          [owner, randomUUID(), alias.jobId, first.jobId, now.toISOString()],
+        );
+        expect(await cohorts.record(fixedInput())).toMatchObject({
+          denominator: 19,
+          exclusions: { duplicate: 1, synthetic: 1 },
+        });
+        await db.query("UPDATE identity_resolutions SET reversed_at=$1 WHERE owner_id=$2", [
+          now.toISOString(),
+          owner,
+        ]);
+
+        const intentId = intents.get(first.id);
+        if (!intentId) throw new Error("Expected persisted intent for frozen application.");
+        const [intent] = await db.query(
+          "SELECT snapshot FROM intents WHERE owner_id=$1 AND id=$2",
+          [owner, intentId],
+        );
+        const snapshot = JSON.parse(String(intent?.snapshot));
+        for (const value of [
+          { ...snapshot, applicationId: "wrong-application" },
+          { ...snapshot, jobId: alias.jobId },
+          { ...snapshot, packetId: "wrong-packet" },
+          { ...snapshot, cohortMetadata: { ...snapshot.cohortMetadata, jobId: alias.jobId } },
+          {
+            ...snapshot,
+            cohortMetadata: {
+              ...snapshot.cohortMetadata,
+              vacancySignals: {
+                ...snapshot.cohortMetadata.vacancySignals,
+                evidence: [
+                  { dimension: "seniority", field: "title", start: 0, end: 0, text: "Senior" },
+                ],
+              },
+            },
+          },
+        ]) {
+          const raw = JSON.stringify(value);
+          await db.query("UPDATE intents SET snapshot=$1,sha256=$2 WHERE owner_id=$3 AND id=$4", [
+            raw,
+            hash(raw),
+            owner,
+            intentId,
+          ]);
+          await expect(cohorts.record(fixedInput())).rejects.toMatchObject({
+            code: "STATE_INVALID",
+          });
+        }
+        await db.query("UPDATE intents SET snapshot=$1,sha256=$2 WHERE owner_id=$3 AND id=$4", [
+          JSON.stringify(snapshot),
+          "f".repeat(64),
+          owner,
+          intentId,
+        ]);
+        await expect(cohorts.record(fixedInput())).rejects.toMatchObject({ code: "STATE_INVALID" });
+        expect(await cohorts.report(request.id)).toEqual(report);
       });
 
       it("excludes synthetic, mock, malformed, unresolved, duplicate and recent evidence", async () => {

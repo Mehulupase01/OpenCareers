@@ -2500,3 +2500,32 @@ Counts remain12/19 phases,99/128 gates. Read P16-generated-wording.md for bounda
 Next independent milestone is intent-frozen conservative vacancy seniority and
 sponsorship cohorts; see docs/plans/P16-cohort-vacancy-signals.md. Do not infer
 employer sponsorship from candidate-relative gate passes or rewrite legacy hashes.
+
+## 2026-10-14: Intent-Frozen Vacancy Signals
+
+Metadata v2 now captures conservative seniority/sponsorship signals from the same
+job row inside guarded intent creation. A fixed local English-vocabulary classifier
+requires exact bounded spans; ambiguous, conditional, contextual, conflicting or
+unsupported wording remains unknown. This is not matching eligibility, a sponsorship
+guarantee or a measured accuracy claim. V1 shape/order/bytes, legacy snapshot hashes
+and replay remain compatible; no old intent/snapshot is backfilled.
+
+Only v2 cohorts carry classification provenance. Reports/UI distinguish classified
+unknown from legacy unavailable, preserve all denominators and sample suppression,
+and refuse mixed-provenance comparisons. Later job/listing/assessment edits cannot
+rewrite frozen categories. No inference, schema migration or submission authority
+is added. Two bounded agents cover contracts/classifier and metadata/outcome tests.
+
+Final frozen check1,225 pass /359 local PostgreSQL/opt-in skips,118 passing files
+/two skipped,351.25s; types/lint/ledger/build/native237-component SBOM pass. Focused
+classifier103, metadata/outcome44, document42 and report8 tests pass; final browser
+outcome/cumulative/signal6/6 passes39.5s. Desktop/mobile screenshots visually
+inspected, no page-width overflow. Public scan542 files before final evidence.
+See docs/evidence/P16-vacancy-signals.md. Successor CI pending; P16-02 stays open.
+
+Generation commitd0c2374 CI38623194120 passes PostgreSQL, Ubuntu and server-image;
+Windows is still running at this checkpoint. P16-05/G5 remain open until parity.
+Counts remain12/19 and99/128. No private environment/DB/service, employer/model/mail
+request, genuine receipt or qualifying soak occurred. Next substantive milestone:
+P15's integrated hostile-input/authority boundary matrix; individual URL/pricing/
+parser checks alone do not close its security gate.

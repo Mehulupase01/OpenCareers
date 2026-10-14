@@ -16,6 +16,18 @@ type Report = ReturnType<typeof fixedCohortReport>;
 type Comparison = ReturnType<typeof compareFixedCohorts>;
 type Catalog = Awaited<ReturnType<CohortRepository["list"]>>;
 const endpoint = "/v1/outcomes/cohorts";
+const dimensionLabel = (value: CohortDimension) =>
+  value === "seniority"
+    ? "Seniority signal"
+    : value === "sponsorship"
+      ? "Sponsorship signal"
+      : value;
+const groupLabel = (value: string) =>
+  value === "explicitly_available"
+    ? "Explicitly available"
+    : value === "explicitly_unavailable"
+      ? "Explicitly unavailable"
+      : value;
 
 export function CohortsWorkspace() {
   const [from, setFrom] = useState(new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
@@ -75,6 +87,7 @@ export function CohortsWorkspace() {
     setRight("");
   };
   const groups = report?.groups.filter((group) => group.dimension === dimension) ?? [];
+  const signalDimension = dimension === "seniority" || dimension === "sponsorship";
   return (
     <section className="calibration-workspace" aria-label="Fixed outcome cohorts">
       <h3>Fixed outcome cohorts</h3>
@@ -208,6 +221,12 @@ export function CohortsWorkspace() {
             {report.window.minimumSample}
           </p>
           <p className="muted">Frozen as of {report.window.asOf}</p>
+          {report.vacancySignalOrigins && (
+            <p className="muted">
+              Vacancy signals: {report.vacancySignalOrigins.intentClassified} classified /{" "}
+              {report.vacancySignalOrigins.legacyUnavailable} legacy unavailable
+            </p>
+          )}
           <dl className="outcome-exclusions">
             {Object.entries(report.exclusions).map(([name, count]) => (
               <div key={name}>
@@ -231,7 +250,9 @@ export function CohortsWorkspace() {
                 }}
               >
                 {cohortDimensionSchema.options.map((value) => (
-                  <option key={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {dimensionLabel(value)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -244,12 +265,13 @@ export function CohortsWorkspace() {
                   <th>Eligible</th>
                   <th>Result</th>
                   <th>Outcomes</th>
+                  {signalDimension && <th>Signal provenance</th>}
                 </tr>
               </thead>
               <tbody>
                 {groups.map((group) => (
                   <tr key={group.value}>
-                    <td>{group.value}</td>
+                    <td>{groupLabel(group.value)}</td>
                     <td>{group.denominator}</td>
                     <td>
                       {group.status === "measured" ? "Recorded fractions" : "Insufficient data"}
@@ -263,6 +285,13 @@ export function CohortsWorkspace() {
                         )
                         .join(", ")}
                     </td>
+                    {signalDimension && (
+                      <td>
+                        {group.vacancySignalOrigins?.intentClassified ?? 0} classified /{" "}
+                        {group.vacancySignalOrigins?.legacyUnavailable ?? group.denominator}{" "}
+                        unavailable
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -300,7 +329,9 @@ export function CohortsWorkspace() {
               >
                 <option value="">Select group</option>
                 {groups.map((group) => (
-                  <option key={group.value}>{group.value}</option>
+                  <option key={group.value} value={group.value}>
+                    {groupLabel(group.value)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -320,7 +351,9 @@ export function CohortsWorkspace() {
                 {groups
                   .filter((group) => group.value !== left)
                   .map((group) => (
-                    <option key={group.value}>{group.value}</option>
+                    <option key={group.value} value={group.value}>
+                      {groupLabel(group.value)}
+                    </option>
                   ))}
               </select>
             </label>
@@ -342,8 +375,8 @@ export function CohortsWorkspace() {
                   : "Insufficient comparison data"}
               </h4>
               <p>
-                {comparison.left.value}: {comparison.left.denominator} / {comparison.right.value}:{" "}
-                {comparison.right.denominator}
+                {groupLabel(comparison.left.value)}: {comparison.left.denominator} /{" "}
+                {groupLabel(comparison.right.value)}: {comparison.right.denominator}
               </p>
               {comparison.differences && (
                 <div className="table-scroll">
@@ -428,7 +461,7 @@ function CumulativeOutcomes({ report, groups }: { report: Report; groups: Report
                   })),
                 ].map((group) => (
                   <tr key={group.id}>
-                    <td>{group.value}</td>
+                    <td>{groupLabel(group.value)}</td>
                     <td>{group.cumulative.denominator}</td>
                     {cumulativeMilestoneSchema.options.map((kind) => (
                       <td key={kind}>{cumulativeCell(group.cumulative, kind)}</td>
@@ -465,8 +498,8 @@ function CumulativeComparison({ comparison }: { comparison: Comparison }) {
             <thead>
               <tr>
                 <th>Milestone</th>
-                <th>{comparison.left.value}</th>
-                <th>{comparison.right.value}</th>
+                <th>{groupLabel(comparison.left.value)}</th>
+                <th>{groupLabel(comparison.right.value)}</th>
                 <th>Difference</th>
               </tr>
             </thead>

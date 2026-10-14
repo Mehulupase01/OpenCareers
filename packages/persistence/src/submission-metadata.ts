@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { submissionCohortMetadataSchema } from "../../contracts/src/cohort.js";
 import { normalizedJobSchema } from "../../contracts/src/discovery.js";
 import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
+import { classifyVacancySignals } from "../../matching/src/vacancy-signals.js";
 import type { SqlExecutor } from "./database.js";
 
 export async function captureSubmissionMetadata(tx: SqlExecutor, ownerId: string, jobId: string) {
@@ -26,11 +27,12 @@ export async function captureSubmissionMetadata(tx: SqlExecutor, ownerId: string
     if (listing.roleFamily?.trim()) families.add(listing.roleFamily.trim());
   }
   return submissionCohortMetadataSchema.parse({
-    method: "frozen_job_at_intent_v1",
+    method: "frozen_job_at_intent_v2",
     jobId,
     jobSha256: createHash("sha256").update(String(row.data)).digest("hex"),
     source: job.source,
     roleFamily: families.size === 1 ? [...families][0] : "unknown",
     synthetic: job.synthetic,
+    vacancySignals: classifyVacancySignals(job),
   });
 }

@@ -7,6 +7,11 @@ import {
 import { DomainError } from "../../contracts/src/index.js";
 import { outcomeKindSchema } from "../../contracts/src/outcome.js";
 
+function vacancySignalOrigins(members: FixedCohort["members"]) {
+  const intentClassified = members.filter((member) => member.vacancySignalsMethod).length;
+  return { intentClassified, legacyUnavailable: members.length - intentClassified };
+}
+
 function cumulativeSummary(
   members: FixedCohort["members"],
   minimumSample: number,
@@ -85,6 +90,7 @@ export function fixedCohortReport(raw: FixedCohort) {
       .map(([value, members]) => ({
         dimension,
         value,
+        vacancySignalOrigins: vacancySignalOrigins(members),
         ...summarize(members, snapshot.window.minimumSample, snapshot.cumulativeMethodology),
       }));
   });
@@ -101,12 +107,14 @@ export function fixedCohortReport(raw: FixedCohort) {
       ).length,
       legacySnapshot: snapshot.members.filter((member) => !member.metadataOrigin).length,
     },
+    vacancySignalOrigins: vacancySignalOrigins(snapshot.members),
     ...summarize(snapshot.members, snapshot.window.minimumSample, snapshot.cumulativeMethodology),
     groups,
     limits: [
       "Current status and cumulative observed milestones use separate numerators at the fixed horizon; no missing funnel stage is inferred.",
       "Legacy cumulative evidence is unavailable, not zero. UNKNOWN resets milestone evidence; restorations rebase the recorded history.",
       "New source/role groups use intent-time metadata; legacy groups retain snapshot-time metadata and are not backfilled.",
+      "Seniority and sponsorship are explicit vacancy signals frozen at intent time, not guarantees. Legacy classification is unavailable; silence or ambiguity remains unknown.",
       "Unknown metadata is not inferred. Comparisons are descriptive, not causal or hiring probabilities.",
       "Experiment groups require pre-dispatch assignment evidence; legacy records stay unassigned.",
     ],
@@ -151,6 +159,14 @@ export function compareFixedCohorts(
     throw new DomainError(
       "STATE_INVALID",
       "Source/role comparisons require consistent metadata provenance.",
+    );
+  if (
+    ["seniority", "sponsorship"].includes(dimension) &&
+    [...a, ...b].some((member) => member.vacancySignalsMethod !== "explicit_vacancy_signals_v1")
+  )
+    throw new DomainError(
+      "STATE_INVALID",
+      "Vacancy-signal comparisons require consistent intent-time classification provenance.",
     );
   if (dimension === "experimentVariant") {
     const reference = a[0]?.experiment;
