@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { factSchema } from "../../contracts/src/candidate.js";
+import { letterClaimReasonSchema } from "../../contracts/src/index.js";
 
 const workload = z.enum(["full_time", "part_time"]);
 export const regressionCorrectionSchema = z.discriminatedUnion("kind", [
@@ -19,7 +20,7 @@ export const regressionCorrectionSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("unsupported_letter_claim"),
       reviewed: z.literal(true),
-      variant: z.literal("invented_quantity"),
+      variant: letterClaimReasonSchema,
     })
     .strict(),
   z

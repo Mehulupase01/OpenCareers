@@ -1989,6 +1989,8 @@
             "docs/evidence/P16-private-regression-proposals.md",
             "docs/evidence/P16-pipeline-history-and-form-regressions.md",
             "docs/evidence/P16-automatic-form-regressions.md",
+            "docs/evidence/P16-letter-regressions.md",
+            "tests/integration/letter-regression.test.ts",
             "tests/integration/regression-proposals.test.ts",
             "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
@@ -2065,6 +2067,8 @@
           "status": "in_progress",
           "evidence": [
             "docs/evidence/P16-regression-import.md",
+            "docs/evidence/P16-letter-regressions.md",
+            "tests/integration/letter-regression.test.ts",
             "tests/unit/regression-redaction.test.ts",
             "tests/integration/regression-loop.test.ts"
           ]

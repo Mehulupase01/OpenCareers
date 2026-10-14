@@ -76,8 +76,10 @@ passes Windows, Ubuntu and PostgreSQL, including the full browser suite and
 production-only Windows installation. This verifies the bounded maintainer
 workflow, not automatic correction capture or the successor diagnostics workspace.
 
-Remaining: audited automatic private proposal capture and review/export workflow,
-broader corrected-fact coverage, misclassified form and adapter-drift cases,
-tracking accepted/rejected proposals and ensuring every supported correction
-becomes a durable regression. P16-04 and G6 remain in progress. Existing P15 and
-production acceptance requirements remain open; totals stay 12/19 and 91/128.
+Historical checkpoint only: audited private proposal capture, explicit review/export,
+and blocked-form/pre-dispatch drift capture subsequently shipped. See
+P16-private-regression-proposals.md, P16-automatic-form-regressions.md and
+P16-letter-regressions.md for the successor typed rejected-letter workflow.
+Broader fact/mail corrections and family-specific form fixture coverage remain.
+P16-04/G6 and existing production acceptance requirements remain open; use the
+phase ledger for current totals rather than this historical verification baseline.

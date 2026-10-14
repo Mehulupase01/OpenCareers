@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { AllocationClass } from "../../contracts/src/agents.js";
 import type { PacketContent } from "../../contracts/src/documents.js";
-import { DomainError } from "../../contracts/src/index.js";
+import { DomainError, LetterClaimError } from "../../contracts/src/index.js";
 import {
   assertPrivacyRoute,
   careerTextMinimizer,
@@ -280,6 +280,7 @@ export class LetterDraftRunner {
           {
             status: "failed",
             errorCode: error instanceof DomainError ? error.code : "MODEL_ROUTE_INELIGIBLE",
+            ...(error instanceof LetterClaimError ? { letterClaimReason: error.reason } : {}),
             ...(error instanceof DomainError && error.code === "RATE_LIMITED"
               ? { backoffUntil: new Date(Date.now() + 120000).toISOString() }
               : {}),

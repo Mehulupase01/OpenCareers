@@ -73,5 +73,7 @@ Automatic capture currently covers verified employment workload corrections,
 not every candidate fact category or rejected model claim. Broader form/adapter
 and mail correction proposals remain, as does their executable public fixture
 breadth. Existing categorical letter/mail importer cases still work but are not
-automatically proposed by this hook. P16-04/G6 remain in progress until that
+automatically proposed by this hook. Successors P16-automatic-form-regressions.md
+and P16-letter-regressions.md add blocked-form/drift and typed rejected-letter
+capture without changing this fact-review transaction. P16-04/G6 remain in progress until that
 scope and cross-platform evidence are satisfied; no phase closes here.

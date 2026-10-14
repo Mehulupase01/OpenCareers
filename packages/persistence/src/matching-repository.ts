@@ -10,7 +10,12 @@ import type {
   ProfileSnapshot,
 } from "../../contracts/src/candidate.js";
 import { policyInputSchema } from "../../contracts/src/candidate.js";
-import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
+import {
+  DomainError,
+  jobInputSchema,
+  type LetterClaimReason,
+  letterClaimReasonSchema,
+} from "../../contracts/src/index.js";
 import {
   assessmentSchema,
   type MatchAssessment,
@@ -22,6 +27,7 @@ import {
 } from "../../contracts/src/matching.js";
 import { localDayStart, localDayWindow } from "../../domain/src/state.js";
 import type { Row } from "./database.js";
+import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -253,9 +259,22 @@ export class MatchingRepository extends Repository {
     id: string,
     result:
       | { status: "completed"; responseHash: string }
-      | { status: "failed"; errorCode: string; backoffUntil?: string },
+      | {
+          status: "failed";
+          errorCode: string;
+          backoffUntil?: string;
+          letterClaimReason?: LetterClaimReason;
+        },
     metrics?: { latencyMs: number; tokens: number | null },
   ) {
+    const claimReason = result.status === "failed" ? result.letterClaimReason : undefined;
+    if (
+      claimReason !== undefined &&
+      (!letterClaimReasonSchema.safeParse(claimReason).success ||
+        result.status !== "failed" ||
+        result.errorCode !== "CLAIM_UNSUPPORTED")
+    )
+      throw new DomainError("CONFIG_INVALID", "Invalid categorical letter failure.");
     if (
       metrics &&
       (!Number.isSafeInteger(metrics.latencyMs) ||
@@ -281,6 +300,14 @@ export class MatchingRepository extends Repository {
         ],
       );
       if (!rows.length) throw new DomainError("REVISION_STALE", "Inference outcome is stale.");
+      if (claimReason !== undefined) {
+        if (!["packet_drafting", "repairs"].includes(String(rows[0]?.allocation_class)))
+          throw new DomainError("CONFIG_INVALID", "Letter failure requires a drafting allocation.");
+        await new RegressionRepository(this.db, this.ownerId, this.clock).captureRejectedLetter(
+          tx,
+          claimReason,
+        );
+      }
       if (metrics) {
         await tx.query(
           "INSERT INTO inference_observations(owner_id,reservation_id,latency_ms,tokens,observed_at) VALUES($1,$2,$3,$4,$5)",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { letterClaimReasonSchema } from "../../packages/contracts/src/index.js";
 import {
   compileRegressionFixture,
   parseRegressionFixture,
@@ -8,6 +9,11 @@ import { documentFacts } from "../fixtures/document-packets.js";
 
 describe("categorical regression publication", () => {
   it.each([
+    ...letterClaimReasonSchema.options.map((variant) => ({
+      kind: "unsupported_letter_claim",
+      reviewed: true,
+      variant,
+    })),
     { kind: "unsupported_form", reviewed: true, variant: "unsupported_required_control" },
     { kind: "adapter_drift", reviewed: true, variant: "changed_form_fingerprint" },
   ])("keeps $kind publication categorical and reviewed", (input) => {

@@ -86,6 +86,26 @@ export class DomainError extends Error {
   }
 }
 
+export const letterClaimReasonSchema = z.enum([
+  "changed_vacancy",
+  "unsupported_motivation",
+  "invented_quantity",
+  "other_employer",
+  "duplicate_contribution",
+  "unapproved_evidence",
+]);
+export type LetterClaimReason = z.infer<typeof letterClaimReasonSchema>;
+
+export class LetterClaimError extends DomainError {
+  constructor(
+    public readonly reason: LetterClaimReason,
+    message: string,
+  ) {
+    super("CLAIM_UNSUPPORTED", message);
+    this.name = "LetterClaimError";
+  }
+}
+
 export const formDriftReasonSchema = z.enum([
   "ADAPTER_IDENTITY_CHANGED",
   "MOCK_FORM_CHANGED",

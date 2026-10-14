@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import { fillStep, inspectForm, planFields } from "../../packages/browser/src/adapter.js";
 import { launchDryRunBrowser } from "../../packages/browser/src/runtime.js";
 import { chronology } from "../../packages/candidate/src/domain.js";
+import { letterClaimReasonSchema } from "../../packages/contracts/src/index.js";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
-import { generatePacketContent } from "../../packages/documents/src/domain.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
 import { compileLetterProposal } from "../../packages/documents/src/letter-draft.js";
 import { classifyMail } from "../../packages/email/src/correlation.js";
@@ -21,6 +21,7 @@ import {
 } from "../../packages/security/src/regression-fixture.js";
 import { importRegressionFixture } from "../../scripts/regression-import.js";
 import { documentFacts, documentGenerationInput } from "../fixtures/document-packets.js";
+import { letterClaimCase } from "../helpers/letter-claim-cases.js";
 
 async function verify(raw: unknown) {
   const fixture = parseRegressionFixture(raw);
@@ -43,15 +44,10 @@ async function verify(raw: unknown) {
       partTimeMonths: fixture.after === "part_time" ? 12 : 0,
     });
   } else if (fixture.kind === "unsupported_letter_claim") {
-    const input = documentGenerationInput(),
-      content = generatePacketContent(input);
-    expect(() =>
-      compileLetterProposal(input, content, {
-        opening: content.letter.opening,
-        motivation: "I built 100 production systems using Python.",
-        contributionIds: [content.letter.contributions[0]?.id ?? "missing"],
-      }),
-    ).toThrow("unsupported claims");
+    const { input, content, proposal } = letterClaimCase(fixture.variant);
+    expect(() => compileLetterProposal(input, content, proposal)).toThrow(
+      expect.objectContaining({ code: "CLAIM_UNSUPPORTED", reason: fixture.variant }),
+    );
   } else if (fixture.kind === "ambiguous_mail") {
     expect(
       classifyMail({
@@ -190,15 +186,22 @@ describe("correction to executable synthetic regression", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it("runs every published categorical regression through real domain validators", async () => {
-    const files = globSync("tests/fixtures/regressions/*.json");
+  const files = globSync("tests/fixtures/regressions/*.json");
+  it("keeps a published categorical fixture discoverable", () => {
     expect(files.length).toBeGreaterThan(0);
-    for (const file of files) await verify(JSON.parse(await readFile(file, "utf8")));
-    for (const correction of [
-      { kind: "unsupported_letter_claim", reviewed: true, variant: "invented_quantity" },
-      { kind: "ambiguous_mail", reviewed: true, variant: "receipt_and_interview" },
-    ])
-      await verify(compileRegressionFixture(correction).fixture);
+  });
+  it.each(files)("executes discovered fixture %s through its real validator", async (file) => {
+    await verify(JSON.parse(await readFile(file, "utf8")));
+  });
+  it.each([
+    ...letterClaimReasonSchema.options.map((variant) => ({
+      kind: "unsupported_letter_claim",
+      reviewed: true,
+      variant,
+    })),
+    { kind: "ambiguous_mail", reviewed: true, variant: "receipt_and_interview" },
+  ])("executes categorical $kind/$variant", async (correction) => {
+    await verify(compileRegressionFixture(correction).fixture);
   });
   it("exports a verified fact correction idempotently without copying private evidence", async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), "opencareers-regression-")));

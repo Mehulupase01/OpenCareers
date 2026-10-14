@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DryRunResult } from "../../contracts/src/browser.js";
 import type { CandidateFact } from "../../contracts/src/candidate.js";
-import { DomainError, type FormDriftReason } from "../../contracts/src/index.js";
+import {
+  DomainError,
+  type FormDriftReason,
+  type LetterClaimReason,
+  letterClaimReasonSchema,
+} from "../../contracts/src/index.js";
 import {
   compileRegressionFixture,
   parseRegressionFixture,
@@ -50,6 +55,19 @@ export class RegressionRepository extends OwnerScope {
       .update(JSON.stringify({ owner: this.ownerId, before, after }))
       .digest("hex");
     await this.capture(tx, correction, event, "owner");
+  }
+
+  // Inference completion owns the transaction/lock; only categorical reasons survive.
+  async captureRejectedLetter(tx: SqlExecutor, reason: LetterClaimReason) {
+    const correction = {
+      kind: "unsupported_letter_claim",
+      reviewed: true,
+      variant: letterClaimReasonSchema.parse(reason),
+    } as const;
+    const event = createHash("sha256")
+      .update(JSON.stringify({ schema: 1, ...correction }))
+      .digest("hex");
+    await this.capture(tx, correction, event, "system:regression");
   }
 
   async captureBlockedForm(tx: SqlExecutor, result: DryRunResult) {

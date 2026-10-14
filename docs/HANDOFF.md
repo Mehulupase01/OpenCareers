@@ -2400,8 +2400,34 @@ with numerator/denominator, fixed dates/exclusions and independent sample refusa
 Two bounded agents contributed disjoint history/persistence tests; parent owns
 contracts/reporting/UI. Frozen full check918 pass /295 local skips,110 passing
 files /two skipped,365.24s; build/native SBOM/types/lint/ledger pass. Targeted browser
-checks4/4 pass46.8s, desktop/narrow screenshots visually inspected. Full browser/CI
-verification is pending; P16-G3 remains in_progress, counts12/19 and98/128 unchanged.
+checks4/4 pass46.8s, desktop/narrow screenshots visually inspected. Full browser78/78
+passes5.3 minutes. Commit18baba2 pushed; CI38565734939 remains pending. P16-G3 remains
+in_progress, counts12/19 and98/128 unchanged until its parity verification completes.
 Read docs/evidence/P16-cumulative-outcomes.md. Synthetic evidence only, no employer,
 mail/model/private configuration actions and no qualifying soak. Next loop: typed
 rejected-letter failure to reviewed sanitized executable regression, not raw prose.
+
+## 2026-10-14: Typed Rejected-Letter Regression Loop
+
+The real letter compiler emits six typed refusal reasons; the existing runner
+passes only that category to inference completion. Failed drafting/repair completion
+atomically captures one owner-scoped private proposal per reason, preserving sent
+request charges, bounded observations and audits. Generic JSON/schema/route errors
+are not mislabeled. Rollback leaves the sent request consumed; completion can be
+retried without reissuing transport. Deduplication never reopens dismissed cases.
+Explicit existing proposal approval/export and maintainer publication remain required.
+No model text, private facts, employer identifiers or URLs cross into fixtures.
+
+A bounded test agent supplies19 SQLite joined workflow cases /19 PostgreSQL cases
+awaiting CI: rejection/accounting/proposal/review/export/temp-repo import/discovered
+typed validation, repair charges, owner isolation, deduplication, rollback and
+noncategorical refusals. A separate read-only review finds no actionable scoped
+issues. The discovered fixture consumer now reports each case individually instead
+of putting all browser fixtures under one aggregate15-second timeout.
+
+Frozen full check953 pass /314 local skips,111 passing files /two skipped,364.55s;
+types/lint/ledger/build/native237-component SBOM pass. Public scan522 files. Focused
+browser checks6/6 pass42.6s; successor CI pending. Read P16-letter-regressions.md for limits:
+broader corrected facts, mail corrections and portal-specific form scenarios remain.
+P16-04/G6 and phaseP16 remain open. No private runtime/config, mailbox/model/employer
+action, real submission or elapsed soak occurred.

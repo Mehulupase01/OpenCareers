@@ -4,7 +4,7 @@ import {
   letterDocumentSchema,
   type PacketContent,
 } from "../../contracts/src/documents.js";
-import { DomainError } from "../../contracts/src/index.js";
+import { DomainError, LetterClaimError } from "../../contracts/src/index.js";
 import { assertNoTools } from "../../inference/src/policy.js";
 import {
   careerTextMinimizer,
@@ -113,7 +113,7 @@ export function compileLetterProposal(
   assertBound(input, content);
   const proposal = letterProposalSchema.parse(raw);
   if (proposal.opening !== content.letter.opening)
-    throw new DomainError("CLAIM_UNSUPPORTED", "Letter opening changed the bound vacancy.");
+    throw new LetterClaimError("changed_vacancy", "Letter opening changed the bound vacancy.");
   const motivation = proposal.motivation;
   const matchedQuotes = input.assessment.requirements
     .filter(
@@ -135,9 +135,12 @@ export function compileLetterProposal(
       outsideFocus,
     )
   )
-    throw new DomainError("CLAIM_UNSUPPORTED", "Letter motivation contains unsupported claims.");
+    throw new LetterClaimError(
+      "unsupported_motivation",
+      "Letter motivation contains unsupported claims.",
+    );
   if (/\b\d+(?:[.,]\d+)?\b/.test(outsideFocus))
-    throw new DomainError("CLAIM_UNSUPPORTED", "Letter motivation introduced a number.");
+    throw new LetterClaimError("invented_quantity", "Letter motivation introduced a number.");
   if (
     input.profile.facts.some(
       (fact) =>
@@ -146,14 +149,15 @@ export function compileLetterProposal(
         motivation.toLowerCase().includes(fact.value.employer.toLowerCase()),
     )
   )
-    throw new DomainError("CLAIM_UNSUPPORTED", "Letter motivation names another employer.");
+    throw new LetterClaimError("other_employer", "Letter motivation names another employer.");
   const byId = new Map(content.letter.contributions.map((claim) => [claim.id, claim]));
   const ids = new Set(proposal.contributionIds);
   if (ids.size !== proposal.contributionIds.length)
-    throw new DomainError("CLAIM_UNSUPPORTED", "Letter repeats a contribution.");
+    throw new LetterClaimError("duplicate_contribution", "Letter repeats a contribution.");
   const contributions = proposal.contributionIds.map((id) => {
     const claim = byId.get(id);
-    if (!claim) throw new DomainError("CLAIM_UNSUPPORTED", "Letter selected unapproved evidence.");
+    if (!claim)
+      throw new LetterClaimError("unapproved_evidence", "Letter selected unapproved evidence.");
     return { ...claim, origin: "inference_validated" as const };
   });
   return letterDocumentSchema.parse({
