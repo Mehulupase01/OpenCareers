@@ -5,7 +5,9 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import yauzl from "yauzl";
 import { publicSourceFindings } from "../../packages/security/src/public-source.js";
+import { normalizeReleaseSbom } from "../../scripts/release-sbom-validation.js";
 import { buildWindowsBundle } from "../../scripts/windows-bundle.js";
+import { nativeReleaseSbomFixture, releaseSbomManifest } from "../fixtures/release-sbom.js";
 
 const hash = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 describe("Windows runtime bundle", () => {
@@ -19,6 +21,7 @@ describe("Windows runtime bundle", () => {
       ".node-version",
       ".env.example",
       "docs/WINDOWS-BACKUP.md",
+      "dist/release/sbom.cdx.json",
       "scripts/windows-runtime.ps1",
       "scripts/windows-startup-host.ps1",
       "dist/scripts/runtime.js",
@@ -60,11 +63,22 @@ describe("Windows runtime bundle", () => {
       JSON.stringify({
         name: "synthetic-fixture",
         version: "0.1.0",
+        packageManager: "pnpm@12.4.2",
         type: "module",
         scripts: { dangerous: "not bundled" },
         dependencies: { yazl: "3.3.1" },
         devDependencies: { typescript: "7.0.2" },
       }),
+    );
+    await writeFile(
+      join(root, "dist/release/sbom.cdx.json"),
+      JSON.stringify(
+        normalizeReleaseSbom(
+          nativeReleaseSbomFixture(),
+          releaseSbomManifest,
+          await readFile(join(root, "pnpm-lock.yaml")),
+        ),
+      ),
     );
     await writeFile(join(root, ".env"), "PRIVATE_TEST_CONTENT_NEVER_BUNDLED");
     await mkdir(join(root, "private"));
@@ -97,6 +111,9 @@ describe("Windows runtime bundle", () => {
     }
     expect(files.has(".env")).toBe(false);
     expect(files.has("dist/scripts/windows-process-census.js")).toBe(true);
+    expect(JSON.parse(files.get("dist/release/sbom.cdx.json")?.toString() ?? "{}").bomFormat).toBe(
+      "CycloneDX",
+    );
     expect([...files.keys()].some((path) => path.startsWith("private/"))).toBe(false);
     for (const [path, content] of files) expect(publicSourceFindings(path, content)).toEqual([]);
     const manifest = JSON.parse(files.get("bundle-manifest.json")?.toString() ?? "{}");
@@ -126,6 +143,12 @@ describe("Windows runtime bundle", () => {
   });
   it("refuses packaging when the native census helper is missing", async () => {
     await rm(join(root, "dist/scripts/windows-process-census.js"));
+    await expect(buildWindowsBundle(root)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+  it("refuses a missing or stale dependency inventory", async () => {
+    await writeFile(join(root, "pnpm-lock.yaml"), "changed synthetic lockfile");
+    await expect(buildWindowsBundle(root)).rejects.toThrow("stale");
+    await rm(join(root, "dist/release/sbom.cdx.json"));
     await expect(buildWindowsBundle(root)).rejects.toMatchObject({ code: "ENOENT" });
   });
   it("rejects credential-like bytes even in an allowed compiled file", async () => {

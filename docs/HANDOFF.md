@@ -2317,3 +2317,37 @@ physical Windows reboot/recovery, complete fault matrix and qualifying24/72h soa
 Next independent release engineering: native pnpm CycloneDX inventory bound to
 public release inputs and included in the verified Windows archive. No new phase
 is closed by this checkpoint.
+
+## 2026-10-14: Required Release SBOM And Fresh Windows Installation
+
+160bad9 CI38539679446 now passes Windows, Ubuntu, PostgreSQL and server-image.
+Native pinned pnpm generates CycloneDX1.6 production lockfile inventory at build,
+with237 dependency components /238 graph nodes. OS/tool-only child environment,
+successful exit, bounded duration/output and unchanged public inputs are enforced.
+Public-field normalization preserves scoped groups; dependency roots, distribution
+hashes and complete reachable graph references are checked. Runtime-manifest/lock
+SHA-256 bindings reject missing/stale inventory before Windows packaging. The
+SBOM is a required checksummed entry and CI evidence artifact. No new dependency.
+
+Frozen check passes with explicit native exit propagation:870 tests /285 local
+skips,109 passing files /two skipped in326.36s; lint/types/ledger/build/generation
+pass with existing warnings. Production audit reports zero known vulnerabilities
+at every severity. Focused32/one skip plus additional11/11 cover bundle, verifier,
+native output, graph constraints and unchanged server-context screening.
+
+Actual fresh Windows production-only clean install passes in142.02s: native
+pre-install integrity checks, separate Chromium cache, compiled API/dashboard,
+two guarded mock receipts including lost-response reconciliation, unknown-answer
+blocking and graceful owned-child shutdown. Ignored artifacts are under
+test-results/windows-runtime; archive SHA-256 is
+1c640e2d07e91cc5c32f2fbaeef6a6e19dab5b49fb79133b0f5f56ded891877a.
+Local Node24.14.0 is not exact release Node24.21.0, which CI separately validates.
+The unchanged frontend's prior76/76 browser suite remains the local UI evidence.
+
+P15-04 engineering ticket complete; no phase/gate closes (12/19,98/128 unchanged).
+Read RELEASE-SUPPLY-CHAIN.md and P15-release-sbom.md for limits: declared optional
+platform packages, not installed-file authenticity, Node/Chromium/OS/secondary
+download inventory, license clearance, publisher signature or full external schema
+validation. No private config/data, employer/mail/model request, startup task or
+physical reboot was used. Next fault milestone: genuine open-SQLite-transaction
+worker kills before intent/receipt commit, retaining one existing submission engine.

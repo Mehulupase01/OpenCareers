@@ -43,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: evidence-${{ matrix.os }}
-          path: test-results/
+          path: |
+            test-results/
+            dist/release/sbom.cdx.json
           retention-days: 7
   postgres-contract:
     runs-on: ubuntu-latest

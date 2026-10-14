@@ -1830,10 +1830,19 @@
         {
           "id": "P15-04",
           "text": "Supply-chain checks. Audit dependencies, pin CI actions where practical, generate an SBOM, scan release artifacts for secrets, and document the provenance of copied code.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": ["docs/evidence/BASELINE-RECOVERY.md"],
-          "nextAction": "Generate and validate release SBOM and artifact scans; retain dependency audit checks."
+          "evidence": [
+            "docs/evidence/BASELINE-RECOVERY.md",
+            "docs/evidence/P15-release-sbom.md",
+            "docs/RELEASE-SUPPLY-CHAIN.md",
+            "docs/sources/research.md",
+            "tests/unit/release-sbom.test.ts",
+            "tests/integration/release-sbom.test.ts",
+            "tests/integration/windows-bundle.test.ts",
+            "tests/integration/windows-clean-install.test.ts"
+          ],
+          "nextAction": null
         },
         {
           "id": "P15-05",

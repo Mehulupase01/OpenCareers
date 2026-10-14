@@ -11,6 +11,7 @@ export const bundleInputPaths = [
   ".node-version",
   ".env.example",
   "docs/WINDOWS-BACKUP.md",
+  "dist/release/sbom.cdx.json",
   "scripts/windows-runtime.ps1",
   "scripts/windows-startup-host.ps1",
   "dist/scripts/runtime.js",
@@ -38,6 +39,7 @@ export const bundleInputPaths = [
   "dist/web/index.html",
 ] as const;
 const rootFiles = new Set([
+  "dist/release/sbom.cdx.json",
   "docs/WINDOWS-BACKUP.md",
   "package.json",
   "pnpm-lock.yaml",

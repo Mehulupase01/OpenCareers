@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bundleInputPaths } from "../../scripts/bundle-verification.js";
+import { normalizeReleaseSbom } from "../../scripts/release-sbom-validation.js";
 import { createServerBuildContext } from "../../scripts/server-context.js";
+import { nativeReleaseSbomFixture, releaseSbomManifest } from "../fixtures/release-sbom.js";
 
 describe("screened server build context", () => {
   let root: string;
@@ -16,7 +18,7 @@ describe("screened server build context", () => {
       await writeFile(
         join(root, path),
         path === "package.json"
-          ? JSON.stringify({ name: "synthetic", version: "0.1.0", type: "module" })
+          ? JSON.stringify({ ...releaseSbomManifest, type: "module" })
           : "synthetic public fixture\n",
       );
       if (path.startsWith("dist/") && path.endsWith(".js")) {
@@ -25,6 +27,16 @@ describe("screened server build context", () => {
         await writeFile(join(root, source), "synthetic source\n");
       }
     }
+    await writeFile(
+      join(root, "dist/release/sbom.cdx.json"),
+      JSON.stringify(
+        normalizeReleaseSbom(
+          nativeReleaseSbomFixture(),
+          releaseSbomManifest,
+          await readFile(join(root, "pnpm-lock.yaml")),
+        ),
+      ),
+    );
     await mkdir(join(root, "deploy/server"), { recursive: true });
     await writeFile(
       join(root, "deploy/server/Dockerfile"),
