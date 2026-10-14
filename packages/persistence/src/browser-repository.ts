@@ -10,6 +10,7 @@ import { packetContentSchema, packetManifestSchema } from "../../contracts/src/d
 import { type ApplicationState, DomainError } from "../../contracts/src/index.js";
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
+import { generationSubmissionHeld } from "./experiment-generation-binding.js";
 import { assertHostedOriginPermission } from "./hosted-origin-repository.js";
 import { RegressionRepository } from "./regression-repository.js";
 import { Repository } from "./repository.js";
@@ -316,7 +317,11 @@ export class BrowserRepository extends Repository {
         tx,
         result,
       );
-      if (ready && options.queueSubmit)
+      if (
+        ready &&
+        options.queueSubmit &&
+        !(await generationSubmissionHeld(tx, this.ownerId, result.applicationId))
+      )
         await this.enqueueIn(tx, {
           type: "submit",
           dedupeKey: `${options.queueSubmit.adapterId}-submit:${id}`,

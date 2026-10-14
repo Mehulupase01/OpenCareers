@@ -1,9 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { experimentGenerationInputSchema } from "../../../packages/contracts/src/experiment-generation.js";
 import { idSchema } from "../../../packages/contracts/src/index.js";
 import { outcomeInputSchema } from "../../../packages/contracts/src/outcome.js";
+import { letterVariantRecipes } from "../../../packages/documents/src/letter-variants.js";
 import { CalibrationRepository } from "../../../packages/persistence/src/calibration-repository.js";
 import { CohortRepository } from "../../../packages/persistence/src/cohort-repository.js";
+import { ExperimentGenerationRepository } from "../../../packages/persistence/src/experiment-generation-repository.js";
 import { ExperimentRepository } from "../../../packages/persistence/src/experiment-repository.js";
 import { OutcomeRepository } from "../../../packages/persistence/src/outcome-repository.js";
 import { RegressionRepository } from "../../../packages/persistence/src/regression-repository.js";
@@ -14,6 +17,7 @@ export async function outcomeRoutes(app: FastifyInstance, repository: Repository
   const calibration = new CalibrationRepository(repository.db, repository.ownerId);
   const cohorts = new CohortRepository(repository.db, repository.ownerId);
   const experiments = new ExperimentRepository(repository.db, repository.ownerId);
+  const generations = new ExperimentGenerationRepository(repository.db, repository.ownerId);
   const regressions = new RegressionRepository(repository.db, repository.ownerId);
   app.get("/v1/outcomes/regressions", () => regressions.list());
   app.post("/v1/outcomes/regressions/:id/review", (request) =>
@@ -28,6 +32,16 @@ export async function outcomeRoutes(app: FastifyInstance, repository: Repository
       ),
   );
   app.get("/v1/outcomes/experiments/packets", () => experiments.packets());
+  app.get("/v1/outcomes/experiments/generations/applications", () =>
+    generations.eligibleApplications(),
+  );
+  app.get("/v1/outcomes/experiments/generations/recipes", () => letterVariantRecipes());
+  app.get("/v1/outcomes/experiments/:id/generations", (request) =>
+    generations.list(z.object({ id: z.uuid() }).parse(request.params).id),
+  );
+  app.post("/v1/outcomes/experiments/generations", (request) =>
+    generations.create(experimentGenerationInputSchema.parse(request.body)),
+  );
   app.get("/v1/outcomes/experiments", () => experiments.list());
   app.post("/v1/outcomes/experiments", (request) => experiments.create(request.body));
   app.post("/v1/outcomes/experiments/:id/stop", (request) =>

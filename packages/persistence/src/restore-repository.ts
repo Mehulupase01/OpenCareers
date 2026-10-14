@@ -51,6 +51,10 @@ export class RestoreRepository extends Repository {
 
   private async revokeExternalCapabilities(tx: SqlExecutor) {
     await tx.query(
+      "UPDATE experiment_generations SET state='failed',failure_code='POLICY_REVOKED',completed_at=$1 WHERE owner_id=$2 AND state IN ('queued','drafting')",
+      [this.now(), this.ownerId],
+    );
+    await tx.query(
       "UPDATE employer_accounts SET state='locked',updated_at=$1 WHERE owner_id=$2 AND state<>'closed'",
       [this.now(), this.ownerId],
     );

@@ -4,6 +4,10 @@ import type { AllocationClass } from "../../contracts/src/agents.js";
 import type { PacketContent } from "../../contracts/src/documents.js";
 import { DomainError, LetterClaimError } from "../../contracts/src/index.js";
 import {
+  type LetterVariantRecipe,
+  letterVariantRecipeSchema,
+} from "../../contracts/src/letter-variant.js";
+import {
   assertPrivacyRoute,
   careerTextMinimizer,
   type PrivacyRevision,
@@ -17,6 +21,7 @@ import {
 import type { MatchingRepository } from "../../persistence/src/matching-repository.js";
 import type { PacketGenerationInput } from "./domain.js";
 import { buildLetterRequest, compileLetterProposal } from "./letter-draft.js";
+import { assertLetterVariantRecipe } from "./letter-variants.js";
 import { validatePacketContent } from "./validation.js";
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -41,7 +46,24 @@ const reviewBudgetSchema = z
     wallTimeMs: z.number().int().min(1).max(120000),
   })
   .strict();
-type ReviewBudget = { signal: AbortSignal; requests: number; tokens: number };
+export interface LetterDraftOptions {
+  recipe?: LetterVariantRecipe;
+  signal?: AbortSignal;
+  check?: () => Promise<void>;
+}
+type ReviewBudget = {
+  signal: AbortSignal;
+  requests: number;
+  tokens: number;
+  recipe?: LetterVariantRecipe;
+  check?: () => Promise<void>;
+};
+
+async function checkpoint(budget?: ReviewBudget) {
+  budget?.signal.throwIfAborted();
+  await budget?.check?.();
+  budget?.signal.throwIfAborted();
+}
 
 export class LetterDraftRunner {
   constructor(
@@ -75,12 +97,19 @@ export class LetterDraftRunner {
     input: PacketGenerationInput,
     content: PacketContent,
     limits: z.infer<typeof reviewBudgetSchema>,
+    options?: LetterDraftOptions,
   ) {
     const parsed = reviewBudgetSchema.parse(limits);
+    const recipe =
+      options?.recipe === undefined ? undefined : letterVariantRecipeSchema.parse(options.recipe);
+    if (recipe) assertLetterVariantRecipe(recipe);
+    const timeout = AbortSignal.timeout(parsed.wallTimeMs);
     const budget: ReviewBudget = {
-      signal: AbortSignal.timeout(parsed.wallTimeMs),
+      signal: options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout,
       requests: parsed.requests,
       tokens: parsed.tokens,
+      ...(recipe ? { recipe } : {}),
+      ...(options?.check ? { check: options.check } : {}),
     };
     let draft = await this.execute(
       input,
@@ -172,6 +201,7 @@ export class LetterDraftRunner {
       critiqueHash: critique.responseHash,
       repaired: critique.value.issues.length > 0,
       validation,
+      ...(recipe ? { recipe } : {}),
     };
   }
 
@@ -183,7 +213,7 @@ export class LetterDraftRunner {
     validate: (raw: unknown) => T,
     budget?: ReviewBudget,
   ) {
-    budget?.signal.throwIfAborted();
+    await checkpoint(budget);
     if (budget && (budget.requests < 1 || budget.tokens < 1))
       throw new DomainError("MODEL_QUOTA_EXHAUSTED", "Letter review budget exhausted.");
     await this.prepareRoute?.(allocationClass);
@@ -192,7 +222,14 @@ export class LetterDraftRunner {
       throw new DomainError("MODEL_ROUTE_INELIGIBLE", "No reviewed free letter route is ready.");
     assertPrivacyRoute(route, this.privacyRevision);
     let request = transform(
-      buildLetterRequest(input, content, route.modelId, route.provider, this.privacyRevision),
+      buildLetterRequest(
+        input,
+        content,
+        route.modelId,
+        route.provider,
+        this.privacyRevision,
+        budget?.recipe,
+      ),
     );
     if (Buffer.byteLength(JSON.stringify(request.messages)) > 24000)
       throw new DomainError(
@@ -200,6 +237,7 @@ export class LetterDraftRunner {
         "Letter review exceeds minimized disclosure bounds.",
       );
     if (budget) request = boundCompletionTokens(request, budget.tokens);
+    await checkpoint(budget);
     const reservation = await this.ledger.reserve(
       route.modelId,
       route.provider,
@@ -215,7 +253,7 @@ export class LetterDraftRunner {
     const latencyMs = () => Math.min(600000, Math.max(0, Math.round(performance.now() - started)));
     let observedTokens: number | null = null;
     try {
-      budget?.signal.throwIfAborted();
+      await checkpoint(budget);
       await this.ledger.markSent(
         reservation.id,
         digest(JSON.stringify(request)),
@@ -225,6 +263,7 @@ export class LetterDraftRunner {
       );
       sent = true;
       if (budget) budget.requests--;
+      budget?.signal.throwIfAborted();
       const response = budget
         ? await this.transport.complete(request, budget.signal)
         : await this.transport.complete(request);

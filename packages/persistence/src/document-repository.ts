@@ -11,7 +11,7 @@ import type { ArtifactStorage } from "../../documents/src/artifact-store.js";
 import type { PacketGenerationInput } from "../../documents/src/domain.js";
 import type { BuiltPacket } from "../../documents/src/factory.js";
 import { CandidateRepository } from "./candidate-repository.js";
-import type { Row } from "./database.js";
+import type { Row, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
 
 const json = <T>(row: Row, key = "data") => JSON.parse(String(row[key])) as T;
@@ -128,6 +128,17 @@ export class DocumentRepository extends Repository {
     packet: BuiltPacket,
     options: { preserveValidAssessment?: boolean } = {},
   ): Promise<PacketSnapshot> {
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      return this.savePacketIn(tx, packet, options);
+    });
+  }
+
+  protected async savePacketIn(
+    tx: SqlExecutor,
+    packet: BuiltPacket,
+    options: { preserveValidAssessment?: boolean } = {},
+  ): Promise<PacketSnapshot> {
     const manifest = packetManifestSchema.parse(packet.manifest);
     const content = packetContentSchema.parse(packet.content);
     if (manifest.validation.status === "blocked") {
@@ -146,134 +157,131 @@ export class DocumentRepository extends Repository {
         "CLAIM_UNSUPPORTED",
         "Packet content hash does not match its manifest.",
       );
-    return this.db.transaction(async (tx) => {
-      await this.lockOwner(tx);
-      const application = (
-        await tx.query("SELECT * FROM applications WHERE owner_id=$1 AND id=$2", [
-          this.ownerId,
-          manifest.applicationId,
-        ])
-      )[0];
-      const candidate = (
-        await tx.query("SELECT * FROM candidates WHERE owner_id=$1", [this.ownerId])
-      )[0];
-      if (!application || !candidate)
-        throw new DomainError("NOT_FOUND", "Packet application missing.");
-      if (
-        application.job_id !== manifest.jobId ||
-        candidate.active_profile_id !== manifest.profileId ||
-        candidate.active_authorization_id !== manifest.authorizationId
-      )
-        throw new DomainError("PROFILE_STALE", "Packet inputs changed before persistence.");
-      const assessment = (
-        await tx.query(
-          "SELECT id FROM match_assessments WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND profile_id=$4",
-          [this.ownerId, manifest.assessmentId, manifest.applicationId, manifest.profileId],
-        )
-      )[0];
-      const authorization = (
-        await tx.query(
-          "SELECT revision,revoked_at FROM authorizations WHERE owner_id=$1 AND id=$2",
-          [this.ownerId, manifest.authorizationId],
-        )
-      )[0];
-      if (
-        !assessment ||
-        !authorization ||
-        Number(authorization.revision) !== manifest.authorizationRevision ||
-        authorization.revoked_at
-      )
-        throw new DomainError("POLICY_REVOKED", "Packet authorization is no longer current.");
-      if (options.preserveValidAssessment) {
-        const preserved = (
-          await tx.query(
-            "SELECT p.manifest,c.content FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.application_id=$2 AND c.assessment_id=$3 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 1",
-            [this.ownerId, manifest.applicationId, manifest.assessmentId],
-          )
-        )[0];
-        if (preserved) {
-          const preservedManifest = packetManifestSchema.parse(json(preserved, "manifest"));
-          if (
-            preservedManifest.profileId === manifest.profileId &&
-            preservedManifest.authorizationId === manifest.authorizationId &&
-            preservedManifest.authorizationRevision === manifest.authorizationRevision &&
-            (preservedManifest.letterGeneration?.method ?? "deterministic") ===
-              (manifest.letterGeneration?.method ?? "deterministic")
-          )
-            return {
-              manifest: preservedManifest,
-              content: packetContentSchema.parse(json(preserved, "content")),
-              valid: true,
-              invalidReason: null,
-            };
-        }
-      }
-      const existing = (
-        await tx.query(
-          "SELECT id,sha256 FROM packets WHERE owner_id=$1 AND application_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1",
-          [this.ownerId, manifest.applicationId],
-        )
-      )[0];
-      const manifestJson = JSON.stringify(manifest);
-      const packetHash = hash(manifestJson);
-      if (existing && existing.sha256 !== packetHash) {
-        await tx.query(
-          "INSERT INTO packet_validity(owner_id,packet_id,invalidated_at,reason) SELECT owner_id,id,$1,'ARTIFACT_CHANGED' FROM packets WHERE owner_id=$2 AND application_id=$3 ON CONFLICT(owner_id,packet_id) DO NOTHING",
-          [this.now(), this.ownerId, manifest.applicationId],
-        );
-        await tx.query(
-          "INSERT INTO intent_validity(owner_id,intent_id,invalidated_at,reason) SELECT owner_id,id,$1,'ARTIFACT_CHANGED' FROM intents WHERE owner_id=$2 AND application_id=$3 ON CONFLICT(owner_id,intent_id) DO NOTHING",
-          [this.now(), this.ownerId, manifest.applicationId],
-        );
-      }
-      for (const artifact of manifest.artifacts)
-        await tx.query(
-          "INSERT INTO artifacts(id,owner_id,sha256,storage_key,mime_type,bytes,created_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(owner_id,sha256) DO NOTHING",
-          [
-            artifact.id,
-            this.ownerId,
-            artifact.sha256,
-            artifact.storageKey,
-            artifact.mimeType,
-            artifact.bytes,
-            this.now(),
-          ],
-        );
+    const application = (
+      await tx.query("SELECT * FROM applications WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        manifest.applicationId,
+      ])
+    )[0];
+    const candidate = (
+      await tx.query("SELECT * FROM candidates WHERE owner_id=$1", [this.ownerId])
+    )[0];
+    if (!application || !candidate)
+      throw new DomainError("NOT_FOUND", "Packet application missing.");
+    if (
+      application.job_id !== manifest.jobId ||
+      candidate.active_profile_id !== manifest.profileId ||
+      candidate.active_authorization_id !== manifest.authorizationId
+    )
+      throw new DomainError("PROFILE_STALE", "Packet inputs changed before persistence.");
+    const assessment = (
       await tx.query(
-        "INSERT INTO packets(id,owner_id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,id) DO NOTHING",
-        [manifest.id, this.ownerId, manifest.applicationId, manifestJson, packetHash, this.now()],
+        "SELECT id FROM match_assessments WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND profile_id=$4",
+        [this.ownerId, manifest.assessmentId, manifest.applicationId, manifest.profileId],
+      )
+    )[0];
+    const authorization = (
+      await tx.query("SELECT revision,revoked_at FROM authorizations WHERE owner_id=$1 AND id=$2", [
+        this.ownerId,
+        manifest.authorizationId,
+      ])
+    )[0];
+    if (
+      !assessment ||
+      !authorization ||
+      Number(authorization.revision) !== manifest.authorizationRevision ||
+      authorization.revoked_at
+    )
+      throw new DomainError("POLICY_REVOKED", "Packet authorization is no longer current.");
+    if (options.preserveValidAssessment) {
+      const preserved = (
+        await tx.query(
+          "SELECT p.manifest,c.content FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.application_id=$2 AND c.assessment_id=$3 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 1",
+          [this.ownerId, manifest.applicationId, manifest.assessmentId],
+        )
+      )[0];
+      if (preserved) {
+        const preservedManifest = packetManifestSchema.parse(json(preserved, "manifest"));
+        if (
+          preservedManifest.profileId === manifest.profileId &&
+          preservedManifest.authorizationId === manifest.authorizationId &&
+          preservedManifest.authorizationRevision === manifest.authorizationRevision &&
+          (preservedManifest.letterGeneration?.method ?? "deterministic") ===
+            (manifest.letterGeneration?.method ?? "deterministic")
+        )
+          return {
+            manifest: preservedManifest,
+            content: packetContentSchema.parse(json(preserved, "content")),
+            valid: true,
+            invalidReason: null,
+          };
+      }
+    }
+    const existing = (
+      await tx.query(
+        "SELECT id,sha256 FROM packets WHERE owner_id=$1 AND application_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1",
+        [this.ownerId, manifest.applicationId],
+      )
+    )[0];
+    const manifestJson = JSON.stringify(manifest);
+    const packetHash = hash(manifestJson);
+    if (existing && existing.sha256 !== packetHash) {
+      await tx.query(
+        "INSERT INTO packet_validity(owner_id,packet_id,invalidated_at,reason) SELECT owner_id,id,$1,'ARTIFACT_CHANGED' FROM packets WHERE owner_id=$2 AND application_id=$3 ON CONFLICT(owner_id,packet_id) DO NOTHING",
+        [this.now(), this.ownerId, manifest.applicationId],
       );
       await tx.query(
-        "INSERT INTO packet_contents(owner_id,packet_id,profile_id,assessment_id,content,validation) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,packet_id) DO NOTHING",
-        [
-          this.ownerId,
-          manifest.id,
-          manifest.profileId,
-          manifest.assessmentId,
-          JSON.stringify(content),
-          JSON.stringify(manifest.validation),
-        ],
+        "INSERT INTO intent_validity(owner_id,intent_id,invalidated_at,reason) SELECT owner_id,id,$1,'ARTIFACT_CHANGED' FROM intents WHERE owner_id=$2 AND application_id=$3 ON CONFLICT(owner_id,intent_id) DO NOTHING",
+        [this.now(), this.ownerId, manifest.applicationId],
       );
-      for (const [ordinal, artifact] of manifest.artifacts.entries())
-        await tx.query(
-          "INSERT INTO packet_artifacts(owner_id,packet_id,artifact_id,kind,filename,ordinal) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,packet_id,kind) DO NOTHING",
-          [this.ownerId, manifest.id, artifact.id, artifact.kind, artifact.filename, ordinal],
-        );
+    }
+    for (const artifact of manifest.artifacts)
       await tx.query(
-        "UPDATE applications SET state=$1,revision=revision+1,updated_at=$2 WHERE owner_id=$3 AND id=$4",
+        "INSERT INTO artifacts(id,owner_id,sha256,storage_key,mime_type,bytes,created_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(owner_id,sha256) DO NOTHING",
         [
-          manifest.validation.status === "valid" ? "PREPARED" : "NEEDS_INPUT",
+          artifact.id,
+          this.ownerId,
+          artifact.sha256,
+          artifact.storageKey,
+          artifact.mimeType,
+          artifact.bytes,
           this.now(),
-          this.ownerId,
-          manifest.applicationId,
         ],
       );
-      await this.audit(tx, manifest.id, "packet.prepared", 1, {
-        status: manifest.validation.status,
-        artifacts: manifest.artifacts.length,
-      });
-      return { manifest, content, valid: true, invalidReason: null };
+    await tx.query(
+      "INSERT INTO packets(id,owner_id,application_id,manifest,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,id) DO NOTHING",
+      [manifest.id, this.ownerId, manifest.applicationId, manifestJson, packetHash, this.now()],
+    );
+    await tx.query(
+      "INSERT INTO packet_contents(owner_id,packet_id,profile_id,assessment_id,content,validation) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,packet_id) DO NOTHING",
+      [
+        this.ownerId,
+        manifest.id,
+        manifest.profileId,
+        manifest.assessmentId,
+        JSON.stringify(content),
+        JSON.stringify(manifest.validation),
+      ],
+    );
+    for (const [ordinal, artifact] of manifest.artifacts.entries())
+      await tx.query(
+        "INSERT INTO packet_artifacts(owner_id,packet_id,artifact_id,kind,filename,ordinal) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,packet_id,kind) DO NOTHING",
+        [this.ownerId, manifest.id, artifact.id, artifact.kind, artifact.filename, ordinal],
+      );
+    await tx.query(
+      "UPDATE applications SET state=$1,revision=revision+1,updated_at=$2 WHERE owner_id=$3 AND id=$4",
+      [
+        manifest.validation.status === "valid" ? "PREPARED" : "NEEDS_INPUT",
+        this.now(),
+        this.ownerId,
+        manifest.applicationId,
+      ],
+    );
+    await this.audit(tx, manifest.id, "packet.prepared", 1, {
+      status: manifest.validation.status,
+      artifacts: manifest.artifacts.length,
     });
+    return { manifest, content, valid: true, invalidReason: null };
   }
 
   async snapshot(): Promise<PacketSnapshot[]> {

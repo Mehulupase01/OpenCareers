@@ -393,7 +393,7 @@ export class Repository extends OwnerScope {
     });
   }
 
-  private async validLease(tx: SqlExecutor, task: Task): Promise<Task> {
+  protected async validLease(tx: SqlExecutor, task: Task): Promise<Task> {
     const rows = await tx.query(
       "SELECT * FROM tasks WHERE owner_id=$1 AND id=$2 AND state='leased' AND fence=$3 AND lease_owner=$4 AND lease_until > $5",
       [this.ownerId, task.id, task.fence, task.leaseOwner, this.now()],

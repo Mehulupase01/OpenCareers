@@ -22,6 +22,7 @@ import { CandidateRepository } from "../../../packages/persistence/src/candidate
 import { DiscoveryScanRepository } from "../../../packages/persistence/src/discovery-scan-repository.js";
 import { DocumentRepository } from "../../../packages/persistence/src/document-repository.js";
 import { EmailRepository } from "../../../packages/persistence/src/email-repository.js";
+import { ExperimentGenerationRepository } from "../../../packages/persistence/src/experiment-generation-repository.js";
 import { HandoffRepository } from "../../../packages/persistence/src/handoff-repository.js";
 import { connect } from "../../../packages/persistence/src/index.js";
 import { MatchingRepository } from "../../../packages/persistence/src/matching-repository.js";
@@ -30,6 +31,7 @@ import { VerificationRepository } from "../../../packages/persistence/src/verifi
 import { runInspectionTask } from "./inspection.js";
 import { startPeriodicWork } from "./periodic-work.js";
 import { draftWorkerLetter } from "./preparation.js";
+import { runVariantPreparation } from "./variant-preparation.js";
 
 const logger = createLogger();
 const controller = new AbortController();
@@ -136,8 +138,30 @@ try {
         );
         try {
           if (task.type === "prepare") {
+            if ("generationId" in task.payload) {
+              await runVariantPreparation(task, {
+                repository: new ExperimentGenerationRepository(repository.db, repository.ownerId),
+                artifacts,
+                runner: letterDraftRunner,
+                signal: controller.signal,
+              });
+              await repository.complete(task);
+              continue;
+            }
             if (!task.applicationId || typeof task.payload.assessmentId !== "string")
               throw new DomainError("CONFIG_INVALID", "Prepare task payload is incomplete.");
+            if (
+              (
+                await repository.db.query(
+                  "SELECT id FROM experiment_generations WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
+                  [repository.ownerId, task.applicationId],
+                )
+              ).length
+            )
+              throw new DomainError(
+                "POLICY_REVOKED",
+                "Experiment enrollment requires generation-specific preparation.",
+              );
             const retained = task.payload.refreshAnswers
               ? null
               : await documents.validPacket(task.payload.assessmentId, config.profile !== "demo");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dateSchema, factValueSchema, monthSchema } from "./candidate.js";
 import { idSchema } from "./index.js";
+import { letterVariantRecipeSchema } from "./letter-variant.js";
 
 const text = z.string().trim().min(1).max(8000);
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -238,8 +239,14 @@ export const packetManifestSchema = z
             modelId: z.string().min(1).max(240),
             provider: z.string().min(1).max(120),
             responseHash: sha256Schema,
+            recipe: letterVariantRecipeSchema.optional(),
+            generationId: z.uuid().optional(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (value) => !value.generationId || Boolean(value.recipe),
+            "Generation requires a recipe.",
+          ),
       ])
       .optional(),
     artifacts: z.array(artifactSchema).length(5),

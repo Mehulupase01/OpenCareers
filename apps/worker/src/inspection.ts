@@ -248,7 +248,17 @@ export async function runInspectionTask(
       }
     }
   }
-  if (result.status === "needs_input" && unresolvedCount && reusableCount === unresolvedCount)
+  if (
+    result.status === "needs_input" &&
+    unresolvedCount &&
+    reusableCount === unresolvedCount &&
+    !(
+      await repository.db.query(
+        "SELECT id FROM experiment_generations WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
+        [repository.ownerId, task.applicationId],
+      )
+    ).length
+  )
     await repository.enqueue({
       type: "prepare",
       domain: "documents",

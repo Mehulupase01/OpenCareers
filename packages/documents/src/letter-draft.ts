@@ -5,6 +5,7 @@ import {
   type PacketContent,
 } from "../../contracts/src/documents.js";
 import { DomainError, LetterClaimError } from "../../contracts/src/index.js";
+import type { LetterVariantRecipe } from "../../contracts/src/letter-variant.js";
 import { assertNoTools } from "../../inference/src/policy.js";
 import {
   careerTextMinimizer,
@@ -13,6 +14,7 @@ import {
 } from "../../inference/src/privacy.js";
 import type { CompletionRequest } from "../../inference/src/transport.js";
 import type { PacketGenerationInput } from "./domain.js";
+import { assertLetterVariantRecipe } from "./letter-variants.js";
 
 export const letterProposalSchema = z
   .object({
@@ -43,8 +45,10 @@ export function buildLetterRequest(
   model: string,
   provider: string,
   privacyRevision: PrivacyRevision = "strict-zdr-v1",
+  recipe?: LetterVariantRecipe,
 ): CompletionRequest {
   assertBound(input, content);
+  const variant = recipe === undefined ? undefined : assertLetterVariantRecipe(recipe);
   if (!model.endsWith(":free") || !provider)
     throw new DomainError(
       "MODEL_ROUTE_INELIGIBLE",
@@ -86,6 +90,7 @@ export function buildLetterRequest(
             id: claim.id,
             text: minimize(claim.text),
           })),
+          ...(variant ? { fixedRecipeInstruction: variant.instruction } : {}),
         }),
       },
     ],

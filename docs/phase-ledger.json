@@ -2009,10 +2009,12 @@
           "evidence": [
             "docs/evidence/P16-controlled-experiments.md",
             "docs/evidence/P16-experiment-attribution.md",
+            "docs/evidence/P16-generated-wording.md",
+            "tests/integration/experiment-generation.test.ts",
             "tests/integration/experiments.test.ts",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "Verify receipt-backed variant attribution across CI, then truthful variant generation and owner policy adoption workflow."
+          "nextAction": "Verify recipe-bound generation, canonical-merge holds and synthetic receipt-backed assignment through frozen local checks and successor CI."
         }
       ],
       "gates": [
@@ -2060,6 +2062,12 @@
           "status": "in_progress",
           "evidence": [
             "docs/evidence/P16-controlled-experiments.md",
+            "docs/evidence/P16-generated-wording.md",
+            "tests/integration/experiment-generation.test.ts",
+            "tests/integration/experiment-generation-api.test.ts",
+            "tests/unit/letter-variants.test.ts",
+            "tests/unit/worker-variant-preparation.test.ts",
+            "tests/e2e/experiment-generation.spec.ts",
             "tests/integration/experiments.test.ts",
             "tests/integration/documents.test.ts"
           ]

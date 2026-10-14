@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { idSchema } from "./index.js";
+import { letterVariantRecipeSchema } from "./letter-variant.js";
 
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
 export const experimentInputSchema = z
@@ -16,6 +17,7 @@ export const experimentInputSchema = z
             id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
             kind: z.enum(["wording", "ordering"]),
             approvalSha256: sha,
+            generationRecipe: letterVariantRecipeSchema.optional(),
           })
           .strict(),
       )
@@ -26,6 +28,11 @@ export const experimentInputSchema = z
   .refine(
     (value) => new Set(value.variants.map((v) => v.id)).size === value.variants.length,
     "Variant identifiers must be distinct.",
+  )
+  .refine(
+    (value) =>
+      value.variants.every((variant) => !variant.generationRecipe || variant.kind === "wording"),
+    "Automatic recipes require wording variants.",
   );
 export const experimentAssignmentSchema = z
   .object({

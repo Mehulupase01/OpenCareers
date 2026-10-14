@@ -166,6 +166,15 @@ path and correlate receipts with server records before CONFIRMED.
 
 ## Milestones
 
+Approved experiment wording generation extends the existing prepare queue and
+packet repository, not the submission stack. Fixed, hash-bound recipes pass
+through the mandatory bounded letter runner; immutable owner-scoped enrollment
+and fenced publication retain input, policy and artifact provenance in the same
+database. Exact-packet owner assignment and a fresh inspection precede the
+existing submission authority. Pending or failed enrollment also holds canonical
+equivalent applications after identity merges. See
+`docs/evidence/P16-generated-wording.md` for verification and evidence limits.
+
 P00-P02 foundation; P03 candidate evidence; P04 discovery/identity; P05 ranking;
 P06-P07 packets and dry run;
 P08 verified submission; P09-P11 coverage/accounts/email; P12-P14 unattended and

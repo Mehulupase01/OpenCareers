@@ -56,6 +56,11 @@ export async function browserRoutes(
   const browser = new BrowserRepository(repository.db, repository.ownerId);
   const documents = new DocumentRepository(repository.db, repository.ownerId);
   const candidates = new CandidateRepository(repository.db, repository.ownerId);
+  const assertBrowserControls = async () => {
+    const controls = await repository.getControl();
+    if (controls.stopped || controls.restoreBlocked || controls.preparationPaused)
+      throw new DomainError("POLICY_REVOKED", "Current controls prohibit this browser action.");
+  };
   const store = createArtifactStore(config);
   app.addHook("onClose", async () => store.close?.());
   const adapters = createAdapterRegistry(config.dataDir);
@@ -100,6 +105,7 @@ export async function browserRoutes(
     const input = dryRunInput.parse(request.body);
     const packet = await documents.get(input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
+    await assertBrowserControls();
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const adapter = adapters.get("mock-ats");
     const target = adapter.parseTarget({ fixture: input.fixture });
@@ -120,6 +126,7 @@ export async function browserRoutes(
     const input = recruiteeInput.parse(request.body);
     const packet = await documents.get(input.packetId);
     if (!packet?.valid) throw new DomainError("NOT_FOUND", "A valid packet is required.");
+    await assertBrowserControls();
     const cv = await documents.artifact(packet.manifest.id, "cv_pdf", store);
     const adapter = adapters.get("recruitee");
     const target = adapter.parseTarget({ tenant: input.tenant, offerSlug: input.offerSlug });

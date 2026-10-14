@@ -3,7 +3,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { get as httpGet } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "../../apps/api/src/server.js";
 import { VisibleHandoffBroker } from "../../packages/browser/src/handoff-broker.js";
 import { type Config, loadConfig } from "../../packages/config/src/index.js";
@@ -13,6 +13,7 @@ import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
 import { buildPacket } from "../../packages/documents/src/factory.js";
 import { CandidateRepository } from "../../packages/persistence/src/candidate-repository.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
+import { DocumentRepository } from "../../packages/persistence/src/document-repository.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { RestoreRepository } from "../../packages/persistence/src/restore-repository.js";
@@ -48,6 +49,58 @@ async function setup(profile: "demo" | "local" = "demo", configOverrides: Partia
 }
 
 describe("API trust boundary", () => {
+  it.each([
+    { stopped: true },
+    { preparationPaused: true },
+    { submissionsPaused: true },
+    { discoveryPaused: true },
+  ])("applies stage-specific browser controls before Chromium startup: %j", async (pause) => {
+    const { app, headers, repository } = await setup();
+    const login = await app.inject({ method: "POST", url: "/v1/session", headers, payload: {} });
+    const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
+    const root = await realpath(await mkdtemp(join(tmpdir(), "opencareers-paused-packet-")));
+    cleanup.push(() => rm(root, { recursive: true, force: true }));
+    const store = new ArtifactStore(root);
+    await store.initialize();
+    const built = await buildPacket(store, documentGenerationInput());
+    const get = vi
+      .spyOn(DocumentRepository.prototype, "get")
+      .mockResolvedValue({ ...built, valid: true, invalidReason: null });
+    const artifact = vi
+      .spyOn(DocumentRepository.prototype, "artifact")
+      .mockRejectedValue(new Error("Must not load artifacts while paused."));
+    try {
+      await repository.setControl({
+        stopped: false,
+        discoveryPaused: false,
+        preparationPaused: false,
+        submissionsPaused: false,
+        ...pause,
+      });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/browser/dry-run",
+        headers: authenticated,
+        payload: { packetId: built.manifest.id, approvedValues: {} },
+      });
+      expect(get).toHaveBeenCalledOnce();
+      if ("stopped" in pause || "preparationPaused" in pause) {
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toMatchObject({
+          code: "POLICY_REVOKED",
+          message: "Current controls prohibit this browser action.",
+        });
+        expect(artifact).not.toHaveBeenCalled();
+      } else {
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toMatchObject({ code: "STORAGE_UNAVAILABLE" });
+        expect(artifact).toHaveBeenCalledOnce();
+      }
+    } finally {
+      get.mockRestore();
+      artifact.mockRestore();
+    }
+  });
   it("requires private owner authentication for hosted-origin grants and accepts no caller-supplied authority", async () => {
     const { app, headers } = await setup("local");
     const payload = {

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { packetManifestSchema } from "../../contracts/src/documents.js";
 import {
   experimentAssignmentSchema,
@@ -6,7 +6,13 @@ import {
   experimentStopSchema,
 } from "../../contracts/src/experiment.js";
 import { DomainError } from "../../contracts/src/index.js";
+import { assertLetterVariantRecipe } from "../../documents/src/letter-variants.js";
 import type { SqlExecutor } from "./database.js";
+import {
+  assertGenerationSources,
+  generationBinding,
+  generationSubmissionHeld,
+} from "./experiment-generation-binding.js";
 import { jobIdentity } from "./job-identity.js";
 import { OwnerScope } from "./owner-scope.js";
 
@@ -42,6 +48,8 @@ function active(row: Row, now: string) {
   return data;
 }
 
+export { active as activeExperimentDefinition };
+
 export function experimentAssignmentEvidence(row: Row, experiment: Row) {
   const assignment = assignmentData(row);
   const data = definition(experiment);
@@ -62,13 +70,20 @@ export async function assertExperimentDispatch(
   packetId: string,
   now: string,
 ) {
+  if (await generationSubmissionHeld(tx, owner, applicationId))
+    throw new DomainError(
+      "POLICY_REVOKED",
+      "Generated enrollment requires exact-packet review and assignment.",
+    );
   const row = (
     await tx.query("SELECT * FROM experiment_assignments WHERE owner_id=$1 AND application_id=$2", [
       owner,
       applicationId,
     ])
   )[0];
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
   const experiment = (
     await tx.query("SELECT * FROM experiments WHERE owner_id=$1 AND id=$2", [
       owner,
@@ -79,6 +94,30 @@ export async function assertExperimentDispatch(
   const data = active(experiment, now);
   if (!data.variants.some((v) => v.id === row.variant_id))
     throw new DomainError("STATE_INVALID", "Assigned variant is invalid.");
+  const variant = data.variants.find((item) => item.id === row.variant_id);
+  if (variant?.generationRecipe) {
+    const generated = await tx.query(
+      "SELECT * FROM experiment_generations WHERE owner_id=$1 AND application_id=$2 AND state='assigned'",
+      [owner, applicationId],
+    );
+    if (generated.length !== 1)
+      throw new DomainError(
+        "STATE_INVALID",
+        "Assigned generation evidence is missing or ambiguous.",
+      );
+    const generatedRow = generated[0];
+    if (!generatedRow) throw new DomainError("STATE_INVALID", "Assigned generation is missing.");
+    const evidence = generationBinding(generatedRow);
+    await assertGenerationSources(tx, owner, evidence, now);
+    if (
+      generated[0]?.packet_id !== packetId ||
+      generated[0]?.packet_sha256 !== row.packet_sha256 ||
+      evidence.request.experimentId !== data.id ||
+      evidence.request.variantId !== row.variant_id ||
+      JSON.stringify(evidence.recipe) !== JSON.stringify(variant.generationRecipe)
+    )
+      throw new DomainError("PROFILE_STALE", "Assigned generation binding changed.");
+  }
   const packet = (
     await tx.query(
       "SELECT manifest,sha256 FROM packets WHERE owner_id=$1 AND id=$2 AND application_id=$3",
@@ -169,6 +208,8 @@ export class ExperimentRepository extends OwnerScope {
   }
   async create(raw: unknown) {
     const input = experimentInputSchema.parse(raw);
+    for (const variant of input.variants)
+      if (variant.generationRecipe) assertLetterVariantRecipe(variant.generationRecipe);
     const data = JSON.stringify(input);
     return this.db.transaction(async (tx) => {
       await this.lockOwner(tx);
@@ -266,8 +307,8 @@ export class ExperimentRepository extends OwnerScope {
         throw new DomainError("STATE_INVALID", "Variant is not owner-approved.");
       const count = (
         await tx.query(
-          "SELECT COUNT(*) AS total FROM experiment_assignments WHERE owner_id=$1 AND experiment_id=$2",
-          [this.ownerId, input.experimentId],
+          "SELECT (SELECT COUNT(*) FROM experiment_assignments WHERE owner_id=$1 AND experiment_id=$2) + (SELECT COUNT(*) FROM experiment_generations WHERE owner_id=$1 AND experiment_id=$2 AND state IN ('queued','drafting','prepared') AND application_id<>$3) AS total",
+          [this.ownerId, input.experimentId, input.applicationId],
         )
       )[0];
       if (Number(count?.total) >= data.maximumAssignments)
@@ -334,6 +375,44 @@ export class ExperimentRepository extends OwnerScope {
           "Experiment requires an already validated packet.",
         );
       const assignedAt = this.now();
+      const generationRows = await tx.query(
+        "SELECT * FROM experiment_generations WHERE owner_id=$1 AND application_id=$2 AND state<>'failed' ORDER BY created_at DESC,id DESC LIMIT 2",
+        [this.ownerId, input.applicationId],
+      );
+      if (generationRows.length > 1)
+        throw new DomainError("STATE_INVALID", "Generation enrollment is ambiguous.");
+      const generated = generationRows[0];
+      if (
+        !generated &&
+        data.variants.find((variant) => variant.id === input.variantId)?.generationRecipe
+      )
+        throw new DomainError(
+          "POLICY_REVOKED",
+          "Automatic recipe variants require generation provenance.",
+        );
+      if (generated) {
+        const evidence = generationBinding(generated);
+        await assertGenerationSources(tx, this.ownerId, evidence, this.now());
+        if (
+          generated.state !== "prepared" ||
+          generated.packet_id !== input.packetId ||
+          generated.packet_sha256 !== input.reviewedPacketSha256 ||
+          evidence.request.experimentId !== input.experimentId ||
+          evidence.request.variantId !== input.variantId ||
+          manifest.letterGeneration?.method !== "llm" ||
+          manifest.letterGeneration.generationId !== String(generated.id) ||
+          JSON.stringify(manifest.letterGeneration.recipe) !== JSON.stringify(evidence.recipe)
+        )
+          throw new DomainError(
+            "PROFILE_STALE",
+            "Assignment requires its exact generated variant packet.",
+          );
+      } else if (await generationSubmissionHeld(tx, this.ownerId, input.applicationId)) {
+        throw new DomainError(
+          "POLICY_REVOKED",
+          "Failed generation cannot silently become a manual enrollment.",
+        );
+      }
       await tx.query(
         "INSERT INTO experiment_assignments(owner_id,id,experiment_id,application_id,canonical_job_id,packet_id,packet_sha256,variant_id,binding,binding_sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
         [
@@ -358,6 +437,27 @@ export class ExperimentRepository extends OwnerScope {
         { experimentId: input.experimentId, assignmentId: input.id, variantId: input.variantId },
         "owner",
       );
+      if (generated) {
+        await tx.query(
+          "UPDATE experiment_generations SET state='assigned' WHERE owner_id=$1 AND id=$2",
+          [this.ownerId, String(generated.id)],
+        );
+        await tx.query(
+          "UPDATE applications SET state='PREPARED',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3",
+          [this.now(), this.ownerId, input.applicationId],
+        );
+        await tx.query(
+          "INSERT INTO tasks(id,owner_id,application_id,type,domain,state,dedupe_key,payload,priority,run_after,max_attempts,created_at) VALUES($1,$2,$3,'inspect','browser','ready',$4,$5,30,$6,4,$6)",
+          [
+            randomUUID(),
+            this.ownerId,
+            input.applicationId,
+            `inspect:experiment:${input.id}`,
+            JSON.stringify({ schemaVersion: 1, packetId: input.packetId }),
+            this.now(),
+          ],
+        );
+      }
       return { id: input.id, assignedAt };
     });
   }

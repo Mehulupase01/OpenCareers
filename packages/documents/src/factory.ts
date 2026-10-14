@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import type {
   LetterDocument,
   PacketArtifact,
@@ -10,10 +11,16 @@ import {
   type PacketManifest,
   packetManifestSchema,
 } from "../../contracts/src/documents.js";
+import { DomainError } from "../../contracts/src/index.js";
+import {
+  type LetterVariantRecipe,
+  letterVariantRecipeSchema,
+} from "../../contracts/src/letter-variant.js";
 import type { ArtifactStorage } from "./artifact-store.js";
 import type { PacketGenerationInput } from "./domain.js";
 import { generatePacketContent } from "./domain.js";
 import { equivalenceIssues, extractDocx, extractPdf } from "./extract.js";
+import { assertLetterVariantRecipe } from "./letter-variants.js";
 import { renderCvDocx, renderCvPdf, renderLetterDocx, renderLetterPdf } from "./render.js";
 import { validatePacketContent } from "./validation.js";
 
@@ -39,8 +46,19 @@ export async function buildPacket(
     modelId: string;
     provider: string;
     responseHash: string;
+    recipe?: LetterVariantRecipe;
+    generationId?: string;
   },
 ): Promise<BuiltPacket> {
+  const recipe =
+    letterDraft?.recipe === undefined
+      ? undefined
+      : letterVariantRecipeSchema.parse(letterDraft.recipe);
+  if (recipe) assertLetterVariantRecipe(recipe);
+  if (letterDraft?.generationId !== undefined) {
+    z.uuid().parse(letterDraft.generationId);
+    if (!recipe) throw new DomainError("CONFIG_INVALID", "Generation identity requires a recipe.");
+  }
   const content = generatePacketContent(input);
   if (letterDraft) content.letter = letterDocumentSchema.parse(letterDraft.letter);
   const baseValidation = validatePacketContent({
@@ -141,7 +159,8 @@ export async function buildPacket(
     }),
   );
   const contentSha256 = hash(JSON.stringify(content));
-  const packetId = `packet-${hash(`${input.authorization.id}:${input.assessment.id}:${contentSha256}:${artifacts.map((item) => item.sha256).join(":")}`)}`;
+  const packetIdentity = `${input.authorization.id}:${input.assessment.id}:${contentSha256}:${artifacts.map((item) => item.sha256).join(":")}`;
+  const packetId = `packet-${hash(`${packetIdentity}${recipe ? `:recipe:${JSON.stringify(recipe)}` : ""}${letterDraft?.generationId ? `:generation:${letterDraft.generationId}` : ""}`)}`;
   return {
     content,
     manifest: packetManifestSchema.parse({
@@ -162,6 +181,8 @@ export async function buildPacket(
             modelId: letterDraft.modelId,
             provider: letterDraft.provider,
             responseHash: letterDraft.responseHash,
+            ...(recipe ? { recipe } : {}),
+            ...(letterDraft.generationId ? { generationId: letterDraft.generationId } : {}),
           }
         : { method: "deterministic" },
       artifacts,

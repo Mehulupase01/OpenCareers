@@ -168,6 +168,10 @@ export const migrations = [
     "CREATE TABLE hosted_origin_permissions (owner_id TEXT NOT NULL REFERENCES owners(id), origin TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0), state TEXT NOT NULL CHECK(state IN ('active','revoked')), expires_at TEXT NOT NULL, permission_sha256 TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,origin))",
   ],
   ["ALTER TABLE restore_runs ADD COLUMN snapshot_created_at TEXT"],
+  [
+    "CREATE TABLE experiment_generations (owner_id TEXT NOT NULL REFERENCES owners(id), id TEXT NOT NULL, experiment_id TEXT NOT NULL, application_id TEXT NOT NULL, canonical_job_id TEXT NOT NULL, data TEXT NOT NULL, sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('queued','drafting','prepared','failed','assigned')), task_id TEXT NOT NULL, fence INTEGER, packet_id TEXT, packet_sha256 TEXT, critique_sha256 TEXT, repaired INTEGER, failure_code TEXT, created_at TEXT NOT NULL, completed_at TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(owner_id,experiment_id) REFERENCES experiments(owner_id,id), FOREIGN KEY(owner_id,application_id) REFERENCES applications(owner_id,id), FOREIGN KEY(owner_id,canonical_job_id) REFERENCES jobs(owner_id,id), FOREIGN KEY(owner_id,task_id) REFERENCES tasks(owner_id,id), FOREIGN KEY(owner_id,packet_id) REFERENCES packets(owner_id,id))",
+    "CREATE UNIQUE INDEX experiment_generation_active_job ON experiment_generations(owner_id,canonical_job_id) WHERE state<>'failed'",
+  ],
 ];
 
 export async function migrate(db: Database, targetVersion = migrations.length): Promise<void> {

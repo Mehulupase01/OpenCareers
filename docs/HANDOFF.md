@@ -2468,3 +2468,35 @@ draft/critique, atomic fenced publication, fresh inspection, exact review and
 assignment. Existing valid-packet reuse must not substitute a baseline/other variant;
 pending enrollment must block dispatch before assignment, including direct engine
 calls. Preserve legacy manual definitions and the one guarded submission engine.
+
+## 2026-10-14: Approved Wording Generation Through Guarded Receipt
+
+Fixed, hash-bound wording recipes now use the existing durable prepare queue,
+mandatory bounded letter draft/critique, local artifacts, atomic fenced packet
+publication, inspection, exact owner assignment and fresh inspection. The existing
+single submission engine retains final authority. Legacy manual definitions and
+recipe-free packet bytes/IDs remain compatible. Generation has explicit failure,
+restore and source/authorization fences, with no arbitrary prompts or baseline
+fallback. Review found and fixed a canonical-merge hold bypass, including a survivor
+with a pre-existing manual assignment. Four real-merge regressions cover it.
+
+The joined workflow uses actual worker/letter runner/Chromium/MockATS preparation,
+two synthetic model requests, exact reviewed assignment, guarded final action and
+one correlated synthetic receipt. It proves no pre-assignment submit and no retry.
+This is not a genuine employer receipt, private model call or qualifying soak.
+Final focused persistence30/30 SQLite;30 PostgreSQL equivalents await CI. Independent
+read-only review finds no further scoped issues after the correction.
+
+Frozen final check1,100 pass /358 local PostgreSQL/opt-in skips,117 passing files
+/two skipped,380.36s. Types/lint/ledger/build/native237-component SBOM pass. Full
+browser80/80 passes5.3 minutes before the final query correction; affected cases
+rerun against corrected source4/4 pass53.3s. Extracted production-only Windows
+installation1/1 passes121.88s. Production audit has no known vulnerabilities;
+public scan538 selected files before final documentation. Previous fact CI Windows
+77/78 failure is addressed by stage-specific early browser control refusal; its
+failed run is not counted as parity. Successor CI pending; P16-05/G5 stay open.
+Counts remain12/19 phases,99/128 gates. Read P16-generated-wording.md for boundaries.
+
+Next independent milestone is intent-frozen conservative vacancy seniority and
+sponsorship cohorts; see docs/plans/P16-cohort-vacancy-signals.md. Do not infer
+employer sponsorship from candidate-relative gate passes or rewrite legacy hashes.
