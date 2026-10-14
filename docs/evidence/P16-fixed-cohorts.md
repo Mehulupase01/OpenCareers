@@ -1,5 +1,9 @@
 # P16 Fixed Horizon Cohorts
 
+Historical current-status checkpoint. `P16-cumulative-outcomes.md` records the later
+separate correction-aware cumulative view; legacy snapshots are not retroactively
+backfilled. The current-state results below remain scoped to their original build.
+
 2026-10-11. P16-02/G3 remain in progress. This completes the immutable cohort
 capture/report/compare workflow, not every grouping signal or cumulative
 conversion analysis. No live corpus was inspected and no empirical outcome

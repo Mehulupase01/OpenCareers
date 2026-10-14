@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fixedCohortSchema } from "../../packages/contracts/src/cohort.js";
 import type { OutcomeKind } from "../../packages/contracts/src/outcome.js";
 import { generatePacketContent } from "../../packages/documents/src/domain.js";
 import { CohortRepository } from "../../packages/persistence/src/cohort-repository.js";
@@ -165,6 +166,253 @@ for (const engine of ["sqlite", "postgres"] as const) {
         from: "2026-08-01T00:00:00.000Z",
         through: "2026-09-30T00:00:00.000Z",
         observationDays: 30,
+      });
+      const storedCohort = async (id: string) => {
+        const [row] = await db.query(
+          "SELECT data,sha256,binding FROM outcome_cohorts WHERE owner_id=$1 AND id=$2",
+          [owner, id],
+        );
+        expect(row).toBeDefined();
+        expect(row?.sha256).toBe(createHash("sha256").update(String(row?.data)).digest("hex"));
+        return { row, snapshot: fixedCohortSchema.parse(JSON.parse(String(row?.data))) };
+      };
+      it("captures corrected cumulative milestones, group minimums and immutable replay from typed history", async () => {
+        const apps: Awaited<ReturnType<typeof application>>[] = [];
+        for (let index = 0; index < 21; index++) {
+          const app = await application(false, index < 20 ? "source-a" : "source-b");
+          await receipt(app.id, "greenhouse");
+          apps.push(app);
+        }
+        const appId = (index: number) => apps[index]?.id as string;
+        const screening = await outcomes.recordOwner(input(appId(0), "SCREENING"));
+        const interview = await outcomes.recordOwner(input(appId(0), "INTERVIEW", 1));
+        await outcomes.recordOwner(input(appId(0), "REJECTION", 2));
+        await outcomes.recordOwner(input(appId(1), "OFFER"));
+        await outcomes.recordOwner(input(appId(2), "SCREENING"));
+        await outcomes.recordOwner(input(appId(2), "UNKNOWN", 1));
+        await outcomes.recordOwner(input(appId(2), "INTERVIEW", 2));
+        await outcomes.recordOwner(input(appId(3), "INTERVIEW"));
+        await outcomes.recordOwner(input(appId(4), "RECEIVED"));
+        now = new Date("2026-09-20T00:00:00.000Z");
+        await outcomes.recordOwner(input(appId(3), "OFFER", 1));
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const control = await repo.getControl();
+        const request = fixedInput();
+        const report = await cohorts.record(request);
+        expect(report).toMatchObject({
+          status: "measured",
+          denominator: 21,
+          counts: { SCREENING: 0, INTERVIEW: 2, OFFER: 1, REJECTION: 1, RECEIVED: 1, UNKNOWN: 16 },
+          fractions: { INTERVIEW: { numerator: 2, denominator: 21, fraction: 2 / 21 } },
+          cumulative: {
+            methodology: "corrected_observed_milestones_v1",
+            status: "measured",
+            denominator: 21,
+            counts: { SCREENING: 1, INTERVIEW: 3, OFFER: 1 },
+            fractions: {
+              SCREENING: { numerator: 1, denominator: 21, fraction: 1 / 21 },
+              INTERVIEW: { numerator: 3, denominator: 21, fraction: 3 / 21 },
+              OFFER: { numerator: 1, denominator: 21, fraction: 1 / 21 },
+            },
+            withoutMilestoneEvidence: 17,
+          },
+        });
+        expect(
+          report.groups.find((group) => group.dimension === "source" && group.value === "source-a"),
+        ).toMatchObject({
+          cumulative: {
+            status: "measured",
+            denominator: 20,
+            counts: { SCREENING: 1, INTERVIEW: 3, OFFER: 1 },
+            fractions: { INTERVIEW: { numerator: 3, denominator: 20, fraction: 0.15 } },
+            withoutMilestoneEvidence: 16,
+          },
+        });
+        expect(
+          report.groups.find((group) => group.dimension === "source" && group.value === "source-b"),
+        ).toMatchObject({
+          cumulative: {
+            status: "insufficient_data",
+            denominator: 1,
+            counts: { SCREENING: 0, INTERVIEW: 0, OFFER: 0 },
+            fractions: null,
+            withoutMilestoneEvidence: 1,
+          },
+        });
+        const frozen = await storedCohort(request.id);
+        expect(frozen.snapshot.cumulativeMethodology).toBe("corrected_observed_milestones_v1");
+        const member = (index: number) =>
+          frozen.snapshot.members.find((item) => item.applicationId === appId(index));
+        expect(member(0)?.cumulativeEvidence).toEqual({
+          historySha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          milestones: [interview, screening].map((event) => ({
+            kind: event.kind,
+            eventId: event.id,
+            revision: event.revision,
+            evidenceSha256: event.evidenceSha256,
+            occurredAt: event.occurredAt,
+          })),
+        });
+        expect(member(1)?.cumulativeEvidence?.milestones.map((event) => event.kind)).toEqual([
+          "OFFER",
+        ]);
+        expect(member(2)?.cumulativeEvidence?.milestones.map((event) => event.kind)).toEqual([
+          "INTERVIEW",
+        ]);
+        expect(member(3)?.cumulativeEvidence?.milestones.map((event) => event.kind)).toEqual([
+          "INTERVIEW",
+        ]);
+        now = new Date("2026-10-02T00:00:00.000Z");
+        await outcomes.recordOwner({
+          ...input(appId(0), "UNKNOWN", 3),
+          occurredAt: "2026-08-10T00:00:00.000Z",
+        });
+        expect(await new CohortRepository(db, owner, () => now).report(request.id)).toEqual(report);
+        expect(await cohorts.record(request)).toEqual(report);
+        expect((await storedCohort(request.id)).row).toEqual(frozen.row);
+        expect(await repo.getControl()).toEqual(control);
+        expect(
+          await db.query(
+            "SELECT id FROM audit_events WHERE owner_id=$1 AND action='outcome.cohort_recorded'",
+            [owner],
+          ),
+        ).toHaveLength(1);
+      });
+
+      it("rebases restoration to the target branch and restores milestones after an UNKNOWN reset", async () => {
+        const app = await application(false);
+        await receipt(app.id, "greenhouse");
+        const screening = await outcomes.recordOwner(input(app.id, "SCREENING"));
+        const interview = await outcomes.recordOwner(input(app.id, "INTERVIEW", 1));
+        const offer = await outcomes.recordOwner(input(app.id, "OFFER", 2));
+        now = new Date("2026-08-02T00:00:00.000Z");
+        await outcomes.reverse(app.id, screening.id, 3, randomUUID());
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const first = await cohorts.record(fixedInput());
+        expect(first).toMatchObject({
+          counts: { SCREENING: 1, OFFER: 0 },
+          cumulative: {
+            status: "insufficient_data",
+            counts: { SCREENING: 1, INTERVIEW: 0, OFFER: 0 },
+            fractions: null,
+          },
+        });
+        // Backdated owner corrections are known only to subsequent snapshots.
+        await outcomes.recordOwner({
+          ...input(app.id, "UNKNOWN", 4),
+          occurredAt: "2026-08-03T00:00:00.000Z",
+        });
+        const reset = await cohorts.record(fixedInput());
+        expect(reset).toMatchObject({
+          cumulative: {
+            counts: { SCREENING: 0, INTERVIEW: 0, OFFER: 0 },
+            withoutMilestoneEvidence: 1,
+          },
+        });
+        // Restoration itself must occur inside this new snapshot's observation horizon.
+        // A 90-day horizon includes the October restoration without altering older captures.
+        await outcomes.reverse(app.id, offer.id, 5, randomUUID());
+        now = new Date("2026-11-01T00:00:00.000Z");
+        const restored = await cohorts.record({ ...fixedInput(), observationDays: 90 });
+        expect(restored).toMatchObject({
+          counts: { OFFER: 1 },
+          cumulative: {
+            status: "insufficient_data",
+            denominator: 1,
+            counts: { SCREENING: 1, INTERVIEW: 1, OFFER: 1 },
+            fractions: null,
+            withoutMilestoneEvidence: 0,
+          },
+        });
+        const { snapshot } = await storedCohort(restored.snapshotId);
+        expect(
+          snapshot.members[0]?.cumulativeEvidence?.milestones.map((event) => event.eventId).sort(),
+        ).toEqual([screening.id, interview.id, offer.id].sort());
+        expect(await cohorts.report(first.snapshotId)).toEqual(first);
+        expect(await cohorts.report(reset.snapshotId)).toEqual(reset);
+      });
+
+      it.each([
+        ["broken predecessor", "previous_event_id=NULL", "restored"],
+        ["revision gap", "revision=9", "restored"],
+        ["invalid restoration digest", `evidence_sha256='${"f".repeat(64)}'`, "restored"],
+        ["invalid restoration target", "evidence_ref='missing-target'", "restored"],
+        ["invalid actor", "actor='mail-correlator'", "restored"],
+        ["invalid timeline", "occurred_at='2027-01-01T00:00:00.000Z'", "restored"],
+        ["invalid actor on discarded branch", "actor='mail-correlator'", "discarded"],
+      ])(
+        "refuses %s in full stored history without persisting a partial cohort",
+        async (_label, mutation, target) => {
+          const app = await application(false);
+          await receipt(app.id, "greenhouse");
+          const first = await outcomes.recordOwner(input(app.id));
+          const discarded = await outcomes.recordOwner(input(app.id, "OFFER", 1));
+          const restored = await outcomes.reverse(app.id, first.id, 2, randomUUID());
+          await db.query(`UPDATE outcome_events SET ${mutation} WHERE owner_id=$1 AND id=$2`, [
+            owner,
+            target === "discarded" ? discarded.id : restored.id,
+          ]);
+          now = new Date("2026-10-01T00:00:00.000Z");
+          const control = await repo.getControl();
+          const cohorts = new CohortRepository(db, owner, () => now);
+          await expect(cohorts.record(fixedInput())).rejects.toMatchObject({
+            code: "STATE_INVALID",
+          });
+          expect(await cohorts.list()).toEqual([]);
+          expect(
+            await db.query(
+              "SELECT id FROM audit_events WHERE owner_id=$1 AND action='outcome.cohort_recorded'",
+              [owner],
+            ),
+          ).toEqual([]);
+          expect(await repo.getControl()).toEqual(control);
+        },
+      );
+
+      it("keeps persisted legacy cohorts immutable with cumulative data unavailable", async () => {
+        const app = await application(false);
+        await receipt(app.id, "greenhouse");
+        await outcomes.recordOwner(input(app.id));
+        now = new Date("2026-10-01T00:00:00.000Z");
+        const cohorts = new CohortRepository(db, owner, () => now);
+        const request = fixedInput();
+        const current = await cohorts.record(request);
+        const { snapshot } = await storedCohort(request.id);
+        const { cumulativeMethodology: _method, ...legacy } = snapshot;
+        const data = JSON.stringify({
+          ...legacy,
+          members: legacy.members.map(({ cumulativeEvidence: _evidence, ...member }) => member),
+        });
+        await db.query("UPDATE outcome_cohorts SET data=$1,sha256=$2 WHERE owner_id=$3 AND id=$4", [
+          data,
+          createHash("sha256").update(data).digest("hex"),
+          owner,
+          request.id,
+        ]);
+        const frozen = await storedCohort(request.id);
+        const report = await cohorts.report(request.id);
+        const unavailable = {
+          status: "unavailable",
+          denominator: 1,
+          counts: null,
+          fractions: null,
+          withoutMilestoneEvidence: null,
+        };
+        expect(report).toMatchObject({
+          counts: current.counts,
+          fractions: current.fractions,
+          cumulative: unavailable,
+        });
+        for (const group of report.groups) expect(group).toMatchObject({ cumulative: unavailable });
+        now = new Date("2026-10-02T00:00:00.000Z");
+        await outcomes.recordOwner(input(app.id, "OFFER", 1));
+        expect(await cohorts.record(request)).toEqual(report);
+        expect(await cohorts.report(request.id)).toEqual(report);
+        expect((await storedCohort(request.id)).row).toEqual(frozen.row);
+        const other = new CohortRepository(db, `other-${owner}`, () => now);
+        await expect(other.report(request.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
       });
       it("freezes canonical receipt-verified cohorts and horizon labels without changing authority", async () => {
         const cohorts = new CohortRepository(db, owner, () => now);

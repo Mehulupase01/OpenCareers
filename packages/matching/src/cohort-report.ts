@@ -1,12 +1,56 @@
 import {
   type CohortDimension,
+  cumulativeMilestoneSchema,
   type FixedCohort,
   fixedCohortSchema,
 } from "../../contracts/src/cohort.js";
 import { DomainError } from "../../contracts/src/index.js";
 import { outcomeKindSchema } from "../../contracts/src/outcome.js";
 
-function summarize(members: FixedCohort["members"], minimumSample: number) {
+function cumulativeSummary(
+  members: FixedCohort["members"],
+  minimumSample: number,
+  methodology?: FixedCohort["cumulativeMethodology"],
+) {
+  const denominator = members.length;
+  const counts = methodology
+    ? Object.fromEntries(
+        cumulativeMilestoneSchema.options.map((kind) => [
+          kind,
+          members.filter((member) =>
+            member.cumulativeEvidence?.milestones.some((item) => item.kind === kind),
+          ).length,
+        ]),
+      )
+    : null;
+  return {
+    methodology: methodology ?? null,
+    status: !methodology
+      ? ("unavailable" as const)
+      : denominator >= minimumSample
+        ? ("measured" as const)
+        : ("insufficient_data" as const),
+    denominator,
+    counts,
+    fractions:
+      counts && denominator >= minimumSample
+        ? Object.fromEntries(
+            Object.entries(counts).map(([kind, numerator]) => [
+              kind,
+              { numerator, denominator, fraction: numerator / denominator },
+            ]),
+          )
+        : null,
+    withoutMilestoneEvidence: methodology
+      ? members.filter((member) => !member.cumulativeEvidence?.milestones.length).length
+      : null,
+  };
+}
+function summarize(
+  members: FixedCohort["members"],
+  minimumSample: number,
+  cumulativeMethodology?: FixedCohort["cumulativeMethodology"],
+) {
   const counts = Object.fromEntries(outcomeKindSchema.options.map((kind) => [kind, 0]));
   for (const member of members) counts[member.outcome] = (counts[member.outcome] ?? 0) + 1;
   const denominator = members.length;
@@ -14,6 +58,7 @@ function summarize(members: FixedCohort["members"], minimumSample: number) {
     status: denominator >= minimumSample ? ("measured" as const) : ("insufficient_data" as const),
     denominator,
     counts,
+    cumulative: cumulativeSummary(members, minimumSample, cumulativeMethodology),
     fractions:
       denominator >= minimumSample
         ? Object.fromEntries(
@@ -40,7 +85,7 @@ export function fixedCohortReport(raw: FixedCohort) {
       .map(([value, members]) => ({
         dimension,
         value,
-        ...summarize(members, snapshot.window.minimumSample),
+        ...summarize(members, snapshot.window.minimumSample, snapshot.cumulativeMethodology),
       }));
   });
   return {
@@ -56,10 +101,11 @@ export function fixedCohortReport(raw: FixedCohort) {
       ).length,
       legacySnapshot: snapshot.members.filter((member) => !member.metadataOrigin).length,
     },
-    ...summarize(snapshot.members, snapshot.window.minimumSample),
+    ...summarize(snapshot.members, snapshot.window.minimumSample, snapshot.cumulativeMethodology),
     groups,
     limits: [
-      "Current recorded outcome at the fixed observation horizon, not cumulative conversion.",
+      "Current status and cumulative observed milestones use separate numerators at the fixed horizon; no missing funnel stage is inferred.",
+      "Legacy cumulative evidence is unavailable, not zero. UNKNOWN resets milestone evidence; restorations rebase the recorded history.",
       "New source/role groups use intent-time metadata; legacy groups retain snapshot-time metadata and are not backfilled.",
       "Unknown metadata is not inferred. Comparisons are descriptive, not causal or hiring probabilities.",
       "Experiment groups require pre-dispatch assignment evidence; legacy records stay unassigned.",
@@ -132,8 +178,8 @@ export function compareFixedCohorts(
       "STATE_INVALID",
       "Overlapping jobs cannot be compared as independent groups.",
     );
-  const leftReport = summarize(a, left.window.minimumSample),
-    rightReport = summarize(b, right.window.minimumSample);
+  const leftReport = summarize(a, left.window.minimumSample, left.cumulativeMethodology),
+    rightReport = summarize(b, right.window.minimumSample, right.cumulativeMethodology);
   return {
     status:
       leftReport.fractions && rightReport.fractions
@@ -161,6 +207,26 @@ export function compareFixedCohorts(
             ]),
           )
         : null,
+    cumulative: {
+      status:
+        !left.cumulativeMethodology || !right.cumulativeMethodology
+          ? ("unavailable" as const)
+          : leftReport.cumulative.fractions && rightReport.cumulative.fractions
+            ? ("measured" as const)
+            : ("insufficient_data" as const),
+      left: leftReport.cumulative,
+      right: rightReport.cumulative,
+      differences:
+        leftReport.cumulative.fractions && rightReport.cumulative.fractions
+          ? Object.fromEntries(
+              cumulativeMilestoneSchema.options.map((kind) => [
+                kind,
+                (leftReport.cumulative.fractions?.[kind]?.fraction ?? 0) -
+                  (rightReport.cumulative.fractions?.[kind]?.fraction ?? 0),
+              ]),
+            )
+          : null,
+    },
     limits: [
       "Descriptive outcome-fraction differences, not causal effects or significance estimates.",
       "No automatic policy, score or submission changes.",

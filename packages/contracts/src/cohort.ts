@@ -26,10 +26,30 @@ export const cohortSnapshotInputSchema = cohortInputSchema
   .omit({ asOf: true })
   .extend({ id: z.uuid() })
   .strict();
+export const cumulativeMilestoneSchema = z.enum(["SCREENING", "INTERVIEW", "OFFER"]);
+export const cumulativeEvidenceSchema = z
+  .object({
+    historySha256: z.string().regex(/^[a-f0-9]{64}$/),
+    milestones: z
+      .array(
+        z
+          .object({
+            kind: cumulativeMilestoneSchema,
+            eventId: idSchema,
+            revision: z.number().int().positive(),
+            evidenceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+            occurredAt: z.iso.datetime(),
+          })
+          .strict(),
+      )
+      .max(3),
+  })
+  .strict();
 export const fixedCohortSchema = z
   .object({
     id: z.uuid(),
     methodology: z.literal("fixed_current_outcome_at_observation_horizon_v1"),
+    cumulativeMethodology: z.literal("corrected_observed_milestones_v1").optional(),
     window: cohortInputSchema,
     recordedAt: z.iso.datetime(),
     exclusions: z.record(z.string(), z.number().int().nonnegative()),
@@ -51,6 +71,7 @@ export const fixedCohortSchema = z
               .nullable(),
             metadataSha256: z.string().regex(/^[a-f0-9]{64}$/),
             metadataOrigin: z.literal("submission_intent").optional(),
+            cumulativeEvidence: cumulativeEvidenceSchema.optional(),
             experiment: z
               .object({
                 id: z.uuid(),
@@ -79,7 +100,37 @@ export const fixedCohortSchema = z
       )
       .max(10000),
   })
-  .strict();
+  .strict()
+  .superRefine((snapshot, context) => {
+    for (const [index, member] of snapshot.members.entries()) {
+      const evidence = member.cumulativeEvidence;
+      if (Boolean(snapshot.cumulativeMethodology) !== Boolean(evidence))
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "cumulativeEvidence"],
+          message: "Cumulative evidence and methodology must be present together.",
+        });
+      if (
+        evidence &&
+        (new Set(evidence.milestones.map((item) => item.kind)).size !==
+          evidence.milestones.length ||
+          new Set(evidence.milestones.map((item) => item.eventId)).size !==
+            evidence.milestones.length ||
+          new Set(evidence.milestones.map((item) => item.revision)).size !==
+            evidence.milestones.length ||
+          evidence.milestones.some(
+            (item) =>
+              Date.parse(item.occurredAt) > Date.parse(member.horizon) ||
+              Date.parse(item.occurredAt) > Date.parse(snapshot.window.asOf),
+          ))
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "cumulativeEvidence"],
+          message: "Cumulative milestones must be unique and within the observation horizon.",
+        });
+    }
+  });
 export const cohortComparisonInputSchema = z
   .object({
     leftSnapshotId: z.uuid(),

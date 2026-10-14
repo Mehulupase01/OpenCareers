@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   type CohortDimension,
   cohortDimensionSchema,
+  cumulativeMilestoneSchema,
 } from "../../../packages/contracts/src/cohort.js";
 import type {
   compareFixedCohorts,
@@ -267,6 +268,7 @@ export function CohortsWorkspace() {
               </tbody>
             </table>
           </div>
+          <CumulativeOutcomes report={report} groups={groups} />
           <form
             className="candidate-form"
             onSubmit={(event) => {
@@ -372,9 +374,113 @@ export function CohortsWorkspace() {
                 </div>
               )}
               <p className="muted">{comparison.limits.join(" ")}</p>
+              <CumulativeComparison comparison={comparison} />
             </div>
           )}
           <p className="muted">{report.limits.join(" ")}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const milestoneLabels = { SCREENING: "Screening", INTERVIEW: "Interview", OFFER: "Offer" };
+function cumulativeCell(summary: Report["cumulative"], kind: string) {
+  const count = summary.counts?.[kind];
+  if (count === undefined) return "Unavailable";
+  const fraction = summary.fractions?.[kind]?.fraction;
+  return `${count}/${summary.denominator}${fraction === undefined ? "" : ` (${fraction.toFixed(3)})`}`;
+}
+function CumulativeOutcomes({ report, groups }: { report: Report; groups: Report["groups"] }) {
+  return (
+    <section aria-label="Cumulative observed outcomes" className="cumulative-outcomes">
+      <h4>Cumulative observed outcomes</h4>
+      {report.cumulative.status === "unavailable" ? (
+        <p>Unavailable for this legacy snapshot.</p>
+      ) : (
+        <>
+          <p className="muted">
+            {report.cumulative.withoutMilestoneEvidence} applications without positive milestone
+            evidence
+          </p>
+          <div className="table-scroll">
+            <table aria-label="Cumulative cohort counts">
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>Eligible</th>
+                  {cumulativeMilestoneSchema.options.map((kind) => (
+                    <th key={kind}>{milestoneLabels[kind]}</th>
+                  ))}
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  {
+                    id: "total",
+                    value: "All eligible applications",
+                    cumulative: report.cumulative,
+                  },
+                  ...groups.map((group) => ({
+                    ...group,
+                    id: `group:${group.dimension}:${group.value}`,
+                  })),
+                ].map((group) => (
+                  <tr key={group.id}>
+                    <td>{group.value}</td>
+                    <td>{group.cumulative.denominator}</td>
+                    {cumulativeMilestoneSchema.options.map((kind) => (
+                      <td key={kind}>{cumulativeCell(group.cumulative, kind)}</td>
+                    ))}
+                    <td>
+                      {group.cumulative.status === "measured"
+                        ? "Observed fractions"
+                        : "Insufficient data"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function CumulativeComparison({ comparison }: { comparison: Comparison }) {
+  const result = comparison.cumulative;
+  return (
+    <section aria-label="Cumulative group comparison" className="cumulative-outcomes">
+      <h4>Cumulative group comparison</h4>
+      {result.status !== "measured" ? (
+        <p>
+          {result.status === "unavailable"
+            ? "Legacy cumulative evidence unavailable."
+            : "Insufficient cumulative comparison data."}
+        </p>
+      ) : (
+        <div className="table-scroll">
+          <table aria-label="Cumulative group differences">
+            <thead>
+              <tr>
+                <th>Milestone</th>
+                <th>{comparison.left.value}</th>
+                <th>{comparison.right.value}</th>
+                <th>Difference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cumulativeMilestoneSchema.options.map((kind) => (
+                <tr key={kind}>
+                  <td>{milestoneLabels[kind]}</td>
+                  <td>{cumulativeCell(result.left, kind)}</td>
+                  <td>{cumulativeCell(result.right, kind)}</td>
+                  <td>{result.differences?.[kind]?.toFixed(3)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </section>

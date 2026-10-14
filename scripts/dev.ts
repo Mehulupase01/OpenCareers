@@ -31,17 +31,22 @@ async function waitForApi(api: ChildProcess) {
   const host = process.env.AUTOPILOT_HOST ?? "127.0.0.1";
   const port = process.env.AUTOPILOT_PORT ?? "4317";
   const endpoint = `http://${host === "::1" ? "[::1]" : host}:${port}/health/ready`;
-  for (let attempt = 0; attempt < 100; attempt++) {
+  const deadline = performance.now() + 45000;
+  while (performance.now() < deadline) {
     if (api.exitCode !== null || api.signalCode) throw new Error("API exited during startup.");
     try {
-      const response = await fetch(endpoint, { signal: AbortSignal.timeout(500) });
+      const response = await fetch(endpoint, {
+        signal: AbortSignal.timeout(
+          Math.max(1, Math.min(500, Math.ceil(deadline - performance.now()))),
+        ),
+      });
       if (response.ok) return;
     } catch {
       // The API owns schema initialization; dependents wait until it is ready.
     }
-    await setTimeout(100);
+    await setTimeout(Math.max(0, Math.min(100, deadline - performance.now())));
   }
-  throw new Error("API did not become ready within 10 seconds.");
+  throw new Error("API did not become ready within 45 seconds.");
 }
 
 process.on("SIGINT", () => stop(0));

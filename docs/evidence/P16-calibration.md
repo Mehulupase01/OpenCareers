@@ -26,8 +26,11 @@ Fixed outcome cohorts qualify typed, digest-checked non-mock confirmed receipts,
 deduplicate canonical jobs and exclude synthetic, unverified, unresolved,
 outside-window and still-observing applications. Receipt observation time starts
 the horizon; only known events occurring by that horizon contribute labels.
-UNKNOWN preserves silence. These are current recorded horizon-state fractions,
-not cumulative ever-screened/interviewed/offered conversion. Each reported fraction
+UNKNOWN preserves silence. Current recorded horizon-state fractions remain separate
+from new correction-aware cumulative observed milestones. New fixed snapshots retain
+explicit screening/interview/offer evidence without inferring earlier stages; legacy
+snapshots do not acquire cumulative data. See `P16-cumulative-outcomes.md` for exact
+UNKNOWN-reset/restoration semantics, limits and verification. Each reported fraction
 has numerator, denominator and observation window; exclusions precede grouping
 and must not be misrepresented as source-specific exclusions. Minimum sample is
 at least 20 independently for each compared group; smaller groups refuse rates.
@@ -45,6 +48,7 @@ minimum-sample refusal. Manual assignment is not randomization.
 | Fixture | Denominator | Observation Window | Result And Limits |
 | --- | --- | --- | --- |
 | Fixed horizon arithmetic | 40 synthetic members | Receipts 2026-08-01 through 2026-08-31; 30 days; cutoff 2026-10-01 | 20 INTERVIEW / 40 and 20 UNKNOWN / 40, each fraction 0.5. Arithmetic only. |
+| Corrected cumulative observations | 21 synthetic qualified members | Receipts 2026-08-01 through 2026-09-30; 30 days; cutoff 2026-10-01 | Screening1/21, interview3/21, offer1/21; UNKNOWN reset and branch restoration honored. Source A3/20; source B1 member, fractions withheld. No live effectiveness claim. |
 | Compatible variant arithmetic | 20 synthetic members per variant | Same fixed fixture window and 30-day declared horizon | INTERVIEW difference 1.0 in deliberately constructed labels. Not employer evidence or improvement. |
 | Small variant comparison | 1 synthetic receipt per variant | September 2026 receipts; 30 days; cutoff 2026-11-01 | Insufficient data; fractions/differences withheld. Production repository attribution fixture, not live submission. |
 | Legacy/unassigned records | Same fixture membership | Same fixed window | No experiment assignment inferred; mixed/unassigned experiment comparison refused. |

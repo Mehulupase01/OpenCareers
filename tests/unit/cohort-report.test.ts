@@ -39,6 +39,86 @@ const fixture = (): FixedCohort => ({
   })),
 });
 describe("fixed horizon cohort reporting", () => {
+  it("reports separate cumulative milestones without interpreting legacy current status as history", () => {
+    const legacy = fixture();
+    expect(fixedCohortReport(legacy).cumulative).toMatchObject({
+      status: "unavailable",
+      denominator: 40,
+      counts: null,
+      fractions: null,
+    });
+    const snapshot: FixedCohort = {
+      ...legacy,
+      cumulativeMethodology: "corrected_observed_milestones_v1",
+      members: legacy.members.map((member, index) => ({
+        ...member,
+        outcome: "REJECTION",
+        cumulativeEvidence: {
+          historySha256: "d".repeat(64),
+          milestones:
+            index < 20
+              ? [
+                  {
+                    kind: "INTERVIEW",
+                    eventId: member.outcomeEventId as string,
+                    revision: 1,
+                    evidenceSha256: "b".repeat(64),
+                    occurredAt: member.receivedAt,
+                  },
+                ]
+              : [],
+        },
+      })),
+    };
+    const report = fixedCohortReport(snapshot);
+    expect(report.counts.INTERVIEW).toBe(0);
+    expect(report.cumulative).toMatchObject({
+      status: "measured",
+      counts: { SCREENING: 0, INTERVIEW: 20, OFFER: 0 },
+      withoutMilestoneEvidence: 20,
+      fractions: { INTERVIEW: { numerator: 20, denominator: 40, fraction: 0.5 } },
+    });
+    const compared = compareFixedCohorts(snapshot, snapshot, "source", "source-a", "source-b");
+    expect(compared.cumulative).toMatchObject({
+      status: "measured",
+      differences: { INTERVIEW: 1, SCREENING: 0, OFFER: 0 },
+    });
+    const mixed = compareFixedCohorts(legacy, snapshot, "source", "source-a", "source-b");
+    expect(mixed.cumulative).toMatchObject({ status: "unavailable", differences: null });
+    const small = fixedCohortReport({ ...snapshot, members: snapshot.members.slice(0, 19) });
+    expect(small.cumulative).toMatchObject({
+      status: "insufficient_data",
+      counts: { INTERVIEW: 19 },
+      fractions: null,
+    });
+    expect(() =>
+      fixedCohortReport({
+        ...snapshot,
+        members: snapshot.members.map((member, index) =>
+          index === 0 ? { ...member, cumulativeEvidence: undefined } : member,
+        ),
+      }),
+    ).toThrow();
+    expect(() => fixedCohortReport({ ...snapshot, cumulativeMethodology: undefined })).toThrow();
+    const member = snapshot.members[0];
+    const evidence = member?.cumulativeEvidence;
+    const milestone = evidence?.milestones[0];
+    if (!member || !evidence || !milestone) throw new Error("Synthetic milestone missing.");
+    expect(() =>
+      fixedCohortReport({
+        ...snapshot,
+        members: [
+          {
+            ...member,
+            cumulativeEvidence: {
+              ...evidence,
+              milestones: [milestone, milestone],
+            },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
   it("distinguishes intent-time metadata and refuses mixing it with legacy source attribution", () => {
     const snapshot = fixture();
     snapshot.members = snapshot.members.map((member, index) =>

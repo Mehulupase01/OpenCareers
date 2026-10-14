@@ -13,8 +13,10 @@ import { DomainError, jobInputSchema } from "../../contracts/src/index.js";
 import { outcomeKindSchema } from "../../contracts/src/outcome.js";
 import { receiptEvidenceSchema } from "../../contracts/src/submission.js";
 import { compareFixedCohorts, fixedCohortReport } from "../../matching/src/cohort-report.js";
+import { captureCumulativeEvidence } from "./cohort-history.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { experimentAssignmentEvidence } from "./experiment-repository.js";
+import { outcomeEventFromRow } from "./outcome-repository.js";
 import { OwnerScope } from "./owner-scope.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -107,7 +109,7 @@ export class CohortRepository extends OwnerScope {
         [this.ownerId, asOf],
       );
       const events = await tx.query(
-        "SELECT id,application_id,revision,kind,evidence_sha256,occurred_at FROM outcome_events WHERE owner_id=$1 AND recorded_at<=$2 AND occurred_at<=$2 ORDER BY revision LIMIT 100001",
+        "SELECT * FROM outcome_events WHERE owner_id=$1 AND recorded_at<=$2 ORDER BY revision LIMIT 100001",
         [this.ownerId, asOf],
       );
       const listings = await tx.query(
@@ -252,7 +254,15 @@ export class CohortRepository extends OwnerScope {
           continue;
         }
         jobs.add(jobId);
-        const event = (byEvents.get(String(row.id)) ?? [])
+        const history = byEvents.get(String(row.id)) ?? [];
+        const cumulativeEvidence = captureCumulativeEvidence(
+          history.map(outcomeEventFromRow),
+          String(row.id),
+          String(row.created_at),
+          new Date(horizon).toISOString(),
+          asOf,
+        );
+        const event = history
           .filter((item) => Date.parse(String(item.occurred_at)) <= horizon)
           .at(-1);
         const families = roleFamilies.get(jobId);
@@ -346,6 +356,7 @@ export class CohortRepository extends OwnerScope {
           outcome: event ? outcomeKindSchema.parse(event.kind) : "UNKNOWN",
           outcomeEventId: event ? String(event.id) : null,
           outcomeEvidenceSha256: event ? String(event.evidence_sha256) : null,
+          cumulativeEvidence,
           metadataSha256: hash(
             JSON.stringify(
               frozenMetadata
@@ -363,6 +374,7 @@ export class CohortRepository extends OwnerScope {
       const snapshot = fixedCohortSchema.parse({
         id: input.id,
         methodology: "fixed_current_outcome_at_observation_horizon_v1",
+        cumulativeMethodology: "corrected_observed_milestones_v1",
         window: {
           from: input.from,
           through: input.through,

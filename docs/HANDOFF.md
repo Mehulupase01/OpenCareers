@@ -2384,3 +2384,24 @@ inside SQLite's native COMMIT critical section, disk power loss, a live Chromium
 click, actual lease passage or a qualifying soak. Full outage/worker/fairness,
 active-browser/native-COMMIT, provider revocation and physical Windows recovery
 scope remain. P15-02/G2 stay in_progress; phases12/19 and gates98/128 unchanged.
+
+## 2026-10-14: Correction-Aware Cumulative Outcome Reporting
+
+New fixed cohorts freeze separately hashed, correction-aware explicit SCREENING,
+INTERVIEW and OFFER milestones. Latest status remains separate: rejection does not
+erase an observed interview; an offer does not invent prior stages. UNKNOWN resets
+positive evidence, exact historical restoration rebases the supported branch, and
+the fixed horizon/knowledge cutoff remain enforced. Strict bounded history checks
+reject malformed links, actors, dates, revisions and restoration hashes. Legacy
+snapshots remain byte-identical with cumulative evidence unavailable, never zero.
+
+Outcomes now shows cumulative totals, per-dimension groups and descriptive comparisons
+with numerator/denominator, fixed dates/exclusions and independent sample refusal.
+Two bounded agents contributed disjoint history/persistence tests; parent owns
+contracts/reporting/UI. Frozen full check918 pass /295 local skips,110 passing
+files /two skipped,365.24s; build/native SBOM/types/lint/ledger pass. Targeted browser
+checks4/4 pass46.8s, desktop/narrow screenshots visually inspected. Full browser/CI
+verification is pending; P16-G3 remains in_progress, counts12/19 and98/128 unchanged.
+Read docs/evidence/P16-cumulative-outcomes.md. Synthetic evidence only, no employer,
+mail/model/private configuration actions and no qualifying soak. Next loop: typed
+rejected-letter failure to reviewed sanitized executable regression, not raw prose.

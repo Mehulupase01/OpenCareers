@@ -2034,7 +2034,14 @@
           "id": "P16-G3",
           "requirement": "Reported conversion rates include numerator, denominator, date range, and relevant exclusions.",
           "status": "in_progress",
-          "evidence": ["docs/evidence/P16-fixed-cohorts.md", "tests/unit/cohort-report.test.ts"]
+          "evidence": [
+            "docs/evidence/P16-fixed-cohorts.md",
+            "docs/evidence/P16-cumulative-outcomes.md",
+            "tests/unit/cohort-history.test.ts",
+            "tests/unit/cohort-report.test.ts",
+            "tests/integration/outcomes.test.ts",
+            "tests/e2e/cumulative-cohorts.spec.ts"
+          ]
         },
         {
           "id": "P16-G4",

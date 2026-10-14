@@ -13,7 +13,7 @@ import type { Row, SqlExecutor } from "./database.js";
 import { OwnerScope } from "./owner-scope.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-const fromRow = (row: Row): OutcomeEvent => ({
+export const outcomeEventFromRow = (row: Row): OutcomeEvent => ({
   id: String(row.id),
   applicationId: String(row.application_id),
   revision: Number(row.revision),
@@ -44,7 +44,7 @@ export class OutcomeRepository extends OwnerScope {
     );
     if (rows.length > 1000)
       throw new DomainError("STATE_INVALID", "Outcome history exceeds the bounded read size.");
-    return rows.map(fromRow);
+    return rows.map(outcomeEventFromRow);
   }
   private async append(
     tx: SqlExecutor,
@@ -76,7 +76,7 @@ export class OutcomeRepository extends OwnerScope {
     if (existing) {
       if (existing.binding !== binding)
         throw new DomainError("REVISION_STALE", "Outcome request identity was already used.");
-      return fromRow(existing);
+      return outcomeEventFromRow(existing);
     }
     const current = (
       await tx.query(
@@ -160,7 +160,7 @@ export class OutcomeRepository extends OwnerScope {
           Number(existing.revision) !== expectedRevision + 1
         )
           throw new DomainError("REVISION_STALE", "Reversal request identity was already used.");
-        return fromRow(existing);
+        return outcomeEventFromRow(existing);
       }
       const prior = (
         await tx.query(
@@ -177,7 +177,7 @@ export class OutcomeRepository extends OwnerScope {
           requestId,
           kind: prior.kind,
           evidenceRef: eventId,
-          evidenceSha256: hash(JSON.stringify(fromRow(prior))),
+          evidenceSha256: hash(JSON.stringify(outcomeEventFromRow(prior))),
           occurredAt: this.now(),
         },
         "reversal",
@@ -225,7 +225,7 @@ export class OutcomeRepository extends OwnerScope {
         [this.ownerId, messageId],
       )
     )[0];
-    if (prior) return { status: "recorded" as const, event: fromRow(prior) };
+    if (prior) return { status: "recorded" as const, event: outcomeEventFromRow(prior) };
     const current = (
       await tx.query(
         "SELECT e.* FROM application_outcomes o JOIN outcome_events e ON e.owner_id=o.owner_id AND e.id=o.event_id WHERE o.owner_id=$1 AND o.application_id=$2",
