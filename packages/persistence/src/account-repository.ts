@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
+  type AccountRecoveryInput,
+  accountRecoveryInputSchema,
   type EmployerAccount,
   employerAccountSchema,
   type SignupReceiptEvidence,
@@ -163,6 +165,102 @@ export class AccountRepository extends Repository {
         [this.ownerId],
       )
     ).map(accountFrom);
+  }
+
+  async recover(
+    accountId: string,
+    raw: AccountRecoveryInput,
+    actor: string,
+  ): Promise<EmployerAccount> {
+    if (actor !== `owner:${this.ownerId}`)
+      throw new DomainError("UNAUTHORIZED", "Account recovery requires the owner.");
+    const input = accountRecoveryInputSchema.parse(raw);
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      if ((await this.readControl(tx)).restoreBlocked)
+        throw new DomainError(
+          "POLICY_REVOKED",
+          "Complete the external-history restore review before account recovery.",
+        );
+      const row = (
+        await tx.query("SELECT * FROM employer_accounts WHERE owner_id=$1 AND id=$2", [
+          this.ownerId,
+          accountId,
+        ])
+      )[0];
+      if (!row) throw new DomainError("NOT_FOUND", "Employer account was not found.");
+      if (row.state !== "locked" || row.updated_at !== input.expectedUpdatedAt)
+        throw new DomainError(
+          "STATE_INVALID",
+          "Account recovery state changed; reload the account.",
+        );
+      const reviewed = Date.parse(input.reviewedAt);
+      if (
+        reviewed < Date.parse(String(row.updated_at)) ||
+        reviewed > this.clock().getTime() ||
+        reviewed < this.clock().getTime() - 900000
+      )
+        throw new DomainError(
+          "CONFIG_INVALID",
+          "Account review must be fresh and follow the current lock.",
+        );
+      let secretId: string | null = null;
+      if (input.disposition === "verified_existing") {
+        if (
+          exactOrigin(input.employerOrigin) !== row.employer_origin ||
+          input.adapterId !== row.adapter_id ||
+          emailDigest(input.identityEmail) !== row.identity_email_hash
+        )
+          throw new DomainError(
+            "RECEIPT_UNCORRELATED",
+            "Account review does not match the exact employer, adapter and identity.",
+          );
+        secretId = randomUUID();
+        const clear = Buffer.from(input.replacementPassword, "utf8");
+        try {
+          const binding = {
+            ownerId: this.ownerId,
+            secretId,
+            purpose: "employer_password" as const,
+            keyVersion: 1,
+          };
+          const envelope = this.vault.seal(clear, binding);
+          const verified = this.vault.open(envelope, binding);
+          try {
+            if (!verified.equals(clear)) throw new Error("Credential sealing failed");
+          } finally {
+            verified.fill(0);
+          }
+          await tx.query(
+            "INSERT INTO vault_secrets(owner_id,id,purpose,key_version,envelope,created_at) VALUES($1,$2,'employer_password',1,$3,$4)",
+            [this.ownerId, secretId, JSON.stringify(envelope), this.now()],
+          );
+        } finally {
+          clear.fill(0);
+        }
+      }
+      const state = input.disposition === "verified_existing" ? "active" : "closed";
+      const updatedAt = this.now();
+      await tx.query(
+        "UPDATE employer_accounts SET state=$1,secret_id=$2,updated_at=$3 WHERE owner_id=$4 AND id=$5",
+        [state, secretId, updatedAt, this.ownerId, accountId],
+      );
+      await this.audit(
+        tx,
+        accountId,
+        "account.recovery_reviewed",
+        1,
+        {
+          disposition: input.disposition,
+          evidenceSha256: input.evidenceSha256,
+          reviewedAt: input.reviewedAt,
+          verification: "owner_attestation",
+          credentialReplaced: secretId ? 1 : 0,
+        },
+        actor,
+      );
+      return accountFrom({ ...row, state, secret_id: secretId, updated_at: updatedAt });
+    });
   }
 
   private async assertOperational(tx: SqlExecutor) {

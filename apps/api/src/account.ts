@@ -9,6 +9,7 @@ import {
 import type { Config } from "../../../packages/config/src/index.js";
 import {
   accountPrepareInputSchema,
+  accountRecoveryInputSchema,
   accountSignupInputSchema,
 } from "../../../packages/contracts/src/account.js";
 import { DomainError, idSchema } from "../../../packages/contracts/src/index.js";
@@ -42,6 +43,20 @@ export async function accountRoutes(
   app.post("/v1/accounts", async (bodyRequest) => {
     const input = accountPrepareInputSchema.parse(bodyRequest.body);
     return registry().prepare(input);
+  });
+
+  app.post("/v1/accounts/:id/recovery", async (request_) => {
+    if (config.profile !== "local")
+      throw new DomainError(
+        "CONFIG_INVALID",
+        "Recovery review requires the private Windows local profile.",
+      );
+    const { id } = z.object({ id: idSchema }).parse(request_.params);
+    return registry().recover(
+      id,
+      accountRecoveryInputSchema.parse(request_.body),
+      `owner:${repository.ownerId}`,
+    );
   });
 
   app.post("/v1/accounts/:id/signup", async (request_) => {

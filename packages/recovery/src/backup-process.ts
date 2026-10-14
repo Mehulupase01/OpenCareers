@@ -24,6 +24,7 @@ const responseSchema = z.union([
       dataDir: z.string(),
       runId: z.uuid(),
       restoreBlocked: z.literal(true),
+      rekeyed: z.boolean(),
       files: z.number().int().positive(),
     })
     .strict(),

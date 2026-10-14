@@ -34,6 +34,7 @@ import {
   MAX_STORED_DOCUMENT_BYTES,
 } from "../../security/src/document-storage.js";
 import { VaultCipher, vaultBindingSchema, vaultEnvelopeSchema } from "../../security/src/vault.js";
+import { rekeyRestoredData } from "./restored-rekey.js";
 
 const MAX_FILES = 5000;
 const MAX_MANIFEST = 4 * 1024 * 1024;
@@ -84,8 +85,12 @@ const commonSchema = z
   })
   .strict();
 export const captureSchema = commonSchema.extend({ dataDir: z.string().min(1) }).strict();
-export const restoreSchema = commonSchema.extend({ archivePath: z.string().min(1) }).strict();
-type Inventory = Omit<FileRecord, "storedBytes" | "storedSha256">;
+export const restoreSchema = commonSchema
+  .extend({ archivePath: z.string().min(1), replacementVaultKey: z.string().min(1).optional() })
+  .strict();
+type Inventory = Omit<FileRecord, "storedBytes" | "storedSha256" | "kind"> & {
+  kind: "candidate_source" | "document_artifact";
+};
 const same = (a: string, b: string) =>
   process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 
@@ -453,6 +458,14 @@ export async function restoreSqliteBackup(raw: z.input<typeof restoreSchema>) {
   let directory: string | undefined, parent: string | undefined;
   try {
     if (input.backupKey === input.vaultKey) throw new Error("Backup and vault keys must differ");
+    if (input.replacementVaultKey !== undefined) {
+      if (
+        input.replacementVaultKey === input.vaultKey ||
+        input.replacementVaultKey === input.backupKey
+      )
+        throw new Error("Replacement key must be independent");
+      new VaultCipher(input.replacementVaultKey);
+    }
     const cipher = new BackupArchiveCipher(input.ownerId, input.backupKey);
     const archive = await canonical(input.archivePath, false);
     parent = await protectedBackupParent(input.destinationParent);
@@ -486,6 +499,18 @@ export async function restoreSqliteBackup(raw: z.input<typeof restoreSchema>) {
     )
       throw new Error("Database and document archive inventories differ");
     await validateDocuments(payload, documents, input.ownerId, input.vaultKey);
+    let rekeyedSecrets = 0;
+    if (input.replacementVaultKey) {
+      rekeyedSecrets = await rekeyRestoredData(
+        payload,
+        input.ownerId,
+        input.vaultKey,
+        input.replacementVaultKey,
+        documents,
+      );
+      inventory(databasePath, input.ownerId, input.replacementVaultKey, manifest.migrationVersion);
+      await validateDocuments(payload, documents, input.ownerId, input.replacementVaultKey);
+    }
     const database = manifest.files.find((entry) => entry.kind === "database");
     if (!database) throw new Error("Missing database identity");
     const db = await openSqlite(databasePath);
@@ -513,6 +538,8 @@ export async function restoreSqliteBackup(raw: z.input<typeof restoreSchema>) {
         runId,
         restoreBlocked: true,
         requiresExternalHistoryReview: true,
+        rekeyed: Boolean(input.replacementVaultKey),
+        rekeyedSecrets,
       }),
       { flag: "wx", mode: 0o600 },
     );
@@ -522,6 +549,7 @@ export async function restoreSqliteBackup(raw: z.input<typeof restoreSchema>) {
       runId,
       restoreBlocked: true as const,
       files: manifest.files.length,
+      rekeyed: Boolean(input.replacementVaultKey),
     };
   } catch {
     if (directory && parent) await cleanup(directory, parent);

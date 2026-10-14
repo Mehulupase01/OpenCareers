@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import {
   mkdir,
@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import yauzl from "yauzl";
 import { ZipFile } from "yazl";
 import { ArtifactStore } from "../../packages/documents/src/artifact-store.js";
@@ -24,12 +24,18 @@ import { type Database, openSqlite } from "../../packages/persistence/src/databa
 import { migrate, migrations } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
 import { runOfflineBackup } from "../../packages/recovery/src/backup-process.js";
+import { rekeyRestoredData } from "../../packages/recovery/src/restored-rekey.js";
 import {
   captureSqliteBackup,
   restoreSqliteBackup,
 } from "../../packages/recovery/src/sqlite-backup.js";
 import { BackupArchiveCipher } from "../../packages/security/src/backup-storage.js";
 import { DocumentStorage } from "../../packages/security/src/document-storage.js";
+import {
+  VaultCipher,
+  vaultBindingSchema,
+  vaultEnvelopeSchema,
+} from "../../packages/security/src/vault.js";
 
 const ownerId = "synthetic-backup-owner";
 const vaultKey = Buffer.alloc(32, 17).toString("base64");
@@ -112,6 +118,7 @@ beforeEach(async () => {
   await repo.setControl({ stopped: true });
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   await db?.close();
   if (root) await rm(root, { recursive: true, force: true });
 });
@@ -229,6 +236,169 @@ it("rejects wrong keys and wrong owners without publishing a restore target", as
   }
 });
 
+it("rekeys every vault purpose and both document kinds only in a fresh quarantined restore", async () => {
+  const oldVault = new VaultCipher(vaultKey),
+    replacementVaultKey = Buffer.alloc(32, 37).toString("base64");
+  for (const purpose of vaultBindingSchema.shape.purpose.options) {
+    const secretId = randomUUID(),
+      binding = { ownerId, secretId, purpose, keyVersion: 1 };
+    const envelope = oldVault.seal(Buffer.from(`synthetic-${purpose}`), binding);
+    await db.query(
+      "INSERT INTO vault_secrets(owner_id,id,purpose,key_version,envelope,created_at) VALUES($1,$2,$3,1,$4,$5)",
+      [ownerId, secretId, purpose, JSON.stringify(envelope), new Date().toISOString()],
+    );
+  }
+  const originalSecrets = await db.query(
+    "SELECT * FROM vault_secrets WHERE owner_id=$1 ORDER BY id",
+    [ownerId],
+  );
+  const originalSource = await readFile(sourcePath);
+  const captured = await capture(),
+    originalArchive = await readFile(captured.archivePath);
+  const restored = await restoreSqliteBackup({
+    ...common(),
+    archivePath: captured.archivePath,
+    destinationParent: restores,
+    replacementVaultKey,
+  });
+  expect(restored).toMatchObject({ rekeyed: true, restoreBlocked: true });
+  const nextVault = new VaultCipher(replacementVaultKey),
+    copy = await openSqlite(join(restored.dataDir, "opencareers.sqlite"));
+  try {
+    expect(await new Repository(copy, ownerId).getControl()).toMatchObject({
+      stopped: true,
+      restoreBlocked: true,
+      submissionsPaused: true,
+    });
+    const rows = await copy.query("SELECT * FROM vault_secrets WHERE owner_id=$1 ORDER BY id", [
+      ownerId,
+    ]);
+    expect(rows).toHaveLength(originalSecrets.length);
+    for (const row of rows) {
+      const old = originalSecrets.find((secret) => secret.id === row.id);
+      if (!old) throw new Error("Missing synthetic secret");
+      const oldBinding = vaultBindingSchema.parse({
+        ownerId,
+        secretId: old.id,
+        purpose: old.purpose,
+        keyVersion: old.key_version,
+      });
+      const nextBinding = { ...oldBinding, keyVersion: Number(old.key_version) + 1 };
+      expect(row.key_version).toBe(nextBinding.keyVersion);
+      expect(typeof row.rotated_at).toBe("string");
+      const before = oldVault.open(
+        vaultEnvelopeSchema.parse(JSON.parse(String(old.envelope))),
+        oldBinding,
+      );
+      const after = nextVault.open(
+        vaultEnvelopeSchema.parse(JSON.parse(String(row.envelope))),
+        nextBinding,
+      );
+      try {
+        expect(after.equals(before)).toBe(true);
+      } finally {
+        before.fill(0);
+        after.fill(0);
+      }
+      expect(() =>
+        oldVault.open(vaultEnvelopeSchema.parse(JSON.parse(String(row.envelope))), nextBinding),
+      ).toThrow();
+    }
+    const store = new ArtifactStore(
+      restored.dataDir,
+      new DocumentStorage(ownerId, "document_artifact", true, replacementVaultKey),
+    );
+    await store.initialize();
+    expect(await store.read(artifact.storageKey, artifact.sha256)).toEqual(artifactBytes);
+    const rekeyedSource = await readFile(
+      join(restored.dataDir, "candidate-sources", digest(ownerId), digest(sourceBytes)),
+    );
+    expect(
+      new DocumentStorage(ownerId, "candidate_source", true, replacementVaultKey).decode(
+        rekeyedSource,
+        digest(sourceBytes),
+      ),
+    ).toEqual(sourceBytes);
+    expect(() =>
+      new DocumentStorage(ownerId, "candidate_source", true, vaultKey).decode(
+        rekeyedSource,
+        digest(sourceBytes),
+      ),
+    ).toThrow();
+    const audit = await copy.query(
+      "SELECT payload FROM audit_events WHERE owner_id=$1 AND action='security.restored_storage_rekeyed'",
+      [ownerId],
+    );
+    expect(audit).toHaveLength(1);
+    expect(JSON.parse(String(audit[0]?.payload))).toEqual({
+      documents: 2,
+      secrets: originalSecrets.length,
+    });
+  } finally {
+    await copy.close();
+  }
+  expect(
+    await db.query("SELECT * FROM vault_secrets WHERE owner_id=$1 ORDER BY id", [ownerId]),
+  ).toEqual(originalSecrets);
+  expect(await readFile(sourcePath)).toEqual(originalSource);
+  expect(await readFile(captured.archivePath)).toEqual(originalArchive);
+  expect((await restore(captured.archivePath)).rekeyed).toBe(false);
+});
+
+it("discards an unpublished rekey failure after document writes without damaging the source or archive", async () => {
+  const captured = await capture(),
+    archive = await readFile(captured.archivePath),
+    source = await readFile(sourcePath);
+  const seal = VaultCipher.prototype.seal;
+  vi.spyOn(VaultCipher.prototype, "seal").mockImplementation(function (
+    this: VaultCipher,
+    plaintext,
+    binding,
+  ) {
+    if (binding.keyVersion === 2) throw new Error("Synthetic failure after document rekey");
+    return seal.call(this, plaintext, binding);
+  });
+  await expect(
+    restoreSqliteBackup({
+      ...common(),
+      archivePath: captured.archivePath,
+      destinationParent: restores,
+      replacementVaultKey: Buffer.alloc(32, 37).toString("base64"),
+    }),
+  ).rejects.toMatchObject({ code: "STORAGE_UNAVAILABLE" });
+  expect(await readdir(restores)).toEqual([]);
+  expect(await readFile(sourcePath)).toEqual(source);
+  expect(await readFile(captured.archivePath)).toEqual(archive);
+});
+
+it("refuses malformed or reused replacement keys before allocating a target", async () => {
+  const { archivePath } = await capture();
+  for (const replacementVaultKey of [
+    vaultKey,
+    backupKey,
+    "invalid",
+    Buffer.alloc(31).toString("base64"),
+  ]) {
+    await expect(
+      restoreSqliteBackup({
+        ...common(),
+        archivePath,
+        destinationParent: restores,
+        replacementVaultKey,
+      }),
+    ).rejects.toMatchObject({ code: "STORAGE_UNAVAILABLE" });
+    expect(await readdir(restores)).toEqual([]);
+  }
+});
+
+it("refuses direct rekey of the authoritative source directory", async () => {
+  const before = await readFile(sourcePath);
+  await expect(
+    rekeyRestoredData(dataDir, ownerId, vaultKey, Buffer.alloc(32, 37).toString("base64"), []),
+  ).rejects.toThrow("unpublished restore extraction");
+  expect(await readFile(sourcePath)).toEqual(before);
+});
+
 it("rejects altered headers, nonces, ciphertext, authentication tags, appended and truncated archives", async () => {
   const { archivePath } = await capture(),
     bytes = await readFile(archivePath);
@@ -339,6 +509,7 @@ it("uses the offline command with an explicit private config and never prints ei
       `AUTOPILOT_OWNER_TOKEN=${"synthetic-owner-token-".repeat(3)}`,
       `AUTOPILOT_VAULT_KEY=${vaultKey}`,
       `AUTOPILOT_BACKUP_KEY=${backupKey}`,
+      `AUTOPILOT_REPLACEMENT_VAULT_KEY=${Buffer.alloc(32, 37).toString("base64")}`,
     ].join("\n"),
   );
   const environment = Object.fromEntries(
@@ -371,10 +542,26 @@ it("uses the offline command with an explicit private config and never prints ei
     [...argumentsFor("restore", restores), "--archive", archivePath],
     options,
   );
-  expect(JSON.parse(restored.stdout)).toMatchObject({ restoreBlocked: true, files: 3 });
+  expect(JSON.parse(restored.stdout)).toMatchObject({
+    restoreBlocked: true,
+    files: 3,
+    rekeyed: false,
+  });
   expect(restored.stderr).toBe("");
   expect(restored.stdout).not.toContain(backupKey);
   expect(restored.stdout).not.toContain(vaultKey);
+  const rekeyed = await execute(
+    process.execPath,
+    [...argumentsFor("restore-rekey", restores), "--archive", archivePath],
+    options,
+  );
+  expect(JSON.parse(rekeyed.stdout)).toMatchObject({
+    restoreBlocked: true,
+    rekeyed: true,
+    files: 3,
+  });
+  expect(rekeyed.stderr).toBe("");
+  expect(rekeyed.stdout).not.toContain(Buffer.alloc(32, 37).toString("base64"));
 }, 30000);
 
 async function rewriteArchive(

@@ -1810,9 +1810,14 @@
             "docs/evidence/ENCRYPTION-RESTORE.md",
             "tests/integration/restore.test.ts",
             "docs/evidence/P15-sqlite-snapshot-foundation.md",
-            "tests/integration/sqlite-snapshot.test.ts"
+            "tests/integration/sqlite-snapshot.test.ts",
+            "docs/evidence/P15-Windows-backup.md",
+            "docs/evidence/P15-Windows-rekey-recovery.md",
+            "tests/integration/sqlite-backup.test.ts",
+            "tests/integration/account-recovery.test.ts",
+            "tests/integration/account-api.test.ts"
           ],
-          "nextAction": "Windows encrypted archive/restore and immutable review-gap boundary are verified. Finish reviewed account recovery, vault rekey, credential rotation and interruption/reboot drills. New PostgreSQL/server expansion is deferred by the owner's Windows-only instruction; no phase closure."
+          "nextAction": "Windows archive restore, fresh-copy vault/document rekey and reviewed account recovery are implemented. Complete remote provider rotation/revocation, nested/legacy restore handling, parent/OS interruption and reboot drills. New PostgreSQL/server expansion remains deferred; no phase closure."
         },
         {
           "id": "P15-04",

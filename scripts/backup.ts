@@ -18,7 +18,7 @@ try {
   });
   if (
     positionals.length !== 1 ||
-    !["capture", "restore"].includes(positionals[0] ?? "") ||
+    !["capture", "restore", "restore-rekey"].includes(positionals[0] ?? "") ||
     !values.destination ||
     !isAbsolute(values.destination) ||
     !values["confirm-offline"] ||
@@ -59,18 +59,26 @@ try {
   } else {
     if (!values.archive || !isAbsolute(values.archive))
       throw new Error("Restore requires an absolute archive");
+    const replacementVaultKey =
+      positionals[0] === "restore-rekey" ? process.env.AUTOPILOT_REPLACEMENT_VAULT_KEY : undefined;
+    if (positionals[0] === "restore-rekey" && !replacementVaultKey)
+      throw new Error("Replacement vault key is required");
     console.log(
       JSON.stringify(
         await runOfflineBackup({
           operation: "restore",
-          input: { ...input, archivePath: values.archive },
+          input: {
+            ...input,
+            archivePath: values.archive,
+            ...(replacementVaultKey ? { replacementVaultKey } : {}),
+          },
         }),
       ),
     );
   }
 } catch {
   console.error(
-    "Offline backup failed. Use capture/restore, an absolute --destination, both --confirm-offline --confirm-protected-destination, a private local config and separately recoverable AUTOPILOT_BACKUP_KEY/vault keys. No runtime was started or resumed.",
+    "Offline backup failed. Use capture/restore/restore-rekey, an absolute --destination, both --confirm-offline --confirm-protected-destination, a private local config and separately recoverable backup/vault keys. Rekey also requires AUTOPILOT_REPLACEMENT_VAULT_KEY. No runtime was started or resumed.",
   );
   process.exitCode = 1;
 }

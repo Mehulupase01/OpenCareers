@@ -1,4 +1,76 @@
 import { expect, test } from "@playwright/test";
+import type { EmployerAccount } from "../../packages/contracts/src/account.js";
+
+test("locked-account recovery collects an explicit review and clears replacement credentials", async ({
+  page,
+}, info) => {
+  test.setTimeout(60000);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const origin = "https://careers.owner-reviewed-synthetic-employer.example";
+  let account: EmployerAccount = {
+    id: "2e7242ca-9819-471f-a66c-c14856b4cf69",
+    candidateId: "synthetic-candidate",
+    employerOrigin: origin,
+    adapterId: "synthetic-signup",
+    identityEmailHash: "a".repeat(64),
+    state: "locked",
+    hasCredential: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const reviews: Record<string, unknown>[] = [];
+  await page.route("**/v1/accounts", (route) => route.fulfill({ json: [account] }));
+  await page.route(`**/v1/accounts/${account.id}/recovery`, async (route) => {
+    const input = route.request().postDataJSON();
+    reviews.push(input);
+    account = {
+      ...account,
+      state: input.disposition === "closed" ? "closed" : "active",
+      hasCredential: input.disposition !== "closed",
+      updatedAt: new Date().toISOString(),
+    };
+    await route.fulfill({ json: account });
+  });
+  await page.goto("/");
+  await expect(page.getByText("No real applications submitted")).toBeVisible({ timeout: 30000 });
+  await page.getByRole("button", { name: "Documents", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Employer accounts" });
+  const row = panel.locator(".account-list li").filter({ hasText: origin });
+  await row.getByRole("button", { name: "Review recovery" }).click();
+  const form = panel.getByRole("group", { name: "Recovery review" });
+  await form.getByLabel("Verified identity email").fill("candidate@example.test");
+  await form.getByLabel("Verified replacement password").fill("synthetic-replacement-password");
+  await form.getByLabel("Review evidence SHA-256").fill("b".repeat(64));
+  await expect(form.getByRole("button", { name: "Record review" })).toBeDisabled();
+  await form.getByLabel("Existing account and replacement credential verified").check();
+  await form.screenshot({ path: `test-results/P15-account-recovery-${info.project.name}.png` });
+  await form.getByRole("button", { name: "Record review" }).click();
+  await expect(row).toHaveAttribute("data-account-state", "active");
+  await expect(form).toHaveCount(0);
+  expect(reviews[0]).toMatchObject({
+    disposition: "verified_existing",
+    employerOrigin: origin,
+    adapterId: "synthetic-signup",
+    existingAccountAndReplacementCredentialVerified: true,
+  });
+  expect(await page.locator("body").innerText()).not.toContain("synthetic-replacement-password");
+  account = { ...account, state: "locked", updatedAt: new Date().toISOString() };
+  await panel.getByRole("button", { name: "Refresh", exact: true }).click();
+  await row.getByRole("button", { name: "Review recovery" }).click();
+  await form.getByLabel("Disposition").selectOption("closed");
+  await expect(form.getByLabel("Verified replacement password")).toHaveCount(0);
+  await form.getByLabel("Review evidence SHA-256").fill("c".repeat(64));
+  await form.getByLabel("Permanently disable this local account").check();
+  await form.getByRole("button", { name: "Record review" }).click();
+  await expect(row).toHaveAttribute("data-account-state", "closed");
+  expect(reviews[1]).toMatchObject({ disposition: "closed", closePermanently: true });
+  expect(reviews[1]).not.toHaveProperty("replacementPassword");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  expect(errors).toEqual([]);
+});
 
 test("employer accounts prepare locally and refuse an external dispatch until authorized", async ({
   page,

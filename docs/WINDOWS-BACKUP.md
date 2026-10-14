@@ -67,8 +67,39 @@ is an attestation, not independent proof of mailbox completeness.
 
 Review release leaves submissions paused. Employer accounts remain locked, Gmail
 requires fresh consent, source sessions remain revoked, and old signup/verification
-handles cannot replay. Reviewed account unlocking is not yet implemented. Nothing
-automatically chooses a vacancy, submits or resumes processing.
+handles cannot replay. After global review, use Employer Accounts > Review recovery
+to disable a locked account locally or record an owner-verified existing account
+with its exact identity and a verified replacement credential. The local review is
+an owner attestation, not a live login or independently verified employer receipt.
+It makes no employer request, does not delete the remote account, and does not
+settle/replay the prior signup. Global
+Stop can remain enabled; nothing automatically submits or resumes processing.
+
+## Rotate The Local Vault And Document Key
+
+Configure a NEW canonical base64 32-byte `AUTOPILOT_REPLACEMENT_VAULT_KEY` in private
+config, distinct from both old vault and backup keys. Preserve the old keys to
+recover historical archives. Use the existing verified archive:
+
+```powershell
+node dist/scripts/backup.js restore-rekey --config C:\Private\opencareers.env --archive C:\Private\Backups\generated\backup.ocb --destination C:\Private\RestoreTargets --confirm-offline --confirm-protected-destination
+```
+
+Only the fresh unpublished restore copy is rekeyed. Source/artifact plaintext hashes,
+sizes and IDs stay unchanged. Existing vault envelopes receive fresh nonces and
+incremented per-secret binding versions. Every document and secret is checked with
+the replacement key before quarantine/publication. Failure discards the unpublished
+copy; the original source/archive remains recoverable under its original keys.
+Normal `restore` ignores a configured replacement key; rekey requires the explicit
+`restore-rekey` command. Successful output records `rekeyed: true`, never the key.
+
+Activate only after separately reviewing the restored copy: set BOTH the returned
+`dataDir` and replacement `AUTOPILOT_VAULT_KEY` together. Do not apply the new key to
+the original data directory. No config/key is rewritten automatically. Rekey does
+NOT change archive encryption, revoke remote OAuth tokens/cookies/passwords, rotate
+OpenRouter credentials or securely erase old secrets. Perform provider revocation
+separately if a key or credential may have been disclosed. Application review and
+Gmail/source-session fences remain in force after rekey.
 
 ## Bounds And Interruptions
 
@@ -87,6 +118,6 @@ incomplete job. Preserve the source/archive, inspect offline and retry into a NE
 directory. SSD deletion is not secure erasure. Capture refuses a database already
 containing an open restore review: complete that review first. Archives with an open
 review also fail closed rather than silently replace the prior quarantine. Nested
-recovery remains a separate workflow. Vault rekey, credential rotation, Windows reboot/recovery drills
+recovery remains a separate workflow. Remote credential revocation/rotation and Windows reboot/recovery drills
 and qualifying 24/72-hour soaks remain separate requirements. Synthetic tests are
 not private recovery evidence.

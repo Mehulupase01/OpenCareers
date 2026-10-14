@@ -9,6 +9,7 @@ import { startMockAts } from "../../packages/mock-ats/src/server.js";
 import { openSqlite } from "../../packages/persistence/src/database.js";
 import { migrate } from "../../packages/persistence/src/migrations.js";
 import { Repository } from "../../packages/persistence/src/repository.js";
+import { RestoreRepository } from "../../packages/persistence/src/restore-repository.js";
 
 const VAULT_KEY = Buffer.alloc(32, 23).toString("base64");
 const IDENTITY_EMAIL = "candidate@example.test";
@@ -111,6 +112,71 @@ const serverTruth = async (mock: Awaited<ReturnType<typeof startMockAts>>) =>
   };
 
 describe("employer account API", () => {
+  it("authenticates scoped recovery, seals the replacement and sends no employer request", async () => {
+    const { app, db, headers, repository, mock, candidateId } = await setup();
+    const prepared = await prepare(app, headers, {
+      candidateId,
+      employerOrigin: mock.url,
+      adapterId: "synthetic-signup",
+      identityEmail: IDENTITY_EMAIL,
+    });
+    const account = prepared.json();
+    const recovery = new RestoreRepository(db, repository.ownerId),
+      run = await recovery.block("a".repeat(64));
+    await recovery.release(run, `owner:${repository.ownerId}`, {
+      externalHistoryReviewedAndImported: true,
+      evidenceSha256: "b".repeat(64),
+      from: "2020-01-01T00:00:00.000Z",
+      through: new Date().toISOString(),
+    });
+    const locked = (await app.inject({ url: "/v1/accounts", headers })).json()[0];
+    const password = "synthetic-owner-verified-replacement";
+    const payload = {
+      disposition: "verified_existing",
+      expectedUpdatedAt: locked.updatedAt,
+      reviewedAt: new Date().toISOString(),
+      evidenceSha256: "c".repeat(64),
+      employerOrigin: mock.url,
+      adapterId: "synthetic-signup",
+      identityEmail: IDENTITY_EMAIL,
+      replacementPassword: password,
+      existingAccountAndReplacementCredentialVerified: true,
+    };
+    const url = `/v1/accounts/${account.id}/recovery`;
+    expect(
+      (await app.inject({ method: "POST", url, headers: { ...headers, cookie: "" }, payload }))
+        .statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url,
+          headers: { ...headers, origin: "https://untrusted.example" },
+          payload,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url,
+          headers,
+          payload: { ...payload, existingAccountAndReplacementCredentialVerified: false },
+        })
+      ).statusCode,
+    ).toBe(400);
+    const response = await app.inject({ method: "POST", url, headers, payload });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ state: "active", hasCredential: true });
+    expect(response.body).not.toContain(password);
+    expect(JSON.stringify(await db.query("SELECT envelope FROM vault_secrets"))).not.toContain(
+      password,
+    );
+    expect((await app.inject({ method: "POST", url, headers, payload })).statusCode).toBe(409);
+    expect((await serverTruth(mock)).signupCount).toBe(0);
+  });
   it("requires owner authentication and never returns credential material", async () => {
     const { app, headers, mock, candidateId } = await setup();
     expect(

@@ -2213,3 +2213,43 @@ not silently "supported". Protected plaintext staging needs reviewed Windows ACL
 and encrypted disk; a parent/OS crash can leave staging, and deletion is not secure
 erasure. Current source requires a new column on activation; private source was NOT
 migrated. The archive command supports the prior schema without source mutation.
+
+## 2026-10-14: Fresh-Copy Rekey And Owner Account Review
+
+Prior a490251 backup workflow CI38530880216 passes Windows, Ubuntu, PostgreSQL and
+server-image. Windows-only delivery remains current; no Android/server expansion.
+This checkpoint closes no new gate/phase:12/19 and98/128 remain honest totals.
+
+Explicit `backup restore-rekey` accepts AUTOPILOT_REPLACEMENT_VAULT_KEY only for a
+fresh unpublished archive restore. Both document kinds and all vault-secret purposes
+are rewrapped/self-verified, preserving plaintext identities; per-secret versions
+increase and counts-only audit records rotation. Source/config/archive are untouched.
+Failure after document writes discards the unpublished copy. New-key verification
+and ordinary restore quarantine precede publication. Normal restore does not rekey
+merely because the environment setting exists. Activation requires separately
+reviewing the fresh dataDir and new vault key together; no source migration or
+automatic config switch occurs. Remote credentials are NOT revoked by local rekey.
+
+Private local owner-authenticated recovery API/UI supports exact-identity existing
+account review with a verified replacement password, or local disabling. Global
+external-history restore review must finish first. Owner/tenant, fresh post-lock
+review time, expected updatedAt/state and evidence hash are enforced transactionally.
+New credentials are sealed; old signup UNKNOWN history is retained, never replayed
+or falsely confirmed. Local disable does not delete the remote account. Owner
+attestation is not independent login/receipt proof. Global Stop can remain set.
+
+Focused44 passed /16 PostgreSQL skipped, five files. Full check858 /283 skipped,
+106 passing files /two skipped in300.04s; lint/types/ledger/build pass. Full browser
+suite72/72 in4.4m. Final LOCAL-disable label clarification reverified4/4 account UI
+cases in20.2s and production build; core/full-suite results precede only that copy
+change. Desktop/narrow screenshots visually inspected without overflow/overlap.
+Separate COMPILED CLI smoke verifies rekey + artifact + vault version2 + owner
+review while stopped/submissionsPaused remain true. All data/keys synthetic; no
+private data/config/service/employer/LLM action. See P15-Windows-rekey-recovery.md.
+
+Remaining Windows recovery work: provider revocation/credential-rotation drills,
+nested open-restore and legacy raw-marker boundary handling, parent/OS interruption
+and physical reboot/BSOD proof. Then complete the full commit-boundary crash matrix,
+qualifying24/72-hour stable-build soaks and broader Windows source/portal readiness.
+Do not call rekey remote revocation, owner review an employer receipt, browser
+viewport tests an Android implementation, or the prior stopped5-hour trace a soak.

@@ -1,4 +1,4 @@
-import { KeyRound, RefreshCw, UserPlus } from "lucide-react";
+import { Check, KeyRound, RefreshCw, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { EmployerAccount } from "../../../packages/contracts/src/account.js";
 import { request } from "./api.js";
@@ -6,11 +6,11 @@ import { request } from "./api.js";
 const stateWords: Record<EmployerAccount["state"], string> = {
   prepared: "Credentials stored, signup not dispatched",
   signup_in_flight: "Signup dispatched, outcome unknown",
-  active: "Signed in",
+  active: "Account confirmed",
   unknown: "Outcome unknown - not retried automatically",
   needs_verification: "Awaiting employer email verification",
   locked: "Locked",
-  closed: "Closed",
+  closed: "Disabled locally",
 };
 
 export function AccountsPanel() {
@@ -22,6 +22,57 @@ export function AccountsPanel() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [recovery, setRecovery] = useState<EmployerAccount | null>(null);
+  const [disposition, setDisposition] = useState<"verified_existing" | "closed">(
+    "verified_existing",
+  );
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [replacementPassword, setReplacementPassword] = useState("");
+  const [evidenceSha256, setEvidenceSha256] = useState("");
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+
+  const clearRecovery = () => {
+    setRecovery(null);
+    setRecoveryEmail("");
+    setReplacementPassword("");
+    setEvidenceSha256("");
+    setReviewConfirmed(false);
+  };
+  const recordRecovery = async () => {
+    if (!recovery) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const common = {
+        expectedUpdatedAt: recovery.updatedAt,
+        reviewedAt: new Date().toISOString(),
+        evidenceSha256,
+      };
+      await request(
+        `/v1/accounts/${recovery.id}/recovery`,
+        disposition === "closed"
+          ? { ...common, disposition, closePermanently: reviewConfirmed }
+          : {
+              ...common,
+              disposition,
+              employerOrigin: recovery.employerOrigin,
+              adapterId: recovery.adapterId,
+              identityEmail: recoveryEmail,
+              replacementPassword,
+              existingAccountAndReplacementCredentialVerified: reviewConfirmed,
+            },
+      );
+      clearRecovery();
+      await refresh();
+      setNotice("Account recovery review recorded.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Account recovery failed.");
+    } finally {
+      setReplacementPassword("");
+      setBusy(false);
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -99,7 +150,14 @@ export function AccountsPanel() {
           <KeyRound size={18} aria-hidden="true" />
           <h2 id="accounts-heading">Employer accounts</h2>
         </div>
-        <button type="button" onClick={() => void refresh()} disabled={busy}>
+        <button
+          type="button"
+          onClick={() => {
+            clearRecovery();
+            void refresh();
+          }}
+          disabled={busy}
+        >
           <RefreshCw size={16} aria-hidden="true" /> Refresh
         </button>
       </div>
@@ -130,16 +188,109 @@ export function AccountsPanel() {
                   {account.updatedAt.slice(0, 10)}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void dispatch(account)}
-                disabled={busy || account.state !== "prepared"}
-              >
-                <UserPlus size={16} aria-hidden="true" /> Create the account
-              </button>
+              {account.state === "locked" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    clearRecovery();
+                    setDisposition("verified_existing");
+                    setRecovery(account);
+                  }}
+                >
+                  <KeyRound size={16} aria-hidden="true" /> Review recovery
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void dispatch(account)}
+                  disabled={busy || account.state !== "prepared"}
+                >
+                  <UserPlus size={16} aria-hidden="true" /> Create the account
+                </button>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {recovery && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void recordRecovery();
+          }}
+        >
+          <fieldset className="account-form" disabled={busy}>
+            <legend>Recovery review</legend>
+            <p className="account-state">{recovery.employerOrigin}</p>
+            <label htmlFor="recovery-disposition">Disposition</label>
+            <select
+              id="recovery-disposition"
+              value={disposition}
+              onChange={(event) => {
+                setDisposition(event.target.value as "verified_existing" | "closed");
+                setReplacementPassword("");
+                setReviewConfirmed(false);
+              }}
+            >
+              <option value="verified_existing">Existing account verified</option>
+              <option value="closed">Disable account locally</option>
+            </select>
+            {disposition === "verified_existing" && (
+              <>
+                <label htmlFor="recovery-email">Verified identity email</label>
+                <input
+                  id="recovery-email"
+                  type="email"
+                  required
+                  value={recoveryEmail}
+                  onChange={(event) => setRecoveryEmail(event.target.value)}
+                  autoComplete="off"
+                />
+                <label htmlFor="recovery-password">Verified replacement password</label>
+                <input
+                  id="recovery-password"
+                  type="password"
+                  required
+                  minLength={12}
+                  maxLength={1024}
+                  value={replacementPassword}
+                  onChange={(event) => setReplacementPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+              </>
+            )}
+            <label htmlFor="recovery-evidence">Review evidence SHA-256</label>
+            <input
+              id="recovery-evidence"
+              required
+              pattern="[a-f0-9]{64}"
+              maxLength={64}
+              value={evidenceSha256}
+              onChange={(event) => setEvidenceSha256(event.target.value)}
+              autoComplete="off"
+            />
+            <label className="account-recovery-confirm">
+              <input
+                type="checkbox"
+                required
+                checked={reviewConfirmed}
+                onChange={(event) => setReviewConfirmed(event.target.checked)}
+              />
+              {disposition === "closed"
+                ? "Permanently disable this local account"
+                : "Existing account and replacement credential verified"}
+            </label>
+            <div className="account-recovery-actions">
+              <button type="submit" disabled={!reviewConfirmed}>
+                <Check size={16} aria-hidden="true" /> Record review
+              </button>
+              <button type="button" onClick={clearRecovery}>
+                <X size={16} aria-hidden="true" /> Cancel
+              </button>
+            </div>
+          </fieldset>
+        </form>
       )}
       <fieldset className="account-form">
         <legend>Prepare an employer account</legend>
