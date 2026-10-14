@@ -1800,12 +1800,13 @@
           "acceptanceTests": ["T26", "T28", "T29"],
           "evidence": [
             "docs/evidence/P15-Windows-commit-crash.md",
+            "docs/evidence/P15-Windows-transaction-crash.md",
             "tests/integration/commit-crash.test.ts",
             "tests/integration/release-recovery.test.ts",
             "tests/integration/durability.test.ts",
             "tests/integration/concurrency.test.ts"
           ],
-          "nextAction": "Six owned process-kill boundaries now verify receipt/attempt fencing and redelivery. Complete the integrated network/duplicate-worker/expiry matrix, unexpected active-browser/transaction kill coverage and Windows power-loss/reboot evidence; cleanup-then-kill and logical clock expiry are explicitly scoped, not full gate closure."
+          "nextAction": "Eight owned process-kill boundaries include real open SQLite intent/receipt transactions before COMMIT, cold-state rollback and redelivery fencing. Complete the integrated outage/duplicate-worker/fairness matrix, active-browser/native-COMMIT interruption and Windows power-loss/reboot evidence. Logical clock expiry and browser-cleanup-first remain explicit limits, not full gate closure."
         },
         {
           "id": "P15-03",
@@ -1866,6 +1867,7 @@
           "status": "in_progress",
           "evidence": [
             "docs/evidence/P15-Windows-commit-crash.md",
+            "docs/evidence/P15-Windows-transaction-crash.md",
             "tests/integration/commit-crash.test.ts",
             "tests/integration/release-recovery.test.ts"
           ]

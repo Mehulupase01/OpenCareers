@@ -36,10 +36,12 @@ export const capacityScenarios = [
 export type CapacityScenario = (typeof capacityScenarios)[number];
 export const commitCrashBoundaries = [
   "claimed_before_intent",
+  "intent_transaction_open",
   "intent_before_dispatch",
   "authorized_without_click",
   "accepted_before_receipt",
   "receipt_write_failed",
+  "receipt_transaction_open",
   "receipt_before_task_complete",
 ] as const;
 export type CommitCrashBoundary = (typeof commitCrashBoundaries)[number];

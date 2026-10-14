@@ -2351,3 +2351,36 @@ download inventory, license clearance, publisher signature or full external sche
 validation. No private config/data, employer/mail/model request, startup task or
 physical reboot was used. Next fault milestone: genuine open-SQLite-transaction
 worker kills before intent/receipt commit, retaining one existing submission engine.
+
+## 2026-10-14: Genuine Open-Transaction Process Kills
+
+Continued beyond the SBOM commit6d47017. The same installed commit-crash command
+now executes eight owned child kills, including two inside real open SQLite write
+transactions. Only the fresh-owned synthetic worker wraps Database/SqlExecutor;
+production persistence/submission contracts have no injected hooks. Real statements
+run through the existing transaction implementation. After the complete guarded
+intent/receipt operation, before its callback returns for COMMIT, staged rows are
+read in that transaction, attested via owned IPC and the process is SIGKILLed.
+
+Parent validates IPC/staged counts/actual exit and cold-reopens. quick_check and
+foreign_key_check pass. Intent rollback leaves READY with zero intents/attempts/
+receipts and only then permits a new lease/fence. Receipt rollback leaves IN_FLIGHT
+with one durable intent/attempt and no receipt; existing read-only reconciliation
+finds the accepted mock record and confirms exactly once. Eight cases produce four
+accepted/receipted records, two needs-review and two retryable pre-intent cases;
+distinct-key redelivery/repeated worker claims create no duplicate record.
+
+Focused eight-boundary proof44.59s. Final frozen check870 /285 local skips,109
+passing files /two skipped in328.22s; lint/types/ledger/build/native SBOM generation
+pass. Separate COMPILED Node command passes all eight kills and exact cold-state
+counts. Its JSON is retained at TEMP/opencareers-transaction-crash-compiled.json;
+owned synthetic traces remain for inspection. No private data/config, employer,
+mail/model, startup-task or OS-reboot action. Existing frontend76/76 and fresh
+Windows install142.02s evidence precede only these synthetic crash-driver changes;
+the new installed command itself was independently run without TSX/Codex.
+
+Read P15-Windows-transaction-crash.md: open-transaction kill is NOT interruption
+inside SQLite's native COMMIT critical section, disk power loss, a live Chromium
+click, actual lease passage or a qualifying soak. Full outage/worker/fairness,
+active-browser/native-COMMIT, provider revocation and physical Windows recovery
+scope remain. P15-02/G2 stay in_progress; phases12/19 and gates98/128 unchanged.

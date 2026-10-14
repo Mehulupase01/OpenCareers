@@ -127,9 +127,12 @@ checkpoint; it does not solve real challenges or submit the challenge fixture.
 It accepts no options and ignores private configuration. This is not a physical
 reboot, production deployment, live application or qualifying soak.
 
-Run node dist/scripts/commit-crash.js for six additional owned mock process-kill
+Run node dist/scripts/commit-crash.js for eight additional owned mock process-kill
 boundaries spanning claim, intent, authorization and receipt persistence. It checks
 redelivery fencing and receipt-write rollback without another employer record.
+Two boundaries kill during real open SQLite write transactions before intent or
+receipt COMMIT; cold reopening verifies rollback and consistency. These are not
+physical interruption inside SQLite's native COMMIT or power loss.
 Lease expiry uses a declared logical clock; the earlier recovery self-test covers
 actual elapsed expiry. Browsers close before these process kills. The authorized
 pre-click case injects a callback error first; this is not a physical Chromium kill,

@@ -44,7 +44,18 @@ async function killAtBoundary(directory: string, boundary: CommitCrashBoundary) 
         !("boundary" in message) ||
         message.boundary !== boundary ||
         !("browserResourcesReleased" in message) ||
-        message.browserResourcesReleased !== true
+        message.browserResourcesReleased !== true ||
+        !("writeTransactionOpen" in message) ||
+        message.writeTransactionOpen !==
+          ["intent_transaction_open", "receipt_transaction_open"].includes(boundary) ||
+        (["intent_transaction_open", "receipt_transaction_open"].includes(boundary) &&
+          (!("staged" in message) ||
+            typeof message.staged !== "object" ||
+            message.staged === null ||
+            !("attempts" in message.staged) ||
+            message.staged.attempts !== 1 ||
+            !("receipts" in message.staged) ||
+            message.staged.receipts !== (boundary === "receipt_transaction_open" ? 1 : 0)))
       )
         failed = true;
       else reached = true;
@@ -65,6 +76,11 @@ async function recoverCase(directory: string, boundary: CommitCrashBoundary) {
   try {
     const db = connected.db,
       owner = connected.ownerId;
+    if (
+      (await db.query("PRAGMA quick_check"))[0]?.quick_check !== "ok" ||
+      (await db.query("PRAGMA foreign_key_check")).length
+    )
+      throw new Error("The interrupted database failed consistency checks");
     const task = (
       await db.query("SELECT * FROM tasks WHERE owner_id=$1 AND type='submit' AND state='leased'", [
         owner,
@@ -86,20 +102,32 @@ async function recoverCase(directory: string, boundary: CommitCrashBoundary) {
     const attemptsBefore = Number(
       (await db.query("SELECT COUNT(*) AS n FROM attempts WHERE owner_id=$1", [owner]))[0]?.n,
     );
+    const intentsBefore = Number(
+      (await db.query("SELECT COUNT(*) AS n FROM intents WHERE owner_id=$1", [owner]))[0]?.n,
+    );
+    if (
+      boundary === "receipt_transaction_open" &&
+      (app.state !== "IN_FLIGHT" || receiptBefore !== 0)
+    )
+      throw new Error("Uncommitted receipt state escaped its rolled-back transaction");
     const retry = await repository.claim("crash-replacement", ["submit"]);
     let outcome: string;
-    if (boundary === "claimed_before_intent") {
+    if (["claimed_before_intent", "intent_transaction_open"].includes(boundary)) {
       if (
         !retry ||
         retry.applicationId !== app.id ||
         retry.fence <= Number(task.fence) ||
         attemptsBefore !== 0 ||
+        intentsBefore !== 0 ||
+        app.state !== "READY" ||
         receiptBefore !== 0
       )
         throw new Error("Pre-intent crash did not preserve retryable work");
       outcome = "retryable_before_intent";
     } else {
       if (retry) throw new Error("A recorded final-action intent was replayed");
+      if (intentsBefore !== 1 || attemptsBefore !== 1)
+        throw new Error("Durable intent and attempt lost their atomic binding");
       if (boundary === "receipt_before_task_complete") {
         if (receiptBefore !== 1 || app.state !== "CONFIRMED")
           throw new Error("Committed receipt was lost");
@@ -127,7 +155,11 @@ async function recoverCase(directory: string, boundary: CommitCrashBoundary) {
           evidence,
         );
         await repository.complete(reconcile);
-        const accepted = ["accepted_before_receipt", "receipt_write_failed"].includes(boundary);
+        const accepted = [
+          "accepted_before_receipt",
+          "receipt_write_failed",
+          "receipt_transaction_open",
+        ].includes(boundary);
         if (outcome !== (accepted ? "confirmed" : "needs_review"))
           throw new Error("Missing receipts were invented or accepted records were lost");
       }
@@ -161,6 +193,7 @@ async function recoverCase(directory: string, boundary: CommitCrashBoundary) {
     const accepted = [
       "accepted_before_receipt",
       "receipt_write_failed",
+      "receipt_transaction_open",
       "receipt_before_task_complete",
     ].includes(boundary);
     if (
@@ -194,8 +227,14 @@ async function recoverCase(directory: string, boundary: CommitCrashBoundary) {
       boundary,
       workerKilled: true,
       browserResourcesReleasedBeforeKill: true,
+      writeTransactionInterrupted: ["intent_transaction_open", "receipt_transaction_open"].includes(
+        boundary,
+      ),
+      databaseConsistencyVerified: true,
+      applicationStateBeforeRecovery: app.state,
       outcome,
       attempts: attemptsBefore,
+      intents: intentsBefore,
       acceptedMockRecords: records.length,
       receipts,
       duplicateRecords: 0,

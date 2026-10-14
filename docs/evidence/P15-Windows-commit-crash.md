@@ -1,5 +1,10 @@
 # Windows Owned Commit Crash Matrix
 
+Historical six-boundary checkpoint. The command now covers eight boundaries;
+`P15-Windows-transaction-crash.md` records the later real open-transaction kills
+and exact remaining limits. The original results below are not rewritten as new
+evidence or physical power-loss proof.
+
 2026-10-14. Synthetic SQLite/mock-ATS process-kill evidence, not a private employer
 submission, physical reboot or qualifying soak. Phase counts stay12/19 and98/128.
 
