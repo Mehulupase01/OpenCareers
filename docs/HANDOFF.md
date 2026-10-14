@@ -2283,3 +2283,37 @@ injects a callback exception before cleanup/kill. Receipt-write failure rolls ba
 before kill. Unexpected live-Chromium/transaction kills, the complete outage/worker/
 queue matrix, physical Windows reboot/power-loss and actual24/72-hour soaks remain.
 Do not combine this logical-clock proof with resource traces or treat it as a soak.
+
+## 2026-10-14: Fail-Closed Legacy Restore And Windows Owner Review
+
+3c9d637 CI38535777122 passes all four lanes including Windows. Legacy raw-checksum
+restores now refuse release without a known capture boundary; restore startup is
+no longer substituted. An authenticated strict-body owner review can bind an
+immutable conservative LOWER bound to the exact open run/snapshot and evidence
+hash. The backup must be captured AT OR AFTER the bound; reviewed external history
+must start AT OR BEFORE it. Future/post-start bounds, replacement/replay, foreign
+runs and malformed persisted dates fail. This is explicit owner attestation, not
+independent backup provenance or mailbox completeness.
+
+Controls > Backup recovery now provides run history, legacy boundary verification,
+per-application receipt/quarantine review and final external-history release. Missing
+boundary/pending reviews disable release. Refused receipt evidence remains an error,
+never a local success. Completed runs are read-only in this screen; existing receipt
+upgrades after completion remain API-supported. Quarantined applications still cannot
+replay and release keeps processing/submissions paused. No private runtime activation,
+schema migration, employer/mail/model request or credential change occurred.
+
+Final full tests861 /285 local skips,107 passing files /two skipped in337.27s;
+lint/types/ledger pass. Redirected PowerShell wrapper reported nonzero despite
+completed stages; a separate production build with explicit native exit propagation
+passes. Existing lint/chunk warnings remain. Full browser76/76 in5.3m; four new
+legacy/archive desktop/narrow cases and screenshots verified. Initial test locator
+and startup-contention failures were corrected/rerun, not counted as passing runs.
+See P15-Windows-restore-review.md and WINDOWS-BACKUP.md for exact claims/workflow.
+
+Counts remain12/19 phases and98/128 gates. Remaining recovery scope includes nested
+open-restore handling, remote-provider rotation/revocation, parent/OS interruption,
+physical Windows reboot/recovery, complete fault matrix and qualifying24/72h soaks.
+Next independent release engineering: native pnpm CycloneDX inventory bound to
+public release inputs and included in the verified Windows archive. No new phase
+is closed by this checkpoint.

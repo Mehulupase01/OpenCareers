@@ -701,6 +701,73 @@ describe("API trust boundary", () => {
     const authenticated = { ...headers, cookie: `opencareers=${login.cookies[0]?.value}` };
     const status = await app.inject({ url: "/v1/restores", headers: authenticated });
     expect(status.json().control.restoreBlocked).toBe(true);
+    const boundaryUrl = `/v1/restores/${runId}/backup-boundary`;
+    const boundary = {
+      snapshotSha256: "a".repeat(64),
+      capturedAtOrAfter: "2020-01-01T00:00:00.000Z",
+      evidenceSha256: "d".repeat(64),
+      backupBoundaryVerified: true,
+    };
+    expect(
+      (await app.inject({ method: "POST", url: boundaryUrl, headers, payload: boundary }))
+        .statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: boundaryUrl,
+          headers: authenticated,
+          payload: { ...boundary, force: true },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: boundaryUrl,
+          headers: authenticated,
+          payload: { ...boundary, snapshotSha256: "b".repeat(64) },
+        })
+      ).statusCode,
+    ).toBe(409);
+    const legacyRelease = await app.inject({
+      method: "POST",
+      url: `/v1/restores/${runId}/release`,
+      headers: authenticated,
+      payload: {
+        externalHistoryReviewedAndImported: true,
+        evidenceSha256: "c".repeat(64),
+        from: boundary.capturedAtOrAfter,
+        through: new Date().toISOString(),
+      },
+    });
+    expect(legacyRelease.statusCode).toBe(409);
+    expect(legacyRelease.json().message).toContain("backup boundary");
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: boundaryUrl,
+          headers: authenticated,
+          payload: boundary,
+        })
+      ).json(),
+    ).toEqual({
+      snapshotCreatedAt: boundary.capturedAtOrAfter,
+      verification: "owner_attestation",
+    });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: boundaryUrl,
+          headers: authenticated,
+          payload: boundary,
+        })
+      ).statusCode,
+    ).toBe(409);
     expect(
       (
         await app.inject({

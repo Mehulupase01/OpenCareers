@@ -1821,9 +1821,11 @@
             "docs/evidence/P15-Windows-rekey-recovery.md",
             "tests/integration/sqlite-backup.test.ts",
             "tests/integration/account-recovery.test.ts",
-            "tests/integration/account-api.test.ts"
+            "tests/integration/account-api.test.ts",
+            "docs/evidence/P15-Windows-restore-review.md",
+            "tests/e2e/restores.spec.ts"
           ],
-          "nextAction": "Windows archive restore, fresh-copy vault/document rekey and reviewed account recovery are implemented. Complete remote provider rotation/revocation, nested/legacy restore handling, parent/OS interruption and reboot drills. New PostgreSQL/server expansion remains deferred; no phase closure."
+          "nextAction": "Windows archive restore, fresh-copy rekey, reviewed account recovery and fail-closed legacy boundary review have owner workflows. Complete remote provider rotation/revocation, nested restore handling, parent/OS interruption and reboot drills. New PostgreSQL/server expansion remains deferred; no phase closure."
         },
         {
           "id": "P15-04",
@@ -1876,7 +1878,12 @@
           "id": "P15-G4",
           "requirement": "A restored system remains commit-disabled until the external-submission gap is reconciled.",
           "status": "in_progress",
-          "evidence": ["docs/evidence/ENCRYPTION-RESTORE.md", "tests/integration/restore.test.ts"]
+          "evidence": [
+            "docs/evidence/ENCRYPTION-RESTORE.md",
+            "tests/integration/restore.test.ts",
+            "docs/evidence/P15-Windows-restore-review.md",
+            "tests/e2e/restores.spec.ts"
+          ]
         },
         {
           "id": "P15-G5",

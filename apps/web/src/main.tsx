@@ -36,6 +36,7 @@ import { EmailWorkspace } from "./email.js";
 import { ExceptionsPanel } from "./exceptions.js";
 import { MatchingWorkspace } from "./matching.js";
 import { OutcomesWorkspace } from "./outcomes.js";
+import { RestoresPanel } from "./restores.js";
 import "./styles.css";
 
 type View =
@@ -715,6 +716,7 @@ function App() {
                       </button>
                     </div>
                   ))}
+                  <RestoresPanel onReleased={refresh} />
                   <h2>Environment</h2>
                   <dl className="environment">
                     <div>

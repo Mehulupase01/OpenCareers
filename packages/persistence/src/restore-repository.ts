@@ -241,6 +241,60 @@ export class RestoreRepository extends Repository {
       );
   }
 
+  async reviewLegacyBoundary(
+    runId: string,
+    actor: string,
+    raw: z.input<typeof restoreBoundaryReviewSchema>,
+  ) {
+    this.assertOwner(actor);
+    const input = restoreBoundaryReviewSchema.parse(raw);
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      const run = (
+        await tx.query(
+          "SELECT state,snapshot_sha256,started_at,snapshot_created_at FROM restore_runs WHERE owner_id=$1 AND id=$2",
+          [this.ownerId, runId],
+        )
+      )[0];
+      if (run?.state !== "open" || run.snapshot_sha256 !== input.snapshotSha256)
+        throw new DomainError("STATE_INVALID", "No matching open restore snapshot.");
+      if (run.snapshot_created_at !== null)
+        throw new DomainError("STATE_INVALID", "The recorded backup boundary cannot be replaced.");
+      if (
+        !z.iso.datetime().safeParse(run.started_at).success ||
+        Date.parse(String(run.started_at)) > this.clock().getTime()
+      )
+        throw new DomainError("STORAGE_UNAVAILABLE", "The recorded restore start is invalid.");
+      if (
+        Date.parse(input.capturedAtOrAfter) > Date.parse(String(run.started_at)) ||
+        Date.parse(input.capturedAtOrAfter) > this.clock().getTime()
+      )
+        throw new DomainError(
+          "CONFIG_INVALID",
+          "The backup boundary must precede restore startup.",
+        );
+      await tx.query("UPDATE restore_runs SET snapshot_created_at=$1 WHERE owner_id=$2 AND id=$3", [
+        input.capturedAtOrAfter,
+        this.ownerId,
+        runId,
+      ]);
+      await this.audit(
+        tx,
+        runId,
+        "restore.legacy_boundary_reviewed",
+        1,
+        {
+          snapshotSha256: input.snapshotSha256,
+          capturedAtOrAfter: input.capturedAtOrAfter,
+          evidenceSha256: input.evidenceSha256,
+          verification: "owner_attestation",
+        },
+        actor,
+      );
+      return { snapshotCreatedAt: input.capturedAtOrAfter, verification: "owner_attestation" };
+    });
+  }
+
   async review(
     runId: string,
     applicationId: string,
@@ -307,8 +361,20 @@ export class RestoreRepository extends Repository {
       )[0];
       if (run?.state !== "open")
         throw new DomainError("STATE_INVALID", "No matching open restore review.");
+      if (!run.snapshot_created_at)
+        throw new DomainError(
+          "STATE_INVALID",
+          "A verified backup boundary is required before external-history release.",
+        );
       if (
-        Date.parse(gap.from) > Date.parse(String(run.snapshot_created_at ?? run.started_at)) ||
+        !z.iso.datetime().safeParse(run.snapshot_created_at).success ||
+        !z.iso.datetime().safeParse(run.started_at).success ||
+        Date.parse(String(run.started_at)) > this.clock().getTime() ||
+        Date.parse(String(run.snapshot_created_at)) > Date.parse(String(run.started_at))
+      )
+        throw new DomainError("STORAGE_UNAVAILABLE", "The recorded backup boundary is invalid.");
+      if (
+        Date.parse(gap.from) > Date.parse(String(run.snapshot_created_at)) ||
         Date.parse(gap.through) < Date.parse(String(run.started_at)) ||
         Date.parse(gap.through) > this.clock().getTime() ||
         Date.parse(gap.from) > Date.parse(gap.through)
@@ -354,6 +420,15 @@ export class RestoreRepository extends Repository {
     });
   }
 }
+
+export const restoreBoundaryReviewSchema = z
+  .object({
+    snapshotSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    capturedAtOrAfter: z.iso.datetime(),
+    evidenceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    backupBoundaryVerified: z.literal(true),
+  })
+  .strict();
 
 export const restoreGapReviewSchema = z
   .object({

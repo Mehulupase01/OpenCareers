@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Repository } from "../../../packages/persistence/src/repository.js";
 import {
   RestoreRepository,
+  restoreBoundaryReviewSchema,
   restoreGapReviewSchema,
 } from "../../../packages/persistence/src/restore-repository.js";
 
@@ -11,6 +12,14 @@ export async function restoreRoutes(app: FastifyInstance, repository: Repository
   const actor = `owner:${repository.ownerId}`;
   const params = z.object({ runId: z.uuid() }).strict();
   app.get("/v1/restores", () => restores.status());
+  app.post("/v1/restores/:runId/backup-boundary", async (request) => {
+    const path = params.parse(request.params);
+    return restores.reviewLegacyBoundary(
+      path.runId,
+      actor,
+      restoreBoundaryReviewSchema.parse(request.body),
+    );
+  });
   app.post("/v1/restores/:runId/applications/:applicationId/review", async (request) => {
     const path = params.extend({ applicationId: z.uuid() }).parse(request.params);
     const body = z

@@ -65,6 +65,44 @@ must begin no later than `backupCreatedAt` and extend through restoration; the
 persisted capture boundary prevents shortening that gap. The owner's evidence hash
 is an attestation, not independent proof of mailbox completeness.
 
+### Owner Recovery Review
+
+Open Controls > Backup recovery on the restored installation. Select the matching
+restore run and compare its snapshot checksum with the offline recovery record.
+Encrypted archive restores already record the capture boundary. Legacy raw-checksum
+restores without one remain blocked; restore startup is NOT a safe substitute.
+
+For a legacy restore, first verify an earliest possible capture time from retained
+backup records. Record that conservative lower bound, the SHA-256 of your supporting
+evidence, and the explicit verification checkbox. The backup must have been captured
+AT OR AFTER this time. An upper bound or a file's last-modified time alone cannot
+establish that lower bound. When an exact capture time cannot be established, review
+from an earlier date that demonstrably predates the backup; do not guess a later one.
+If no reliable lower bound is available, leave the installation quarantined.
+
+This owner-attested boundary is immutable and cannot be later shortened, replaced,
+or used to release a different snapshot. Its audit record stores the evidence hash,
+snapshot hash and owner identity, not the evidence document. It is not an independent
+verification of backup provenance. The authenticated API equivalent is
+`POST /v1/restores/:runId/backup-boundary` with the exact body:
+
+```json
+{
+  "snapshotSha256": "<64 lowercase hex characters>",
+  "capturedAtOrAfter": "2026-01-01T00:00:00.000Z",
+  "evidenceSha256": "<64 lowercase hex characters>",
+  "backupBoundaryVerified": true
+}
+```
+
+For every restored application, record either permanent quarantine or the ID of an
+already correlated confirmed receipt. A note or arbitrary receipt ID never proves
+submission. Then finish external-history review using UTC timestamps from no later
+than the recorded boundary through at least restore startup. Import missing
+post-backup applications before attesting completeness. Completing the review does
+not resume processing or unquarantine those applications. Invalid/refused evidence
+is shown as an error and does not advance the review.
+
 Review release leaves submissions paused. Employer accounts remain locked, Gmail
 requires fresh consent, source sessions remain revoked, and old signup/verification
 handles cannot replay. After global review, use Employer Accounts > Review recovery

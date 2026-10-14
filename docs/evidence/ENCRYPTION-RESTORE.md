@@ -91,6 +91,12 @@ No private migration, key rewrite, service restart or employer action was perfor
 
 ## Open Gates
 
+Historical checkpoint below. Later Windows archive backup, fresh-copy rekey,
+account recovery and restore-review implementation are documented in
+`P15-Windows-backup.md`, `P15-Windows-rekey-recovery.md` and
+`P15-Windows-restore-review.md`. Their synthetic evidence does not close the
+remaining physical recovery, provider-revocation or real-duration soak gates.
+
 This checkpoint starts P15 recovery engineering; it does not close P15. Database
 facts, extraction text and packet ASTs are still plaintext; this is file/secret
 encryption, not whole-database encryption. Whole-installation backups, automatic

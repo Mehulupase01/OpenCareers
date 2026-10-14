@@ -2187,6 +2187,80 @@ td:last-child {
   padding: 8px 14px;
 }
 
+.restore-workspace {
+  margin-block: 24px;
+  border-block: 1px solid var(--line);
+  padding-block: 20px;
+  min-width: 0;
+}
+.restore-workspace .section-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.restore-workspace h3 {
+  font-size: 1rem;
+}
+.restore-workspace .restore-metadata dd,
+.restore-identity,
+.restore-completed-review {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.restore-run-select,
+.restore-form fieldset,
+.restore-form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.restore-workspace input,
+.restore-workspace select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 8px;
+  background: #fff;
+}
+.restore-form fieldset {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 16px 0;
+  padding: 12px 0;
+}
+.restore-form legend {
+  font-weight: 600;
+  padding-right: 8px;
+}
+.restore-form .restore-confirm {
+  display: flex;
+  align-items: start;
+}
+.restore-confirm input {
+  flex: 0 0 16px;
+  width: 16px;
+  margin-top: 3px;
+}
+.restore-form button {
+  justify-self: start;
+  gap: 8px;
+  white-space: normal;
+  text-align: left;
+}
+.restore-review-list {
+  list-style: none;
+  padding: 0;
+}
+.restore-review-list > li {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
 .exceptions-panel {
   padding: 22px 0;
   border-bottom: 1px solid var(--line);

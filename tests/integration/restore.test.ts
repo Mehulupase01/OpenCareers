@@ -69,9 +69,120 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await db.close();
       });
 
+      it("keeps legacy snapshots blocked until an immutable owner-reviewed boundary covers the history gap", async () => {
+        const run = await restores.block(snapshot);
+        await restores.review(
+          run,
+          appId,
+          { disposition: "quarantined", note: "Synthetic legacy review." },
+          actor,
+        );
+        const input = {
+          snapshotSha256: snapshot,
+          capturedAtOrAfter: "2026-01-01T00:00:00.000Z",
+          evidenceSha256: "d".repeat(64),
+          backupBoundaryVerified: true as const,
+        };
+        await expect(restores.release(run, actor, gapEvidence())).rejects.toThrow(
+          "backup boundary",
+        );
+        await expect(
+          restores.reviewLegacyBoundary(run, "system:restore", input),
+        ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+        await expect(
+          restores.reviewLegacyBoundary(run, actor, { ...input, snapshotSha256: "b".repeat(64) }),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        await expect(
+          restores.reviewLegacyBoundary(run, actor, {
+            ...input,
+            capturedAtOrAfter: new Date(Date.now() + 86400000).toISOString(),
+          }),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        await expect(
+          restores.reviewLegacyBoundary(run, actor, {
+            ...input,
+            backupBoundaryVerified: false as true,
+          }),
+        ).rejects.toThrow();
+        const foreign = new RestoreRepository(db, `foreign-${owner}`);
+        await foreign.initialize();
+        await expect(
+          foreign.reviewLegacyBoundary(run, `owner:${foreign.ownerId}`, input),
+        ).rejects.toMatchObject({ code: "STATE_INVALID" });
+        expect((await restores.status()).runs[0]?.snapshot_created_at).toBeNull();
+        expect((await repo.getControl()).restoreBlocked).toBe(true);
+        expect(await restores.reviewLegacyBoundary(run, actor, input)).toEqual({
+          snapshotCreatedAt: input.capturedAtOrAfter,
+          verification: "owner_attestation",
+        });
+        await expect(restores.reviewLegacyBoundary(run, actor, input)).rejects.toThrow(
+          "cannot be replaced",
+        );
+        await expect(
+          restores.block(snapshot, "system:restore", "2026-02-01T00:00:00.000Z"),
+        ).rejects.toThrow("cannot be replaced");
+        const started = String((await restores.status()).runs[0]?.started_at);
+        await expect(
+          restores.release(run, actor, { ...gapEvidence(), from: started }),
+        ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+        await restores.release(run, actor, gapEvidence());
+        await expect(restores.reviewLegacyBoundary(run, actor, input)).rejects.toThrow(
+          "matching open",
+        );
+        const audit = await db.query(
+          "SELECT payload,actor FROM audit_events WHERE owner_id=$1 AND action='restore.legacy_boundary_reviewed'",
+          [owner],
+        );
+        expect(audit).toHaveLength(1);
+        expect(audit[0]?.actor).toBe(actor);
+        expect(JSON.parse(String(audit[0]?.payload))).toEqual({
+          snapshotSha256: snapshot,
+          capturedAtOrAfter: input.capturedAtOrAfter,
+          evidenceSha256: input.evidenceSha256,
+          verification: "owner_attestation",
+        });
+        expect(await repo.getControl()).toMatchObject({
+          restoreBlocked: false,
+          submissionsPaused: true,
+          discoveryPaused: true,
+          preparationPaused: true,
+        });
+        await expect(assertNoRestoreReplay(db, owner, appId)).rejects.toMatchObject({
+          code: "POLICY_REVOKED",
+        });
+      });
+
+      it("rejects corrupt persisted backup dates rather than allowing NaN comparisons to release", async () => {
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
+        await restores.review(
+          run,
+          appId,
+          { disposition: "quarantined", note: "Synthetic corrupt-boundary review." },
+          actor,
+        );
+        for (const value of ["not-a-date", "2099-01-01T00:00:00.000Z"]) {
+          await db.query(
+            "UPDATE restore_runs SET snapshot_created_at=$1 WHERE owner_id=$2 AND id=$3",
+            [value, owner, run],
+          );
+          await expect(restores.release(run, actor, gapEvidence())).rejects.toMatchObject({
+            code: "STORAGE_UNAVAILABLE",
+          });
+          expect((await repo.getControl()).restoreBlocked).toBe(true);
+        }
+      });
+
       it("requires external history from the immutable backup boundary rather than just restore startup", async () => {
         const boundary = "2026-01-01T00:00:00.000Z";
         const run = await restores.block(snapshot, "system:restore", boundary);
+        await expect(
+          restores.reviewLegacyBoundary(run, actor, {
+            snapshotSha256: snapshot,
+            capturedAtOrAfter: gapEvidence().from,
+            evidenceSha256: "d".repeat(64),
+            backupBoundaryVerified: true,
+          }),
+        ).rejects.toThrow("cannot be replaced");
         await expect(
           restores.block(snapshot, "system:restore", "2026-02-01T00:00:00.000Z"),
         ).rejects.toMatchObject({ code: "STATE_INVALID" });
@@ -158,7 +269,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
             ],
           );
         }
-        const run = await restores.block(snapshot);
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
         const links = await db.query(
           "SELECT state FROM email_verification_links WHERE owner_id=$1",
           [owner],
@@ -251,7 +362,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         await foreign.initialize();
         await foreign.configure(client, "other@example.test", true);
         const beforeForeign = (await foreign.snapshot()).connection;
-        const run = await restores.block(snapshot);
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
         await expect(mail.credentials(lease)).rejects.toMatchObject({ code: "POLICY_REVOKED" });
         expect((await mail.snapshot()).connection).toMatchObject({
           state: "reconnect_required",
@@ -308,7 +419,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
         const task = await repo.claim("old-worker", ["prepare"]);
         expect(task).not.toBeNull();
         if (!task) throw new Error("Expected synthetic preparation lease");
-        const run = await restores.block(snapshot);
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
         expect(await restores.block(snapshot)).toBe(run);
         await expect(restores.block("b".repeat(64))).rejects.toThrow("already open");
         expect(await repo.getControl()).toMatchObject({
@@ -340,7 +451,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       });
 
       it("keeps restored applications permanently quarantined while allowing fresh applications after release", async () => {
-        const run = await restores.block(snapshot);
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
         await restores.review(
           run,
           appId,
@@ -443,7 +554,7 @@ for (const engine of ["sqlite", "postgres"] as const) {
       });
 
       it("validates receipt integrity and tenant correlation before settling a review", async () => {
-        const run = await restores.block(snapshot);
+        const run = await restores.block(snapshot, "system:restore", gapEvidence().from);
         const at = new Date().toISOString();
         const receiptId = randomUUID();
         const evidence = {

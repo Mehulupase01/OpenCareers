@@ -51,7 +51,7 @@ for (const engine of ["sqlite", "postgres"] as const)
         await accounts.authorizeSignup(handle);
         now = new Date("2026-10-14T12:01:00.000Z");
         await repo.setControl({ stopped: true });
-        runId = await recovery.block("a".repeat(64));
+        runId = await recovery.block("a".repeat(64), "system:restore", "2020-01-01T00:00:00.000Z");
         now = new Date("2026-10-14T12:02:00.000Z");
       });
       afterEach(async () => {

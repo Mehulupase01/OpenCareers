@@ -122,7 +122,7 @@ describe("employer account API", () => {
     });
     const account = prepared.json();
     const recovery = new RestoreRepository(db, repository.ownerId),
-      run = await recovery.block("a".repeat(64));
+      run = await recovery.block("a".repeat(64), "system:restore", "2020-01-01T00:00:00.000Z");
     await recovery.release(run, `owner:${repository.ownerId}`, {
       externalHistoryReviewedAndImported: true,
       evidenceSha256: "b".repeat(64),
