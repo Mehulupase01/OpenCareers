@@ -49,6 +49,48 @@ export class RestoreRepository extends Repository {
     };
   }
 
+  private async revokeExternalCapabilities(tx: SqlExecutor) {
+    await tx.query(
+      "UPDATE employer_accounts SET state='locked',updated_at=$1 WHERE owner_id=$2 AND state<>'closed'",
+      [this.now(), this.ownerId],
+    );
+    await tx.query(
+      "UPDATE signup_attempts SET state='UNKNOWN',fence=fence+1,ended_at=$1 WHERE owner_id=$2 AND state IN ('INTENT_RECORDED','IN_FLIGHT')",
+      [this.now(), this.ownerId],
+    );
+    await tx.query(
+      "UPDATE email_verification_links SET state='unknown' WHERE owner_id=$1 AND state IN ('pending','in_flight')",
+      [this.ownerId],
+    );
+    const mail = (
+      await tx.query("SELECT data FROM email_connections WHERE owner_id=$1", [this.ownerId])
+    )[0];
+    if (mail) {
+      const data = JSON.parse(String(mail.data));
+      await tx.query(
+        "UPDATE email_connections SET state='reconnect_required',generation=generation+1,token_secret_id=NULL,lease_until=NULL,expires_at=NULL,refresh_expires_at=NULL,data=$1 WHERE owner_id=$2",
+        [
+          JSON.stringify({
+            ...data,
+            cursorSecretId: null,
+            lastContextKey: null,
+            scanPaused: true,
+            reason: "Restore requires fresh Gmail consent and a new scan.",
+          }),
+          this.ownerId,
+        ],
+      );
+    }
+    await tx.query(
+      "UPDATE owner_source_sessions SET state='revoked',secret_id=NULL,revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND state='stored'",
+      [this.now(), this.ownerId],
+    );
+    await tx.query(
+      "UPDATE sources SET lease_token=NULL,lease_until=NULL,revision=revision+1 WHERE owner_id=$1",
+      [this.ownerId],
+    );
+  }
+
   // Call on the restored database while every old/new worker and browser is offline.
   async block(snapshotSha256: string, actor = "system:restore") {
     if (!/^[a-f0-9]{64}$/.test(snapshotSha256))
@@ -63,6 +105,8 @@ export class RestoreRepository extends Repository {
       if (active) {
         if (active.snapshot_sha256 !== snapshotSha256)
           throw new DomainError("STATE_INVALID", "Another restore review is already open.");
+        // Reassert fences when upgrading a quarantine created by an older build.
+        await this.revokeExternalCapabilities(tx);
         return String(active.id);
       }
       const id = randomUUID();
@@ -85,6 +129,8 @@ export class RestoreRepository extends Repository {
         "UPDATE hosted_origin_permissions SET state='revoked',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND state='active'",
         [this.now(), this.ownerId],
       );
+      // A pre-dispatch backup may still predate signup or verification on the old host.
+      await this.revokeExternalCapabilities(tx);
       // Even a pre-intent snapshot can predate an actual dispatch on the old installation.
       await tx.query(
         "INSERT INTO restore_reviews(owner_id,run_id,application_id,disposition) SELECT owner_id,$1,id,'pending' FROM applications WHERE owner_id=$2",

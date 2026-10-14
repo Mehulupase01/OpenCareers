@@ -71,6 +71,7 @@ export class AccountRepository extends Repository {
     try {
       return await this.db.transaction(async (tx) => {
         await this.lockOwner(tx);
+        await this.assertOperational(tx);
         const candidate = (
           await tx.query("SELECT id FROM candidates WHERE owner_id=$1 AND id=$2", [
             this.ownerId,
@@ -135,19 +136,23 @@ export class AccountRepository extends Repository {
     adapterId: string;
   }): Promise<Buffer> {
     const origin = exactOrigin(input.employerOrigin);
-    const row = (
-      await this.db.query(
-        "SELECT a.secret_id,s.purpose,s.key_version,s.envelope FROM employer_accounts a JOIN vault_secrets s ON s.owner_id=a.owner_id AND s.id=a.secret_id WHERE a.owner_id=$1 AND a.id=$2 AND a.employer_origin=$3 AND a.adapter_id=$4 AND a.state NOT IN ('closed','locked')",
-        [this.ownerId, input.accountId, origin, input.adapterId],
-      )
-    )[0];
-    if (!row?.secret_id)
-      throw new DomainError("NOT_FOUND", "Usable employer credential not found.");
-    return this.vault.open(vaultEnvelopeSchema.parse(JSON.parse(String(row.envelope))), {
-      ownerId: this.ownerId,
-      secretId: String(row.secret_id),
-      purpose: "employer_password",
-      keyVersion: Number(row.key_version),
+    return this.db.transaction(async (tx) => {
+      await this.lockOwner(tx);
+      await this.assertOperational(tx);
+      const row = (
+        await tx.query(
+          "SELECT a.secret_id,s.purpose,s.key_version,s.envelope FROM employer_accounts a JOIN vault_secrets s ON s.owner_id=a.owner_id AND s.id=a.secret_id WHERE a.owner_id=$1 AND a.id=$2 AND a.employer_origin=$3 AND a.adapter_id=$4 AND a.state NOT IN ('closed','locked')",
+          [this.ownerId, input.accountId, origin, input.adapterId],
+        )
+      )[0];
+      if (!row?.secret_id)
+        throw new DomainError("NOT_FOUND", "Usable employer credential not found.");
+      return this.vault.open(vaultEnvelopeSchema.parse(JSON.parse(String(row.envelope))), {
+        ownerId: this.ownerId,
+        secretId: String(row.secret_id),
+        purpose: "employer_password",
+        keyVersion: Number(row.key_version),
+      });
     });
   }
 
@@ -160,7 +165,17 @@ export class AccountRepository extends Repository {
     ).map(accountFrom);
   }
 
+  private async assertOperational(tx: SqlExecutor) {
+    const control = await this.readControl(tx);
+    if (control.stopped || control.restoreBlocked)
+      throw new DomainError(
+        "POLICY_REVOKED",
+        "Account activity is blocked by stop or restore controls.",
+      );
+  }
+
   private async assertAccountPolicy(tx: SqlExecutor, candidateId: string) {
+    await this.assertOperational(tx);
     const row = (
       await tx.query(
         "SELECT c.active_authorization_id,a.data,a.effective_at,a.expires_at,a.revoked_at FROM candidates c JOIN authorizations a ON a.owner_id=c.owner_id AND a.id=c.active_authorization_id WHERE c.owner_id=$1 AND c.id=$2",

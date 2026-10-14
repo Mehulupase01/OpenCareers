@@ -1806,8 +1806,13 @@
           "text": "Recovery drills. Back up, restore, rekey where supported, rotate credentials, revoke authorization, and simulate restoring a database older than external applications.",
           "status": "in_progress",
           "acceptanceTests": ["T26", "T28", "T29"],
-          "evidence": ["docs/evidence/ENCRYPTION-RESTORE.md", "tests/integration/restore.test.ts"],
-          "nextAction": "Complete whole-installation restore, signup/mailbox fencing and artifact consistency drills."
+          "evidence": [
+            "docs/evidence/ENCRYPTION-RESTORE.md",
+            "tests/integration/restore.test.ts",
+            "docs/evidence/P15-sqlite-snapshot-foundation.md",
+            "tests/integration/sqlite-snapshot.test.ts"
+          ],
+          "nextAction": "Complete encrypted whole-installation archives, artifact consistency, reviewed account recovery, vault rekey and PostgreSQL backup/restore. Database capture and restored signup/mailbox/source fencing are partial evidence, not gate closure."
         },
         {
           "id": "P15-04",

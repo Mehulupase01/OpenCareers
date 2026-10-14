@@ -2135,3 +2135,48 @@ Successor CI is needed for this security delta;418d502 all-four-lane green remai
 the prior verified milestone. P15-01 moves toin_progress for partial threat review,
 not G1 closure. Totals12/19 and97/128 unchanged. Private runtime remains offline;
 no private DB migration, real application, mailbox or inference action occurred.
+
+## 2026-10-13: Autonomous Goal And SQLite Snapshot Foundation
+
+Persistent thread goal is active, as explicitly requested by the owner to continue
+until full production completion or usage limits. This supersedes historical claims
+that no cross-turn coding continuation is available; no cron/heartbeat workaround
+was created. Keep the complete19-phase/128-gate objective, not a smaller milestone.
+
+ce416e4 successor CI38336830044 passes all four lanes, verifying the final hosted
+credential/callback hardening. New work adds a read-only existing-file SQLite native
+snapshot with WAL capture, verified migration history/integrity/owner/stopped controls,
+lease/worker refusal, no redirects/overwrites, source-change detection and fresh-copy
+verification. Existing restore quarantine is exercised against a captured copy with
+identity preserved and submit/replay blocked. Protected staging only: plaintext,
+database-only, productionBackupAccepted=false; no private snapshot was executed.
+See P15-sqlite-snapshot-foundation.md for explicit bounds and missing full workflow.
+
+Focused snapshot/restore14 passed /four PostgreSQL skipped, types/lint/build/scan
+pass. Full check is running on frozen code. No gate or phase closure;12/19 and97/128.
+Next build complete encrypted artifact/source/database archives, bounded offline
+entry/verification/restore and PostgreSQL parity, then private readiness/activation.
+Do not run the mutating doctor against private data as a substitute for this preflight.
+
+## 2026-10-14: Snapshot And External Recovery Fences
+
+Resumed at owner's explicit continue/progress request. Goal service currently reports
+usageLimited, not active; the older active-goal note is historical. This turn continues
+the requested engineering but does not claim an unlimited background coding run.
+Counts stay12/19 phases,97/128 gates. No private data, employer, Gmail or LLM call.
+
+Restore now locks all non-closed employer accounts, invalidates pending/in-flight
+signup handles and verification links, advances Gmail generations with detached
+token/cursor references, revokes source sessions and clears poll leases. Stop/restore
+guards cover account preparation, credential reads and signup authorization. Repeated
+entry reasserts external fences for older open quarantines. Release does not silently
+unlock accounts; reviewed account recovery, encrypted whole-installation archives,
+artifact/source integrity, rekey and PostgreSQL backup/restore remain unfinished.
+
+Final focused46 passed /36 PostgreSQL skipped, five files; types and scan488 pass.
+Full frozen successor check passes838 tests /278 skipped,104 passing files /two
+skipped in265.15 seconds, plus lint/types/ledger/build. Existing browser-helper lint
+and chunk-size warnings remain. Earlier broad results overlapped edits and are not
+accepted. P15-03 evidence/next action updated, no gate closure. Successor CI is pending.
+Prior provisional PID28712 is gone; last preserved sample covered about5.08 hours,
+16 cycles and five mock receipts. No24/72-hour acceptance; preserve the old traces.

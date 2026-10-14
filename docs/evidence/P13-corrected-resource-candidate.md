@@ -45,3 +45,13 @@ both finish records and stdout result, not just a live PID. The full outage/quot
 fairness matrix, 24-hour production acceptance and 72-hour security soak remain open;
 `productionSoakGateSatisfied` stays false. The benchmark can outlive the coding turn
 but is not an autonomous coding agent or continuation schedule.
+
+## 2026-10-14 Recovery Observation
+
+Root PID28712 is no longer present. The last preserved sample is
+2026-10-13T05:50:38.465Z, elapsed18275849ms (about5.08 hours),16 cycles,
+five confirmed mock receipts and zero confirmed applications without receipts.
+No successful finish record or qualifying24/72-hour duration is established.
+Traces and the immutable installation are preserved; no PID was terminated or
+candidate restarted during this recovery check. This stopped provisional run
+cannot certify the current source or close a soak gate.

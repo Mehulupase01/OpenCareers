@@ -94,7 +94,7 @@ No private migration, key rewrite, service restart or employer action was perfor
 This checkpoint starts P15 recovery engineering; it does not close P15. Database
 facts, extraction text and packet ASTs are still plaintext; this is file/secret
 encryption, not whole-database encryption. Whole-installation backups, automatic
-restore detection, reviewed restore UI, account-signup/mailbox restore fencing,
+restore detection, reviewed restore UI, reviewed employer-account recovery,
 encrypted solved-session continuation, rekey/rotation and the full adversarial
 crash/restore matrix remain. Heartbeat absence does not prove every browser is
 offline; the operator must enforce offline exclusivity. A copied database without
