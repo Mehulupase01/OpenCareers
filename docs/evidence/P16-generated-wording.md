@@ -1,7 +1,13 @@
 # Approved Wording Generation
 
-Engineering milestone,2026-10-14. Local verification passes; successor CI is pending.
-P16-05/G5 remain in progress until their acceptance evidence is verified remotely.
+Engineering milestone,2026-10-14. Local verification and CI38623194120 at
+d0c2374141b6d2e9d244d77a4b4aaac6f91f93de pass all four lanes: Windows, Ubuntu,
+PostgreSQL and server-image. P16-05/G5 close; the complete P16 phase remains open.
+
+2026-10-15 follow-up: P15 review found source quotations could launder unsupported
+candidate claims into motivation. P16-05/G5 are reopened pending verification of
+the full-text and retained-packet correction in P15-hostile-input-matrix.md.
+The earlier successful CI remains historical evidence, not proof of this fix.
 
 ## Owner Workflow
 
@@ -104,7 +110,8 @@ precedes the final helper's assigned-generation query correction; the final froz
 unit/integration suite above includes that correction. Affected document/generation
 browser checks rerun against corrected source pass4/4 in53.3s. A fresh extracted
 production-only Windows installation passes1/1 in121.88s, booting its compiled
-synthetic runtime without the development environment. Successor CI remains pending.
+synthetic runtime without the development environment. CI38623194120 also passes
+the production-only Windows installation and complete browser verification.
 The initial full pass1,096/354 in363.66s
 precedes the merge correction and is not substituted for final acceptance.
 

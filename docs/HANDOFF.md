@@ -2529,3 +2529,27 @@ Counts remain12/19 and99/128. No private environment/DB/service, employer/model/
 request, genuine receipt or qualifying soak occurred. Next substantive milestone:
 P15's integrated hostile-input/authority boundary matrix; individual URL/pricing/
 parser checks alone do not close its security gate.
+
+Generation CI38623194120 atd0c2374 now passes all four lanes, including Windows
+production-only installation and full browser checks. P16-05/G5 close:100/128 gates,
+12/19 phases. P16 and its P15 dependencies remain open. Cohort-signal commit7a954e2
+has its own successor CI pending; do not reuse the older green run for its closure.
+
+## 2026-10-15: Hostile Input And Retained Letter Correction
+
+Cohort CI38625085704 at7a954e2 now passes all four lanes, including full browser
+and clean Windows installation; P16-02 closes. Security review found raw unexpected
+inference exceptions retained verbatim, recognized control prose accepted in letters,
+and first-person factual source quotations bypassing motivation screening. Fixed
+transport/gateway diagnostics, full-text shared motivation screening, independent
+packet validation, retained packet/artifact invalidation, intent and dispatch digest
+and narrative checks. Unattempted invalid packets remain recoverable; uncertain
+and confirmed outcomes are never reset or replayed. G5/P16-05 were reopened for
+this counterexample, so counts are currently12/19 phases and99/128 gates.
+
+Focused final security group161 pass/81 PostgreSQL skips in48.30s. One frozen full
+check passes1,344 tests/398 PostgreSQL or opt-in skips,121 passing files/two skipped
+in391.98s. Affected desktop/mobile document/generation checks4/4 pass48.8s. See
+P15-hostile-input-matrix.md for bounded claims; no private service, model, mailbox
+or employer was activated. Next development batch is Windows lifecycle delivery,
+not another expansion of the same security test checkpoint.

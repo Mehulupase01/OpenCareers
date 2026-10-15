@@ -305,7 +305,7 @@ export class MatchingRunner {
     } catch (error) {
       await this.repo.setUnavailable(
         error instanceof DomainError && error.code === "RATE_LIMITED" ? "rate_limited" : "paused",
-        error instanceof Error ? error.message : "Model catalogue refresh failed.",
+        error instanceof DomainError ? error.message : "Model catalogue refresh failed.",
         error instanceof DomainError && error.code === "RATE_LIMITED"
           ? new Date(Date.now() + 120000).toISOString()
           : null,
@@ -488,14 +488,17 @@ export class MatchingRunner {
           new Date(Date.now() + 120000).toISOString(),
         );
       else if (
-        error instanceof DomainError &&
+        !(error instanceof DomainError) ||
         !["MODEL_QUOTA_EXHAUSTED", "REVISION_STALE"].includes(error.code)
       )
-        await this.repo.setUnavailable("paused", error.message);
+        await this.repo.setUnavailable(
+          "paused",
+          error instanceof DomainError ? error.message : "Inference failed closed.",
+        );
       return this.pause(
         input,
         gates,
-        error instanceof Error ? error.message : "Inference failed closed.",
+        error instanceof DomainError ? error.message : "Inference failed closed.",
       );
     }
     const validated = proposal;

@@ -70,41 +70,46 @@ export class OpenRouterTransport {
   ) {}
 
   private async call(path: string, init?: RequestInit) {
-    const response = await this.fetcher(`https://openrouter.ai/api/v1${path}`, {
-      ...init,
-      redirect: "error",
-      signal: init?.signal
-        ? AbortSignal.any([
-            init.signal,
-            AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
-          ])
-        : AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        Accept: "application/json",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      },
-    });
-    if (response.status === 429)
-      throw new DomainError(
-        "RATE_LIMITED",
-        `Free inference is rate limited until ${new Date(Date.now() + retryAfter(response.headers.get("retry-after"))).toISOString()}.`,
-        true,
-      );
-    if (response.status === 404 && path === "/chat/completions")
-      throw new DomainError(
-        "MODEL_ROUTE_INELIGIBLE",
-        "No endpoint accepted the pinned model, provider, capability and privacy requirements.",
-      );
-    if (!response.ok)
-      throw new DomainError(
-        "MODEL_ROUTE_INELIGIBLE",
-        `OpenRouter returned HTTP ${response.status}.`,
-        response.status >= 500,
-      );
-    return JSON.parse(
-      await bounded(response, path === "/models" ? 8 * 1024 * 1024 : 2 * 1024 * 1024),
-    ) as unknown;
+    try {
+      const response = await this.fetcher(`https://openrouter.ai/api/v1${path}`, {
+        ...init,
+        redirect: "error",
+        signal: init?.signal
+          ? AbortSignal.any([
+              init.signal,
+              AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
+            ])
+          : AbortSignal.timeout(path === "/chat/completions" ? 30000 : 15000),
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+          ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        },
+      });
+      if (response.status === 429)
+        throw new DomainError(
+          "RATE_LIMITED",
+          `Free inference is rate limited until ${new Date(Date.now() + retryAfter(response.headers.get("retry-after"))).toISOString()}.`,
+          true,
+        );
+      if (response.status === 404 && path === "/chat/completions")
+        throw new DomainError(
+          "MODEL_ROUTE_INELIGIBLE",
+          "No endpoint accepted the pinned model, provider, capability and privacy requirements.",
+        );
+      if (!response.ok)
+        throw new DomainError(
+          "MODEL_ROUTE_INELIGIBLE",
+          `OpenRouter returned HTTP ${response.status}.`,
+          response.status >= 500,
+        );
+      return JSON.parse(
+        await bounded(response, path === "/models" ? 8 * 1024 * 1024 : 2 * 1024 * 1024),
+      ) as unknown;
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
+      throw new DomainError("MODEL_ROUTE_INELIGIBLE", "Inference transport failed closed.", true);
+    }
   }
 
   catalogue(signal?: AbortSignal) {
@@ -150,6 +155,8 @@ export class OpenRouterTransport {
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
     };
     if (
+      !raw ||
+      typeof raw !== "object" ||
       typeof raw.model !== "string" ||
       typeof raw.provider !== "string" ||
       typeof raw.choices?.[0]?.message?.content !== "string"

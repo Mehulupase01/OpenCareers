@@ -1789,7 +1789,11 @@
             "docs/evidence/P18-hosted-preparation-integration.md",
             "tests/unit/hosted-read.test.ts",
             "tests/unit/hosted-prepare.test.ts",
-            "docs/evidence/P15-pricing-adversarial.md"
+            "docs/evidence/P15-pricing-adversarial.md",
+            "docs/evidence/P15-hostile-input-matrix.md",
+            "tests/integration/hostile-inference.test.ts",
+            "tests/integration/untrusted-mail.test.ts",
+            "tests/unit/hostile-letter.test.ts"
           ],
           "nextAction": "Complete the integrated malicious-input, document, mailbox and authority-widening threat matrix; URL and pricing boundaries alone do not close G1."
         },
@@ -1858,8 +1862,13 @@
         {
           "id": "P15-G1",
           "requirement": "No critical unresolved finding can permit unauthorized submission, secret disclosure, wrong-owner access, or blind duplicate replay.",
-          "status": "not_started",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/evidence/P15-hostile-input-matrix.md",
+            "tests/integration/hostile-inference.test.ts",
+            "tests/integration/untrusted-mail.test.ts",
+            "tests/unit/hostile-letter.test.ts"
+          ]
         },
         {
           "id": "P15-G2",
@@ -1952,7 +1961,7 @@
         {
           "id": "P16-02",
           "text": "Cohort reporting. Compare sources, role families, seniority, sponsorship signals, and document variants using fixed application cohorts and suitable observation windows.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-outcome-foundation.md",
@@ -1966,7 +1975,7 @@
             "tests/integration/outcomes.test.ts",
             "tests/e2e/outcomes.spec.ts"
           ],
-          "nextAction": "P16-02"
+          "nextAction": null
         },
         {
           "id": "P16-03",
@@ -2018,7 +2027,7 @@
             "tests/integration/experiments.test.ts",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "Verify recipe-bound generation, canonical-merge holds and synthetic receipt-backed assignment through frozen local checks and successor CI."
+          "nextAction": "Verify source-quote narrative and retained-packet security corrections through full checks and successor CI."
         }
       ],
       "gates": [
@@ -2106,7 +2115,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "9a25aaa0446746cbdb1be6f620dab71443610163",
+      "lastVerifiedCommit": "7a954e2fd20e73453d105a8a83ca487ebc04421b",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2155,10 +2164,28 @@
           "commit": "9a25aaa0446746cbdb1be6f620dab71443610163",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL"],
           "covers": "Canonical matching pipeline history and frozen compatibility, mixed-version/profile refusal, legacy unknowns, executable categorical unsupported-control/form-drift cases, isolated outcome workflow, complete browser and production-only Windows install. Not successor native verifier, real effectiveness or full phase closure."
+        },
+        {
+          "runId": "38565734939",
+          "commit": "18baba25131def76950a86643d2e545902f86157",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
+          "covers": "Correction-aware cumulative observations, fixed denominators/windows/exclusions, minimum-sample refusal and full browser/Windows clean-install parity. Closes G3 only; no genuine outcomes or elapsed soaks."
+        },
+        {
+          "runId": "38623194120",
+          "commit": "d0c2374141b6d2e9d244d77a4b4aaac6f91f93de",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
+          "covers": "Recipe-bound mandatory LLM wording generation, fenced atomic publication, canonical-merge holds, exact owner assignment/fresh inspection and actual synthetic worker-to-receipt proof; full browser and production-only Windows installation. Closes P16-05/G5, not full P16, genuine submission evidence or successor vacancy signals."
+        },
+        {
+          "runId": "38625085704",
+          "commit": "7a954e2fd20e73453d105a8a83ca487ebc04421b",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
+          "covers": "Intent-frozen conservative vacancy seniority/sponsorship signals, legacy hash compatibility, fixed cohort provenance, full browser and production-only Windows installation. Closes P16-02 only. G5 was subsequently reopened for unsupported quoted-letter claims; this older green build does not verify that correction."
         }
       ],
       "acceptanceTests": [],
-      "nextAction": "P16-02",
+      "nextAction": "P16-03",
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",

@@ -10,6 +10,7 @@ import { assessmentSchema, type MatchAssessment } from "../../contracts/src/matc
 import type { ArtifactStorage } from "../../documents/src/artifact-store.js";
 import type { PacketGenerationInput } from "../../documents/src/domain.js";
 import type { BuiltPacket } from "../../documents/src/factory.js";
+import { assertLetterMotivation } from "../../documents/src/letter-safety.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Row, SqlExecutor } from "./database.js";
 import { Repository } from "./repository.js";
@@ -18,6 +19,22 @@ const json = <T>(row: Row, key = "data") => JSON.parse(String(row[key])) as T;
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export class DocumentRepository extends Repository {
+  private async packetSnapshot(row: Row): Promise<PacketSnapshot> {
+    const manifest = packetManifestSchema.parse(json(row, "manifest"));
+    const content = packetContentSchema.parse(json(row, "content"));
+    let reason = (row.reason as string | null) ?? null;
+    if (!reason && manifest.letterGeneration?.method === "llm") {
+      try {
+        assertLetterMotivation(content.letter.motivation);
+      } catch (error) {
+        if (!(error instanceof DomainError && error.code === "CLAIM_UNSUPPORTED")) throw error;
+        reason = "LETTER_NARRATIVE_UNSUPPORTED";
+        await this.invalidate(manifest.id, reason);
+      }
+    }
+    return { manifest, content, valid: !reason, invalidReason: reason };
+  }
+
   async get(packetId: string): Promise<PacketSnapshot> {
     const row = (
       await this.db.query(
@@ -26,12 +43,7 @@ export class DocumentRepository extends Repository {
       )
     )[0];
     if (!row) throw new DomainError("NOT_FOUND", "Packet was not found.");
-    return {
-      manifest: packetManifestSchema.parse(json(row, "manifest")),
-      content: packetContentSchema.parse(json(row, "content")),
-      valid: !row.reason,
-      invalidReason: (row.reason as string | null) ?? null,
-    };
+    return this.packetSnapshot(row);
   }
 
   async validPacket(assessmentId: string, requireLlm = false): Promise<PacketSnapshot | null> {
@@ -39,12 +51,16 @@ export class DocumentRepository extends Repository {
       "SELECT p.id,p.manifest FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC",
       [this.ownerId, assessmentId],
     );
-    const row = rows.find(
-      (item) =>
-        !requireLlm ||
-        packetManifestSchema.parse(json(item, "manifest")).letterGeneration?.method === "llm",
-    );
-    return row ? this.get(String(row.id)) : null;
+    for (const row of rows) {
+      if (
+        requireLlm &&
+        packetManifestSchema.parse(json(row, "manifest")).letterGeneration?.method !== "llm"
+      )
+        continue;
+      const packet = await this.get(String(row.id));
+      if (packet.valid) return packet;
+    }
+    return null;
   }
 
   async queueInspection(packet: PacketSnapshot): Promise<void> {
@@ -60,14 +76,18 @@ export class DocumentRepository extends Repository {
   }
   async hasValidPacket(assessmentId: string, requireLlm = false): Promise<boolean> {
     const rows = await this.db.query(
-      "SELECT p.manifest FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 100",
+      "SELECT p.manifest,c.content FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND c.assessment_id=$2 AND v.packet_id IS NULL ORDER BY p.created_at DESC,p.id DESC LIMIT 100",
       [this.ownerId, assessmentId],
     );
-    return rows.some(
-      (row) =>
-        !requireLlm ||
-        packetManifestSchema.parse(json(row, "manifest")).letterGeneration?.method === "llm",
-    );
+    for (const row of rows) {
+      if (
+        requireLlm &&
+        packetManifestSchema.parse(json(row, "manifest")).letterGeneration?.method !== "llm"
+      )
+        continue;
+      if ((await this.packetSnapshot(row)).valid) return true;
+    }
+    return false;
   }
 
   async generationInput(
@@ -157,6 +177,8 @@ export class DocumentRepository extends Repository {
         "CLAIM_UNSUPPORTED",
         "Packet content hash does not match its manifest.",
       );
+    if (manifest.letterGeneration?.method === "llm")
+      assertLetterMotivation(content.letter.motivation);
     const application = (
       await tx.query("SELECT * FROM applications WHERE owner_id=$1 AND id=$2", [
         this.ownerId,
@@ -202,7 +224,18 @@ export class DocumentRepository extends Repository {
       )[0];
       if (preserved) {
         const preservedManifest = packetManifestSchema.parse(json(preserved, "manifest"));
+        const preservedContent = packetContentSchema.parse(json(preserved, "content"));
+        let safeNarrative = true;
+        if (preservedManifest.letterGeneration?.method === "llm") {
+          try {
+            assertLetterMotivation(preservedContent.letter.motivation);
+          } catch (error) {
+            if (!(error instanceof DomainError && error.code === "CLAIM_UNSUPPORTED")) throw error;
+            safeNarrative = false;
+          }
+        }
         if (
+          safeNarrative &&
           preservedManifest.profileId === manifest.profileId &&
           preservedManifest.authorizationId === manifest.authorizationId &&
           preservedManifest.authorizationRevision === manifest.authorizationRevision &&
@@ -211,7 +244,7 @@ export class DocumentRepository extends Repository {
         )
           return {
             manifest: preservedManifest,
-            content: packetContentSchema.parse(json(preserved, "content")),
+            content: preservedContent,
             valid: true,
             invalidReason: null,
           };
@@ -289,15 +322,14 @@ export class DocumentRepository extends Repository {
       "SELECT p.manifest,c.content,v.reason FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 ORDER BY p.created_at DESC,p.id DESC LIMIT 100",
       [this.ownerId],
     );
-    return rows.map((row) => ({
-      manifest: packetManifestSchema.parse(json(row, "manifest")),
-      content: packetContentSchema.parse(json(row, "content")),
-      valid: !row.reason,
-      invalidReason: (row.reason as string | null) ?? null,
-    }));
+    const packets: PacketSnapshot[] = [];
+    for (const row of rows) packets.push(await this.packetSnapshot(row));
+    return packets;
   }
 
   async artifact(packetId: string, kind: string, store: ArtifactStorage) {
+    if (!(await this.get(packetId)).valid)
+      throw new DomainError("NOT_FOUND", "Valid packet artifact not found.");
     const row = (
       await this.db.query(
         "SELECT a.*,pa.filename FROM packet_artifacts pa JOIN artifacts a ON a.owner_id=pa.owner_id AND a.id=pa.artifact_id LEFT JOIN packet_validity v ON v.owner_id=pa.owner_id AND v.packet_id=pa.packet_id WHERE pa.owner_id=$1 AND pa.packet_id=$2 AND pa.kind=$3 AND v.packet_id IS NULL",
@@ -334,8 +366,21 @@ export class DocumentRepository extends Repository {
         [this.now(), reason, this.ownerId, packetId],
       );
       await tx.query(
-        "UPDATE applications SET state='NEEDS_REVIEW',revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state NOT IN ('CONFIRMED','HISTORICAL_SUBMITTED','IN_FLIGHT','UNKNOWN')",
-        [this.now(), this.ownerId, String(packet.application_id)],
+        "UPDATE applications SET state=$4,revision=revision+1,updated_at=$1 WHERE owner_id=$2 AND id=$3 AND state NOT IN ('CONFIRMED','HISTORICAL_SUBMITTED','IN_FLIGHT','UNKNOWN','INTENT_RECORDED','RECONCILING')",
+        [
+          this.now(),
+          this.ownerId,
+          String(packet.application_id),
+          reason === "LETTER_NARRATIVE_UNSUPPORTED" &&
+          !(
+            await tx.query(
+              "SELECT id FROM intents WHERE owner_id=$1 AND application_id=$2 LIMIT 1",
+              [this.ownerId, String(packet.application_id)],
+            )
+          ).length
+            ? "NEEDS_INPUT"
+            : "NEEDS_REVIEW",
+        ],
       );
     });
   }

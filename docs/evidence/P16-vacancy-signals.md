@@ -66,8 +66,10 @@ Final frozen full check: 1,225 passed, 359 local PostgreSQL/opt-in skips, 118 pa
 files and two skipped, in 351.25 seconds. Lint, typecheck, ledger, production build
 and native 237-component SBOM pass. Six final desktop/mobile outcome, cumulative
 and vacancy-signal checks pass in 39.5 seconds. No source/test edits overlapped
-the final frozen suite. Successor CI remains pending; the previous milestone's
-local clean installation does not substitute for this build's remote verification.
+the final frozen suite. CI run38625085704 at7a954e2 passes all four lanes:
+Windows, Ubuntu, PostgreSQL and server-image, including full browser checks and
+production-only Windows installation. P16-02 is complete; P16 remains open.
+This run does not verify the subsequent hostile-input/retained-letter correction.
 
 No owner private
 configuration, mailbox, model or employer service was activated. Synthetic fixture

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { dryRunResultSchema } from "../../contracts/src/browser.js";
 import {
+  type PacketContent,
   type PacketManifest,
   packetContentSchema,
   packetManifestSchema,
@@ -18,6 +19,7 @@ import {
   receiptEvidenceSchema,
   recruiteeReceiptEvidenceSchema,
 } from "../../contracts/src/submission.js";
+import { assertLetterMotivation } from "../../documents/src/letter-safety.js";
 import { assertTransition } from "../../domain/src/state.js";
 import { CandidateRepository } from "./candidate-repository.js";
 import type { Database, SqlExecutor } from "./database.js";
@@ -28,6 +30,13 @@ import { assertNoRestoreReplay } from "./restore-repository.js";
 import { captureSubmissionMetadata } from "./submission-metadata.js";
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+function assertPacketNarrative(manifest: PacketManifest, content: PacketContent) {
+  if (digest(content) !== manifest.contentSha256)
+    throw new DomainError("CLAIM_UNSUPPORTED", "Packet content hash does not match its manifest.");
+  if (manifest.letterGeneration?.method === "llm")
+    assertLetterMotivation(content.letter.motivation);
+}
 
 export function assertExternalLetter(
   manifest: PacketManifest,
@@ -115,7 +124,7 @@ export class SubmissionRepository extends Repository {
         throw new DomainError("LEASE_STALE", "Commit fence changed.");
       const packet = (
         await tx.query(
-          "SELECT p.manifest FROM packets p LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.id=$2 AND p.application_id=$3 AND v.packet_id IS NULL",
+          "SELECT p.manifest,c.content FROM packets p JOIN packet_contents c ON c.owner_id=p.owner_id AND c.packet_id=p.id LEFT JOIN packet_validity v ON v.owner_id=p.owner_id AND v.packet_id=p.id WHERE p.owner_id=$1 AND p.id=$2 AND p.application_id=$3 AND v.packet_id IS NULL",
           [this.ownerId, input.packetId, applicationId],
         )
       )[0];
@@ -124,6 +133,10 @@ export class SubmissionRepository extends Repository {
       if (manifest.validation.status !== "valid" || manifest.jobId !== app.job_id)
         throw new DomainError("PROFILE_STALE", "Packet does not match the ready job.");
       assertExternalLetter(manifest, task.domain, this.requireLlmExternal);
+      assertPacketNarrative(
+        manifest,
+        packetContentSchema.parse(JSON.parse(String(packet.content))),
+      );
       const preparation = (
         await tx.query(
           "SELECT status,result,created_at FROM browser_preparations WHERE owner_id=$1 AND id=$2 AND application_id=$3 AND packet_id=$4",
@@ -386,6 +399,7 @@ export class SubmissionRepository extends Repository {
         valid: true,
         invalidReason: null,
       };
+      assertPacketNarrative(packet.manifest, packet.content);
       const candidates = new CandidateRepository(this.db, this.ownerId, this.clock);
       if (prepared.snapshots.length !== prepared.plans.length)
         throw new DomainError("FORM_CHANGED", "Prepared answer steps changed.");

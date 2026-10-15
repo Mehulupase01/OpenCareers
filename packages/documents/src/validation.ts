@@ -7,7 +7,9 @@ import {
   type ValidationReport,
   validationReportSchema,
 } from "../../contracts/src/documents.js";
+import { DomainError } from "../../contracts/src/index.js";
 import type { MatchAssessment } from "../../contracts/src/matching.js";
+import { assertLetterMotivation } from "./letter-safety.js";
 
 const placeholder = /\[(?:insert|company|role|name|date)[^\]]*\]|\{\{[^}]+\}\}|\bTBD\b|<[^>]+>/i;
 const monthsLabel = (months: number) => {
@@ -123,6 +125,17 @@ export function validatePacketContent(input: {
 }): ValidationReport {
   const issues: ValidationIssue[] = [];
   const add = (issue: ValidationIssue) => issues.push(issue);
+  try {
+    assertLetterMotivation(input.content.letter.motivation);
+  } catch (error) {
+    if (!(error instanceof DomainError && error.code === "CLAIM_UNSUPPORTED")) throw error;
+    add({
+      code: "CLAIM_UNSUPPORTED",
+      severity: "error",
+      path: "letter.motivation",
+      message: "Letter motivation contains unsupported claims or control prose.",
+    });
+  }
   const facts = new Map(input.profile.facts.map((fact) => [fact.id, fact]));
   const allClaims = claims(input.content);
   for (const { path, claim } of allClaims) {

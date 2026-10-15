@@ -14,6 +14,7 @@ import {
 } from "../../inference/src/privacy.js";
 import type { CompletionRequest } from "../../inference/src/transport.js";
 import type { PacketGenerationInput } from "./domain.js";
+import { assertLetterMotivation, motivationDirectives } from "./letter-safety.js";
 import { assertLetterVariantRecipe } from "./letter-variants.js";
 
 export const letterProposalSchema = z
@@ -120,15 +121,15 @@ export function compileLetterProposal(
   if (proposal.opening !== content.letter.opening)
     throw new LetterClaimError("changed_vacancy", "Letter opening changed the bound vacancy.");
   const motivation = proposal.motivation;
+  assertLetterMotivation(motivation);
   const matchedQuotes = input.assessment.requirements
     .filter(
       (item) =>
         item.status === "met" &&
         item.span.quote.length >= 4 &&
         item.span.quote.length <= 120 &&
-        !/[\r\n<>@]|https?:\/\/|\b(?:ignore|instructions|system|assistant)\b/i.test(
-          item.span.quote,
-        ),
+        !/[\r\n<>@]|https?:\/\//i.test(item.span.quote) &&
+        !motivationDirectives.some((pattern) => pattern.test(item.span.quote)),
     )
     .map((item) => item.span.quote);
   const focus = matchedQuotes.find((quote) => motivation.includes(quote));
