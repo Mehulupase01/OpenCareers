@@ -1,14 +1,10 @@
-import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
-const child = spawn(process.execPath, ["dist/scripts/runtime.js", "start"], {
+const result = await promisify(execFile)(process.execPath, ["dist/scripts/runtime.js", "launch"], {
   cwd: process.cwd(),
   env: process.env,
-  detached: true,
+  timeout: 5000,
   windowsHide: true,
-  stdio: "ignore",
 });
-child.on("error", () => {
-  process.exitCode = 1;
-});
-console.log(child.pid);
-child.unref();
+console.log(JSON.parse(result.stdout).runtimePid);

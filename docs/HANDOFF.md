@@ -2609,3 +2609,21 @@ changes. No actual24/72h soak, physical reboot/sleep, genuine employer receipt,
 private activation or complete source/portal coverage is claimed. Next work is
 remaining Windows runtime/scheduling/recovery acceptance and measured installed
 synthetic operation; do not reopen closed P16 engineering for optional breadth.
+
+## 2026-10-15: Windows Hosted Launch Correction
+
+Lifecycle CI38711591671 at e21cd34 fails the five Windows launcher cases while
+Ubuntu/PostgreSQL/server-image pass. Hidden extra PowerShell launch never reaches
+the synthetic runtime on that runner; no exact OS cause is asserted. Replaced that
+manual start hop with the proven detached Node pattern in the production runtime
+CLI, invoked through the existing isolated host. Authenticated readiness must match
+its returned PID. Startup Task Scheduler still uses its foreground host and receives
+actual exit status; no execution policy bypass or readiness-timeout increase.
+
+The compiled lifecycle fixture now exercises production launch instead of its
+own copied launcher. Focused14/14 passes184.44s; types/lint/build/native237-component
+SBOM pass. CI runs launcher cases first and excludes them only from the subsequent
+full step, retaining every check once. Overall CI job25min covers accumulated
+full suite/clean install/browser time; per-operation/test limits are unchanged.
+Corrected-build CI must pass before marking Windows lifecycle parity. Earlier
+security CI remains valid for its scoped gate closures, not this successor code.

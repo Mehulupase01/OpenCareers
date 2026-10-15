@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory)][string]$InstallRoot,
     [Parameter(Mandatory)][string]$ConfigFile,
     [Parameter(Mandatory)][string]$NodePath,
-    [ValidateSet('Run', 'Validate', 'Status', 'Stop', 'Version')][string]$Mode = 'Run'
+    [ValidateSet('Run', 'Launch', 'Validate', 'Status', 'Stop', 'Version')][string]$Mode = 'Run'
 )
 
 $ErrorActionPreference = 'Stop'

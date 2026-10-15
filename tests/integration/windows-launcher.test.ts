@@ -29,6 +29,15 @@ async function main() {
     console.log(JSON.stringify({profile: "local"}));
     return;
   }
+  if (command === "launch") {
+    const child = require("node:child_process").spawn(process.execPath, [__filename, "start", ...process.argv.slice(3)], {
+      cwd: process.cwd(), env: process.env, detached: true, windowsHide: true, stdio: "ignore",
+    });
+    await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+    child.unref();
+    console.log(JSON.stringify({runtimePid: child.pid}));
+    return;
+  }
   if (command === "status" || command === "stop") {
     const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
     const response = await fetch("http://127.0.0.1:" + record.port + "/" + command, {

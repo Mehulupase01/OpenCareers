@@ -57,13 +57,17 @@ try {
             if ($existing.state -eq 'running') { $existing | ConvertTo-Json -Compress; return }
             throw 'A runtime already owns this installation but is not running. Check Status before retrying.'
         }
-        $launched = Start-Process -FilePath $powershell -ArgumentList $hostArguments -WorkingDirectory $root -WindowStyle Hidden -PassThru
+        $launch = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Launch
+        if ($LASTEXITCODE -ne 0 -or -not $launch) { throw 'Detached runtime launch failed.' }
+        $identity = $launch | ConvertFrom-Json
+        if (-not $identity.runtimePid -or $identity.runtimePid -le 0) { throw 'Detached runtime identity is missing.' }
+        $launched = Get-Process -Id $identity.runtimePid -ErrorAction Stop
         try {
             $watch = [System.Diagnostics.Stopwatch]::StartNew()
             while ($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
-                if ($launched.HasExited) { throw 'The runtime host exited before readiness. Check bounded runtime diagnostics.' }
+                if ($launched.HasExited) { throw 'The runtime exited before readiness. Check bounded runtime diagnostics.' }
                 $status = Read-RuntimeStatus
-                if ($status -and $status.state -eq 'running') { $status | ConvertTo-Json -Compress; return }
+                if ($status -and $status.runtimePid -eq $identity.runtimePid -and $status.state -eq 'running') { $status | ConvertTo-Json -Compress; return }
                 Start-Sleep -Milliseconds 250
             }
             throw 'Runtime readiness timed out. A process may still be starting; inspect Status before retrying. No process or control record was forcibly removed.'

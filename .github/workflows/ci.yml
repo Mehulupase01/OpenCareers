@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
@@ -25,13 +25,19 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm public:scan
+      - name: Windows launcher preflight
+        if: runner.os == 'Windows'
+        run: pnpm exec vitest run tests/integration/windows-launcher.test.ts
       - if: runner.os == 'Linux'
         run: pnpm exec playwright install --with-deps chromium
       - if: runner.os == 'Windows'
         run: pnpm exec playwright install chromium
       - if: runner.os == 'Windows'
         run: pnpm exec tsx scripts/process-census-diagnostic.ts
-      - run: pnpm test
+      - if: runner.os == 'Windows'
+        run: pnpm test --exclude tests/integration/windows-launcher.test.ts
+      - if: runner.os != 'Windows'
+        run: pnpm test
       - run: pnpm build
       - if: runner.os == 'Windows'
         run: pnpm exec vitest run tests/integration/windows-clean-install.test.ts

@@ -18,7 +18,29 @@ try {
   } else await import("../packages/config/src/env.js");
   const config = loadConfig();
   if (command === "start") await runManagedRuntime(config, process.cwd(), process.env);
-  else if (command === "status" || command === "stop")
+  else if (command === "launch") {
+    if (config.profile === "server" || !import.meta.filename.endsWith(".js"))
+      throw new Error("Detached launch requires a compiled local installation.");
+    const child = spawn(
+      process.execPath,
+      [import.meta.filename, "start", ...process.argv.slice(3)],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        detached: true,
+        windowsHide: true,
+        stdio: "ignore",
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("spawn", resolve);
+    });
+    const runtimePid = child.pid;
+    child.unref();
+    if (!runtimePid) throw new Error("Detached runtime has no process identity.");
+    console.log(JSON.stringify({ runtimePid }));
+  } else if (command === "status" || command === "stop")
     console.log(JSON.stringify(await runtimeCommand(config, command)));
   else if (command === "validate")
     console.log(
@@ -28,10 +50,12 @@ try {
         externalSubmissionEnabled: config.externalSubmissionEnabled,
       }),
     );
-  else throw new Error("Expected start, status, stop or validate.");
+  else throw new Error("Expected start, launch, status, stop or validate.");
 } catch {
   console.error(
     "Managed runtime failed. Check configuration, build, control ownership and bounded runtime metadata; no submission is replayed.",
   );
   process.exitCode = 1;
 }
+
+import { spawn } from "node:child_process";

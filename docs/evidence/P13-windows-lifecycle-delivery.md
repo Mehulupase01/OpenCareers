@@ -40,6 +40,29 @@ compiled runtime identity/drain checks above are separate integration evidence.
 No needed test process remains running. Lint/types/ledger pass; public-source
 scan551 files before final acceptance documentation.
 
+## Hosted Windows Correction
+
+CI38711591671 at e21cd34 passes Ubuntu, PostgreSQL and server-image, but all five
+Windows launcher cases fail: the extra hidden PowerShell hop never reaches the
+synthetic runtime. The exact runner-specific cause is not established; this is
+not treated as a successful installation or solved by increasing readiness waits.
+
+Manual Start/Restart now invoke the isolated startup host's Launch command, which
+uses the same detached Node pattern already proven by compiled lifecycle checks.
+The production runtime CLI owns this operation; its PID is returned and matched
+against authenticated readiness. No extra hidden PowerShell host, inherited console
+or untrusted output channel is needed. Scheduled logon still uses the foreground
+host so Task Scheduler receives the real runtime exit code. No policy is bypassed.
+
+The standalone lifecycle fixture now calls the production launch command instead
+of maintaining a separate test-only launcher. All14 focused launcher/host/compiled
+cases pass184.44s; types/lint/build/native SBOM pass. Windows CI runs the five
+launcher cases before browser download/full regression and excludes only those
+already-run cases from the later full step. Total coverage is unchanged, not
+duplicated. The overall CI job bound becomes25 minutes for the accumulated suite,
+clean install and browser workload; per-test, readiness and shutdown limits stay
+unchanged. Corrected-build Windows CI is still required before claiming parity.
+
 The full suite runs once in successor CI for this narrower launcher-only batch;
 the prior security batch's1,344-test local full check is not presented as evidence
 for these new changes. No real private configuration, installed logon task,
