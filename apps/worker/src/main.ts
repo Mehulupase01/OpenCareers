@@ -3,11 +3,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { createAdapterRegistry } from "../../../packages/browser/src/adapter-sdk.js";
 import { loadConfig } from "../../../packages/config/src/index.js";
-import {
-  DomainError,
-  FormDriftError,
-  type TaskType,
-} from "../../../packages/contracts/src/index.js";
+import { DomainError, FormDriftError } from "../../../packages/contracts/src/index.js";
 import { runDiscovery } from "../../../packages/discovery/src/runner.js";
 import { buildPacket } from "../../../packages/documents/src/factory.js";
 import { LetterDraftRunner } from "../../../packages/documents/src/letter-gateway.js";
@@ -31,6 +27,7 @@ import { VerificationRepository } from "../../../packages/persistence/src/verifi
 import { runInspectionTask } from "./inspection.js";
 import { startPeriodicWork } from "./periodic-work.js";
 import { draftWorkerLetter } from "./preparation.js";
+import { selectWorkerTask } from "./task-selection.js";
 import { runVariantPreparation } from "./variant-preparation.js";
 
 const logger = createLogger();
@@ -111,23 +108,15 @@ try {
             mailSync = null;
           });
       }
-      await matching.run();
-      const canPrepare =
-        config.profile === "demo" ||
-        (letterDraftRunner !== null &&
-          (await matchingRepository.snapshot(config.inference.dailyLimit)).route.status ===
-            "ready");
-      const taskTypes: TaskType[] =
-        config.profile === "demo"
-          ? ["demo_probe", "prepare", "inspect", "submit", "reconcile"]
-          : config.externalSubmissionEnabled
-            ? canPrepare
-              ? ["prepare", "inspect", "submit", "reconcile"]
-              : ["inspect", "submit", "reconcile"]
-            : canPrepare
-              ? ["prepare"]
-              : [];
-      const task = await repository.claim(workerId, taskTypes);
+      const task = await selectWorkerTask({
+        profile: config.profile,
+        externalSubmissionEnabled: config.externalSubmissionEnabled,
+        hasLetterRunner: letterDraftRunner !== null,
+        claim: (types) => repository.claim(workerId, types),
+        assess: (limit) => matching.run(limit),
+        routeReady: async () =>
+          (await matchingRepository.snapshot(config.inference.dailyLimit)).route.status === "ready",
+      });
       if (task) {
         const renewal = startPeriodicWork(
           10000,

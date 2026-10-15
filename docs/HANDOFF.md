@@ -2576,3 +2576,17 @@ calibration and all four named regression categories; optional future breadth is
 not a moving blocker. P16-engineering-acceptance.md records exact evidence/limits.
 Counts are12/19 completed phases and100/128 gates. P16 G5 awaits corrected-letter
 CI; P15 dependencies, genuine receipts and elapsed24/72h soaks remain unfulfilled.
+
+## 2026-10-15: Recovery Before Inference
+
+Production worker now selects reconciliation before model work and bounds ordinary
+assessment to one job per loop (previously five). Existing queue owns expiry,
+owner/stop/concurrency/lease fences; private network-disabled profiles gain no
+adapter traffic. Already-running model/browser actions are not preempted.
+Joined actual guarded MockATS response-loss/lease-recovery/read-only receipt proof
+retains one attempt/receipt/mock record, then resumes ordinary work. Logical expiry
+and callback interruption are explicit, not OS crash evidence. See
+P13-recovery-first-scheduling.md. Final unit/joined pair7/7 pass5.65s; separate
+recovery/compiled lifecycle8/8 pass23.03s; types/lint/build/native237-component SBOM
+pass. Full checks and clean installation run in successor CI rather than a duplicate
+local full suite. No new gate closure follows just from scheduling improvement.
