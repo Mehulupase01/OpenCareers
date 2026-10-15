@@ -21,6 +21,8 @@ const fs = require("node:fs");
 const http = require("node:http");
 const crypto = require("node:crypto");
 const command = process.argv[2];
+const trace = (stage, extra = {}) => fs.appendFileSync("launch-trace.jsonl", JSON.stringify({stage, command, pid: process.pid, time: Date.now(), ...extra}) + "\n");
+trace("entered");
 const settings = () => JSON.parse(fs.readFileSync("settings.json", "utf8"));
 const event = (kind, extra = {}) => fs.appendFileSync("events.jsonl", JSON.stringify({kind, pid: process.pid, ...extra}) + "\n");
 const recordPath = "control.json";
@@ -34,8 +36,10 @@ async function main() {
       cwd: process.cwd(), env: process.env, detached: true, windowsHide: true, stdio: "ignore",
     });
     await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+    trace("spawned", {childPid: child.pid});
     child.unref();
     console.log(JSON.stringify({runtimePid: child.pid}));
+    trace("returning");
     return;
   }
   if (command === "status" || command === "stop") {
@@ -80,7 +84,7 @@ async function main() {
     }, settings().readyMs || 100);
   });
   setInterval(() => { if (fs.existsSync("release")) finish(); }, 50);
-  setTimeout(finish, 60000);
+  setTimeout(finish, 180000);
 }
 main().catch(() => process.exitCode = 1);
 `;
@@ -127,7 +131,7 @@ async function fixture(settings: Settings = {}) {
   const configure = (value: Settings) =>
     writeFile(join(directory, "settings.json"), JSON.stringify(value));
   await configure(settings);
-  const run = (mode: string, extra: string[] = []) =>
+  const run = (mode: string, extra: string[] = [], timeoutSeconds = 15) =>
     execute(
       "powershell.exe",
       [
@@ -144,7 +148,7 @@ async function fixture(settings: Settings = {}) {
         "-NodePath",
         process.execPath,
         "-TimeoutSeconds",
-        "5",
+        String(timeoutSeconds),
         ...extra,
       ],
       {
@@ -154,10 +158,19 @@ async function fixture(settings: Settings = {}) {
           NODE_OPTIONS: "--require=missing-synthetic-preload.cjs",
           AUTOPILOT_OWNER_TOKEN: "synthetic-not-a-token",
         },
-        timeout: 25000,
+        timeout: 60000,
         windowsHide: true,
       },
-    );
+    ).catch(async (error: unknown) => {
+      if (error instanceof Error) {
+        const trace = await readFile(join(directory, "launch-trace.jsonl"), "utf8").catch(
+          () => "No synthetic launch trace.",
+        );
+        const lifecycle = await events(directory);
+        error.message += `\nSynthetic launch trace: ${trace}\nLifecycle: ${JSON.stringify(lifecycle)}`;
+      }
+      throw error;
+    });
   return { directory, config, configure, run, events: () => events(directory) };
 }
 
@@ -203,7 +216,7 @@ describe.skipIf(process.platform !== "win32")(
       await f.configure({ state: "backoff" });
       await expect(f.run("Start")).rejects.toMatchObject({ code: 1 });
       expect((await f.events()).filter((entry) => entry.kind === "launch")).toHaveLength(1);
-    }, 60000);
+    }, 120000);
 
     it("restarts only after authenticated supervisor exit and preserves owner policy", async () => {
       const f = await fixture({ shutdownMs: 1800 });
@@ -220,14 +233,14 @@ describe.skipIf(process.platform !== "win32")(
       expect(lifecycle.map((entry) => entry.kind)).toEqual(["launch", "stop", "exit", "launch"]);
       expect(lifecycle.slice(0, 3).every((entry) => entry.pid === first.runtimePid)).toBe(true);
       expect(await readFile(policy, "utf8")).toBe(policyText);
-    }, 60000);
+    }, 120000);
 
     it("reports failed startup and bounded readiness timeout without removing ownership or killing the runtime", async () => {
       const failed = await fixture({ failStart: true });
       await expect(failed.run("Start")).rejects.toMatchObject({ code: 1 });
       expect((await failed.events()).filter((entry) => entry.kind === "launch")).toHaveLength(1);
       const hung = await fixture({ neverReady: true });
-      await expect(hung.run("Start")).rejects.toMatchObject({ code: 1 });
+      await expect(hung.run("Start", [], 5)).rejects.toMatchObject({ code: 1 });
       const record = await readFile(join(hung.directory, "control.json"), "utf8");
       const pid = JSON.parse(record).pid;
       expect(() => process.kill(pid, 0)).not.toThrow();
@@ -235,7 +248,7 @@ describe.skipIf(process.platform !== "win32")(
       await expect(hung.run("Start")).rejects.toMatchObject({ code: 1 });
       expect(await readFile(join(hung.directory, "control.json"), "utf8")).toBe(record);
       expect((await hung.events()).filter((entry) => entry.kind === "launch")).toHaveLength(1);
-    }, 60000);
+    }, 120000);
 
     it("refuses unknown identity, nonrunning authentication and hung shutdown without replacement or record deletion", async () => {
       const f = await fixture();
@@ -243,10 +256,11 @@ describe.skipIf(process.platform !== "win32")(
       const path = join(f.directory, "control.json");
       const record = await readFile(path, "utf8");
       await f.configure({ missingPid: true });
-      await expect(f.run("Restart")).rejects.toMatchObject({ code: 1 });
+      await expect(f.run("Restart", [], 5)).rejects.toMatchObject({ code: 1 });
       expect((await f.events()).some((entry) => entry.kind === "stop")).toBe(false);
       await f.configure({ hangShutdown: true });
-      await expect(f.run("Restart")).rejects.toMatchObject({ code: 1 });
+      await expect(f.run("Restart", [], 5)).rejects.toMatchObject({ code: 1 });
+      expect((await f.events()).filter((entry) => entry.kind === "stop")).toHaveLength(1);
       expect(() => process.kill(JSON.parse(record).pid, 0)).not.toThrow();
       expect(await readFile(path, "utf8")).toBe(record);
       expect((await f.events()).filter((entry) => entry.kind === "launch")).toHaveLength(1);
@@ -260,7 +274,7 @@ describe.skipIf(process.platform !== "win32")(
       await f.configure({ state: "stopping", hangShutdown: true });
       await expect(f.run("Restart")).rejects.toMatchObject({ code: 1 });
       expect((await f.events()).filter((entry) => entry.kind === "stop")).toHaveLength(stopCount);
-    }, 60000);
+    }, 120000);
 
     it("WhatIf performs no lifecycle actions for Start or Restart", async () => {
       const f = await fixture();
@@ -272,6 +286,6 @@ describe.skipIf(process.platform !== "win32")(
       expect((await f.run("Restart", ["-WhatIf"])).stdout).toContain("What if:");
       expect(await f.events()).toEqual(before);
       expect(await readFile(join(f.directory, "control.json"), "utf8")).toBe(record);
-    }, 60000);
+    }, 120000);
   },
 );

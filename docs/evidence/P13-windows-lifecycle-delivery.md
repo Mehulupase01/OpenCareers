@@ -63,6 +63,34 @@ duplicated. The overall CI job bound becomes25 minutes for the accumulated suite
 clean install and browser workload; per-test, readiness and shutdown limits stay
 unchanged. Corrected-build Windows CI is still required before claiming parity.
 
+## Bounded Control Protocol
+
+CI38714097993 at45f91c8 still fails the Windows fixture preflight: its25-second
+outer command deadline expires with no captured reply. Empty capture did not prove
+Node had printed nothing: the host withheld output until synchronous EOF and an
+unbounded process wait both completed. A scoped independent review identified
+those unbounded waits; it did not establish a specific OS or inherited-pipe cause.
+
+The host now reads the single-line control protocol asynchronously and bounds
+client exit/reply waits. Control deadlines are min(TimeoutSeconds,15) seconds;
+foreground Run remains intentionally continuous for Task Scheduler. Only a timed-out
+owned control client can be killed, never its detached managed runtime child.
+No ownership record is deleted and a failed control never authorizes replacement.
+
+Pinned CI Node24.21.0 was downloaded from the official distribution and checked
+against its published SHA256; no global runtime or dependency was changed.
+On that exact version, launcher/host8/8 pass168.63s, including a genuinely hung
+control client that is stopped and verified gone. Compiled lifecycle7/7 passes
+24.39s with the production launch command. A standalone healthy launch case also
+passes26.90s. These are focused local results, not hosted-runner parity.
+
+Healthy fixture startup uses15 seconds within the production default60; deliberate
+readiness/hung-shutdown cases retain5-second limits. The test command envelope is
+60 seconds and multi-command cases120 seconds, rather than a25-second envelope
+that could expire before several separately bounded operations. Fixture self-expiry
+covers that envelope. Synthetic command-stage traces are attached only on failure;
+they contain no real account/candidate/model data. New hosted CI is still required.
+
 The full suite runs once in successor CI for this narrower launcher-only batch;
 the prior security batch's1,344-test local full check is not presented as evidence
 for these new changes. No real private configuration, installed logon task,

@@ -164,10 +164,12 @@ with private data outside the installation on a non-synced disk. Then use:
 
 Status, Stop and Restart use the same arguments with their respective Mode.
 Start waits for authenticated readiness. Restart drains the known runtime before
-replacement; it never clears a control record or forces a kill. -TimeoutSeconds
+replacement; it never clears a control record or force-kills the managed runtime. -TimeoutSeconds
 bounds each wait (default 60, range 5-120). On failure inspect Status; a process
 may remain starting or draining. Owner pause/policy and uncertain outcomes are
-preserved. Use -WhatIf to preview lifecycle changes. Startup
+preserved. Use -WhatIf to preview lifecycle changes.
+Control clients have a separate bounded deadline and may be stopped without
+killing their managed runtime child. Startup
 installation/removal require -ApproveStartup; use -WhatIf first. The startup
 task runs at current-user logon, not while logged out. Private operation still
 requires reviewed facts, authorized policy and supported routes. This is not

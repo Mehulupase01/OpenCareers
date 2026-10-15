@@ -28,7 +28,7 @@ process.exit(process.argv[2] === "start" ? 17 : 0);\n`,
   afterEach(async () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
-  const run = (mode: string) =>
+  const run = (mode: string, extra: string[] = []) =>
     execute(
       "powershell.exe",
       [
@@ -44,6 +44,7 @@ process.exit(process.argv[2] === "start" ? 17 : 0);\n`,
         process.execPath,
         "-Mode",
         mode,
+        ...extra,
       ],
       {
         timeout: 15000,
@@ -88,5 +89,16 @@ process.exit(process.argv[2] === "start" ? 17 : 0);\n`,
       expect(observed.args).toEqual([mode.toLowerCase(), "--config", config]);
     }
     expect((await run("Version")).stdout.trim()).toBe(process.version);
+  });
+  it("bounds a hung control client without leaving its owned process running", async () => {
+    await writeFile(
+      join(directory, "dist/scripts/runtime.js"),
+      'require("node:fs").writeFileSync("hung-client.json", JSON.stringify({pid:process.pid})); console.log("SYNTHETIC_REPLY"); setInterval(() => {}, 1000);',
+    );
+    await expect(run("Status", ["-ControlTimeoutSeconds", "1"])).rejects.toMatchObject({
+      code: 1,
+    });
+    const { pid } = JSON.parse(await readFile(join(directory, "hung-client.json"), "utf8"));
+    expect(() => process.kill(pid, 0)).toThrow();
   });
 });

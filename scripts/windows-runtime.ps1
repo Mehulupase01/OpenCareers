@@ -25,7 +25,8 @@ $node = (Resolve-Path -LiteralPath $NodePath).Path
 if (-not $ConfigFile) { $ConfigFile = Join-Path $root '.env' }
 $config = (Resolve-Path -LiteralPath $ConfigFile).Path
 if ($root.Contains('"') -or $config.Contains('"') -or $runtime.Contains('"') -or $node.Contains('"') -or $startupHost.Contains('"')) { throw 'Paths must not contain quote characters.' }
-$versionText = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version
+$controlSeconds = [Math]::Min($TimeoutSeconds, 15)
+$versionText = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version -ControlTimeoutSeconds $controlSeconds
 if (-not $versionText -or $LASTEXITCODE -ne 0) { throw 'The Node executable did not return its version.' }
 $version = [Version]($versionText.Trim().TrimStart('v'))
 if ($version -lt [Version]'24.14.0' -or $version -ge [Version]'25.0.0') { throw 'Use the pinned Node 24 runtime.' }
@@ -33,7 +34,7 @@ $previous = Get-Location
 try {
     Set-Location -LiteralPath $root
     $hostArguments = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-File', "`"$startupHost`"", '-InstallRoot', "`"$root`"", '-ConfigFile', "`"$config`"", '-NodePath', "`"$node`"")
-    $validated = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate
+    $validated = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate -ControlTimeoutSeconds $controlSeconds
     if ($LASTEXITCODE -ne 0) { throw 'Private runtime configuration is invalid.' }
     $settings = $validated | ConvertFrom-Json
     if ($settings.profile -ne 'local') { throw 'Windows startup is restricted to the local private profile.' }
@@ -44,7 +45,7 @@ try {
     $taskName = "OpenCareers-$suffix"
     function Read-RuntimeStatus {
         try {
-            $output = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status 2>$null
+            $output = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status -ControlTimeoutSeconds $controlSeconds 2>$null
             if ($LASTEXITCODE -ne 0 -or -not $output) { return $null }
             $status = $output | ConvertFrom-Json
             if ($status.state -notin @('starting', 'running', 'backoff', 'stopping', 'stopped')) { return $null }
@@ -57,7 +58,7 @@ try {
             if ($existing.state -eq 'running') { $existing | ConvertTo-Json -Compress; return }
             throw 'A runtime already owns this installation but is not running. Check Status before retrying.'
         }
-        $launch = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Launch
+        $launch = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Launch -ControlTimeoutSeconds $controlSeconds
         if ($LASTEXITCODE -ne 0 -or -not $launch) { throw 'Detached runtime launch failed.' }
         $identity = $launch | ConvertFrom-Json
         if (-not $identity.runtimePid -or $identity.runtimePid -le 0) { throw 'Detached runtime identity is missing.' }
@@ -74,8 +75,8 @@ try {
         } finally { $launched.Dispose() }
     }
     switch ($Mode) {
-        'Status' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status }
-        'Stop' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop }
+        'Status' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status -ControlTimeoutSeconds $controlSeconds }
+        'Stop' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop -ControlTimeoutSeconds $controlSeconds }
         'Start' {
             if ($PSCmdlet.ShouldProcess($root, 'Start hidden application runtime')) {
                 Start-ReadyRuntime
@@ -87,7 +88,7 @@ try {
                 if (-not $status -or $status.state -ne 'running' -or -not $status.runtimePid -or $status.runtimePid -le 0) { throw 'Restart requires an authenticated running runtime with a known process identity. Use Status; no replacement was launched.' }
                 $owned = Get-Process -Id $status.runtimePid -ErrorAction Stop
                 try {
-                    $stopped = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop
+                    $stopped = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop -ControlTimeoutSeconds $controlSeconds
                     if ($LASTEXITCODE -ne 0) { throw 'Authenticated runtime shutdown failed; no replacement was launched.' }
                     $shutdown = $stopped | ConvertFrom-Json
                     if ($shutdown.runtimePid -ne $status.runtimePid) { throw 'Runtime ownership changed during shutdown; no replacement was launched.' }

@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][string]$InstallRoot,
     [Parameter(Mandatory)][string]$ConfigFile,
     [Parameter(Mandatory)][string]$NodePath,
-    [ValidateSet('Run', 'Launch', 'Validate', 'Status', 'Stop', 'Version')][string]$Mode = 'Run'
+    [ValidateSet('Run', 'Launch', 'Validate', 'Status', 'Stop', 'Version')][string]$Mode = 'Run',
+    [ValidateRange(1, 60)][int]$ControlTimeoutSeconds = 15
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,10 +35,24 @@ try {
     $info.RedirectStandardOutput = $Mode -ne 'Run'
     $process = [System.Diagnostics.Process]::Start($info)
     try {
-        if ($Mode -ne 'Run') { $output = $process.StandardOutput.ReadToEnd() }
-        $process.WaitForExit()
+        if ($Mode -eq 'Run') { $process.WaitForExit() }
+        else {
+            # Control replies are one line; EOF may remain held by a descendant.
+            $reply = $process.StandardOutput.ReadLineAsync()
+            if (-not $process.WaitForExit($ControlTimeoutSeconds * 1000)) {
+                # Only this owned control client is stopped, never its runtime child.
+                $process.Kill()
+                [void]$process.WaitForExit(5000)
+                throw 'Runtime control client exceeded its deadline.'
+            }
+            if (-not $reply.Wait(1000)) { throw 'Runtime control reply exceeded its deadline.' }
+            $output = $reply.Result
+        }
         $code = $process.ExitCode
-        if ($Mode -ne 'Run' -and $code -eq 0) { Write-Output $output.TrimEnd() }
+        if ($Mode -ne 'Run' -and $code -eq 0) {
+            if (-not $output) { throw 'Runtime control reply is missing.' }
+            Write-Output $output.TrimEnd()
+        }
     } finally { $process.Dispose() }
     exit $code
 } catch {

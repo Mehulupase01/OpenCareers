@@ -54,8 +54,10 @@ private configuration path and `-NodePath` with the pinned Node executable to
 `-WhatIf` previews them. The hidden host isolates Node's environment and returns
 its exit status. Start waits for authenticated readiness; Restart drains the known
 runtime before starting its replacement. `-TimeoutSeconds` bounds each wait
-(default 60, range 5-120). A timeout never forces a process kill or clears an
-ownership record; inspect Status before retrying. Lifecycle commands do not unpause
+(default 60, range 5-120). A timeout never force-kills the managed runtime or clears an
+ownership record; inspect Status before retrying. Short-lived control clients
+have their own deadline and may be terminated without
+stopping the managed runtime. Lifecycle commands do not unpause
 submissions or replay uncertain attempts. Actual installed-task/reboot verification remains open; see
 [Windows runtime evidence](docs/evidence/P13-windows-startup-host.md).
 

@@ -2627,3 +2627,26 @@ full step, retaining every check once. Overall CI job25min covers accumulated
 full suite/clean install/browser time; per-operation/test limits are unchanged.
 Corrected-build CI must pass before marking Windows lifecycle parity. Earlier
 security CI remains valid for its scoped gate closures, not this successor code.
+
+## 2026-10-15: Control Deadlines And Pinned Runtime Reproduction
+
+CI38714097993 at45f91c8 still fails Windows preflight via the25-second test command
+envelope. Do not claim hosted parity. Review found a concrete independent defect:
+host ReadToEnd and WaitForExit could block outside readiness deadlines. Empty output
+was withheld by those calls, not evidence that Node produced none. The precise
+hosted-runner noncompletion cause remains unproven.
+
+Host control now uses one-line asynchronous replies and bounded client exit/reply
+waits, capped at min(TimeoutSeconds,15). Only its owned short-lived control client
+can be stopped on timeout, never the managed runtime child. Foreground Run remains
+continuous for Task Scheduler. Tests add a real hung client and sanitized synthetic
+stage traces; healthy startup15 sec stays below production default60, adverse
+readiness/shutdown cases retain5 sec. Command/test envelopes60/120 sec cover the
+multiple bounded operations; no submission/owner-policy safeguard is relaxed.
+
+Official Node24.21.0 binary is SHA256-verified in TEMP/opencareers-node-v24.21.0;
+global Node remains unchanged. On the pinned version, control/launcher8/8 pass168.63s
+before the fixture-envelope-only adjustment; actual compiled lifecycle7/7 passes
+24.39s afterwards. Types/lint/build checks and successor CI must be recorded for
+the final correction. Counts remain12/19 phases and102/128 gates. Prior verified
+security/outcome scope remains distinct from this newer Windows runtime work.
