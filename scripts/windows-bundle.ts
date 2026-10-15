@@ -162,7 +162,12 @@ with private data outside the installation on a non-synced disk. Then use:
 
     powershell.exe -NoProfile -File scripts/windows-runtime.ps1 -Mode Start -ConfigFile <absolute-config> -NodePath <absolute-node>
 
-Status and Stop use the same arguments with their respective Mode. Startup
+Status, Stop and Restart use the same arguments with their respective Mode.
+Start waits for authenticated readiness. Restart drains the known runtime before
+replacement; it never clears a control record or forces a kill. -TimeoutSeconds
+bounds each wait (default 60, range 5-120). On failure inspect Status; a process
+may remain starting or draining. Owner pause/policy and uncertain outcomes are
+preserved. Use -WhatIf to preview lifecycle changes. Startup
 installation/removal require -ApproveStartup; use -WhatIf first. The startup
 task runs at current-user logon, not while logged out. Private operation still
 requires reviewed facts, authorized policy and supported routes. This is not

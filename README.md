@@ -47,12 +47,16 @@ are fixture simulations and memory covers the Node driver, not Chromium children
 short runs do not satisfy production soak gates. See
 [capacity evidence](docs/evidence/P13-capacity-foundation.md).
 
-After building, the local Windows launcher supports `Start`, `Status`, `Stop`,
+After building, the local Windows launcher supports `Start`, `Restart`, `Status`, `Stop`,
 `InstallStartup` and `RemoveStartup`. Supply `-ConfigFile` with an absolute
 private configuration path and `-NodePath` with the pinned Node executable to
 `scripts/windows-runtime.ps1`. Startup changes require `-ApproveStartup`;
 `-WhatIf` previews them. The hidden host isolates Node's environment and returns
-its exit status. Actual installed-task/reboot verification remains open; see
+its exit status. Start waits for authenticated readiness; Restart drains the known
+runtime before starting its replacement. `-TimeoutSeconds` bounds each wait
+(default 60, range 5-120). A timeout never forces a process kill or clears an
+ownership record; inspect Status before retrying. Lifecycle commands do not unpause
+submissions or replay uncertain attempts. Actual installed-task/reboot verification remains open; see
 [Windows runtime evidence](docs/evidence/P13-windows-startup-host.md).
 
 `corepack pnpm bundle:windows` rebuilds a checksummed, precompiled runtime ZIP

@@ -28,3 +28,8 @@ was registered or removed. The launcher's current-user interactive logon scope
 does not promise operation while logged out.
 
 The process settings follow the [Microsoft ProcessStartInfo documentation](https://learn.microsoft.com/en-us/dotnet/fundamentals/runtime-libraries/system-diagnostics-processstartinfo-useshellexecute).
+
+2026-10-15 successor: the launcher now waits for authenticated readiness and
+supports orderly Restart with process-exit and ownership checks. See
+[Windows lifecycle delivery](P13-windows-lifecycle-delivery.md). This still does
+not establish installed logon/reboot/sleep/soak acceptance.

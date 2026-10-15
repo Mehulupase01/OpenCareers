@@ -2553,3 +2553,26 @@ in391.98s. Affected desktop/mobile document/generation checks4/4 pass48.8s. See
 P15-hostile-input-matrix.md for bounded claims; no private service, model, mailbox
 or employer was activated. Next development batch is Windows lifecycle delivery,
 not another expansion of the same security test checkpoint.
+
+## 2026-10-15: Windows Lifecycle And Fixed Acceptance
+
+Security correctiona8484e4 is pushed; CI38710562833 is pending. Windows launcher
+now waits for authenticated running state and supports orderly Restart. The
+authenticated runtime PID is captured before stop, checked again in its response,
+and awaited before replacement. Unknown/nonrunning ownership, failed stop and hung
+shutdown refuse replacement. No forced kill, control deletion or owner-policy
+change occurs; startup approval and WhatIf remain intact. TimeoutSeconds defaults
+to60, range5-120, plus bounded probe overhead. README/bundle instructions updated.
+
+Five real-launcher/host synthetic fixture checks pass31.86s; actual compiled
+lifecycle/host group9/9 passes20.90s. Types/lint/ledger and production build/native
+237-component SBOM pass. Full suite and clean installation run in successor CI,
+not a second duplicate local full run. P13 physical reboot/sleep and elapsed soaks
+remain open, with no private runtime, installed logon task or employer activated.
+
+Independent bounded acceptance review found P16-03, P16-04 and G6 already satisfy
+their written engineering criteria. Closed them against existing executable
+calibration and all four named regression categories; optional future breadth is
+not a moving blocker. P16-engineering-acceptance.md records exact evidence/limits.
+Counts are12/19 completed phases and100/128 gates. P16 G5 awaits corrected-letter
+CI; P15 dependencies, genuine receipts and elapsed24/72h soaks remain unfulfilled.

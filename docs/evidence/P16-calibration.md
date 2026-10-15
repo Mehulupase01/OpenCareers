@@ -6,6 +6,11 @@ Engineering report, not a completed live quality evaluation. P16 remains in
 progress and depends on unfinished P15 acceptance. No standing policy revision,
 score weight, daily limit or submission authorization is changed by this report.
 
+2026-10-15 acceptance reconciliation: P16-03 and P16-04/G6 engineering criteria
+are satisfied; see P16-engineering-acceptance.md. Optional future breadth and
+missing live volumes are not additional coding blockers. P16's P15 dependency
+and corrected-letter G5 verification remain open.
+
 Published project evidence contains no certified genuine P08 receipt. Private
 owner databases, messages and review files were not inspected for this report;
 their population is therefore unknown, not asserted to be zero. Synthetic
@@ -19,8 +24,10 @@ Owner-reviewed relevance datasets freeze exact assessment/job/profile attributio
 minimized labels and a server recording cutoff. Compatible model/provider routes,
 canonical-job uniqueness and evidence digests are required. The reports expose
 rank correlation and discrimination diagnostics with sample sizes, fixed review
-windows and refusal states; they do not produce hiring probabilities. Scoring
-code-version and immutable provider-build attribution remain incomplete.
+windows and refusal states; they do not produce hiring probabilities. Local
+pipeline/profile compatibility is now frozen for new assessments/datasets;
+legacy version history and immutable upstream provider-build attribution remain
+explicitly unavailable.
 
 Fixed outcome cohorts qualify typed, digest-checked non-mock confirmed receipts,
 deduplicate canonical jobs and exclude synthetic, unverified, unresolved,
@@ -64,13 +71,16 @@ and physical Windows/server operation are tracked independently.
 - Immutable upstream provider-build history and submission-time metadata history;
   new matching assessments and fixed datasets now record local pipeline/profile
   compatibility, while legacy version history remains explicitly unrecorded.
-- Authoritative seniority and sponsorship grouping; current unknowns stay unknown.
-- Truthful automatic wording/ordering variant generation and independent approval.
+- Effectiveness of intent-frozen conservative seniority/sponsorship grouping;
+  new v2 cohorts have evidence/provenance, legacy and unsupported inputs stay unknown.
+- Live effectiveness of approved role_focus/concise wording recipes. Generation,
+  exact owner assignment and synthetic guarded receipt workflows are implemented;
+  arbitrary ordering recipes remain unsupported rather than silently generated.
 - Selection bias, assignment effects and sample volumes sufficient for inference.
-- Broader private correction proposals and form/adapter regression cases; verified
-  workload corrections have owner-gated proposal/export capture. Reviewed generic
-  unsupported-control and changed-fingerprint fixtures execute in the owned browser
-  engine; broader automatic capture and portal-specific variants remain open.
+- Optional future correction and portal-specific breadth beyond the four written
+  categories. Workload/date/language/metric corrections, rejected claims,
+  unsupported controls and generic drift have reviewed executable synthetic
+  consumers; exhaustive future coverage is not a ticket completion condition.
 
 Any recommendation is advisory. Existing owner authorization remains the sole
 policy source. An experiment definition, report, fixture or inferred preference

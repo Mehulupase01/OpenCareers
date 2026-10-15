@@ -243,6 +243,7 @@ describe("standalone compiled installation", () => {
       throw new Error(`Synthetic startup failed: ${events}`);
     }
     expect(processAlive(pid)).toBe(true);
+    expect((await runtimeCommand(config, "status")).runtimePid).toBe(pid);
     expect((await fetch(`http://127.0.0.1:${port}/health/runtime`)).status).toBe(200);
     const record = JSON.parse(
       await readFile(join(config.dataDir, ".runtime/control.json"), "utf8"),

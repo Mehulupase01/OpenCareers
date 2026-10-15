@@ -1515,7 +1515,8 @@
           "evidence": [
             "docs/evidence/P13-runtime-foundation.md",
             "docs/evidence/P13-windows-startup-host.md",
-            "docs/evidence/P13-windows-bundle.md"
+            "docs/evidence/P13-windows-bundle.md",
+            "docs/evidence/P13-windows-lifecycle-delivery.md"
           ],
           "nextAction": "P13-01"
         },
@@ -1980,7 +1981,7 @@
         {
           "id": "P16-03",
           "text": "Score calibration. Evaluate whether high fit scores correspond to better reviewed relevance and eventually better outcomes, publishing no interview probabilities before enough reliable labeled outcomes exist.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-score-calibration.md",
@@ -1988,14 +1989,15 @@
             "docs/evidence/P16-calibration.md",
             "tests/unit/score-calibration.test.ts",
             "tests/integration/calibration.test.ts",
-            "tests/e2e/calibration.spec.ts"
+            "tests/e2e/calibration.spec.ts",
+            "docs/evidence/P16-engineering-acceptance.md"
           ],
-          "nextAction": "P16-03"
+          "nextAction": null
         },
         {
           "id": "P16-04",
           "text": "Quality regression loop. Turn corrected facts, rejected claims, misclassified forms, and adapter drift into sanitized regression fixtures.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-regression-import.md",
@@ -2010,9 +2012,10 @@
             "tests/integration/regression-proposals.test.ts",
             "tests/e2e/regressions.spec.ts",
             "tests/unit/regression-redaction.test.ts",
-            "tests/integration/regression-loop.test.ts"
+            "tests/integration/regression-loop.test.ts",
+            "docs/evidence/P16-engineering-acceptance.md"
           ],
-          "nextAction": "P16-04"
+          "nextAction": null
         },
         {
           "id": "P16-05",
@@ -2088,13 +2091,14 @@
         {
           "id": "P16-G6",
           "requirement": "Owner corrections become regression tests without leaking personal data into Git.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P16-regression-import.md",
             "docs/evidence/P16-letter-regressions.md",
             "tests/integration/letter-regression.test.ts",
             "tests/unit/regression-redaction.test.ts",
-            "tests/integration/regression-loop.test.ts"
+            "tests/integration/regression-loop.test.ts",
+            "docs/evidence/P16-engineering-acceptance.md"
           ]
         },
         {
@@ -2185,7 +2189,7 @@
         }
       ],
       "acceptanceTests": [],
-      "nextAction": "P16-03",
+      "nextAction": "Verify corrected-letter P16-05/G5 CI; retain P15 phase dependency and live-data limitations without expanding closed engineering criteria.",
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",

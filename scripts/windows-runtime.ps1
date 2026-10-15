@@ -1,11 +1,12 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [ValidateSet('Start', 'Status', 'Stop', 'InstallStartup', 'RemoveStartup')]
+    [ValidateSet('Start', 'Restart', 'Status', 'Stop', 'InstallStartup', 'RemoveStartup')]
     [string]$Mode = 'Status',
     [string]$InstallRoot,
     [string]$ConfigFile,
     [string]$NodePath,
-    [switch]$ApproveStartup
+    [switch]$ApproveStartup,
+    [ValidateRange(5, 120)][int]$TimeoutSeconds = 60
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,12 +42,54 @@ try {
     finally { $hash.Dispose() }
     $suffix = ([BitConverter]::ToString($digest)).Replace('-', '').Substring(0, 12)
     $taskName = "OpenCareers-$suffix"
+    function Read-RuntimeStatus {
+        try {
+            $output = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status 2>$null
+            if ($LASTEXITCODE -ne 0 -or -not $output) { return $null }
+            $status = $output | ConvertFrom-Json
+            if ($status.state -notin @('starting', 'running', 'backoff', 'stopping', 'stopped')) { return $null }
+            return $status
+        } catch { return $null }
+    }
+    function Start-ReadyRuntime {
+        $existing = Read-RuntimeStatus
+        if ($existing) {
+            if ($existing.state -eq 'running') { $existing | ConvertTo-Json -Compress; return }
+            throw 'A runtime already owns this installation but is not running. Check Status before retrying.'
+        }
+        $launched = Start-Process -FilePath $powershell -ArgumentList $hostArguments -WorkingDirectory $root -WindowStyle Hidden -PassThru
+        try {
+            $watch = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+                if ($launched.HasExited) { throw 'The runtime host exited before readiness. Check bounded runtime diagnostics.' }
+                $status = Read-RuntimeStatus
+                if ($status -and $status.state -eq 'running') { $status | ConvertTo-Json -Compress; return }
+                Start-Sleep -Milliseconds 250
+            }
+            throw 'Runtime readiness timed out. A process may still be starting; inspect Status before retrying. No process or control record was forcibly removed.'
+        } finally { $launched.Dispose() }
+    }
     switch ($Mode) {
         'Status' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status }
         'Stop' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop }
         'Start' {
             if ($PSCmdlet.ShouldProcess($root, 'Start hidden application runtime')) {
-                Start-Process -FilePath $powershell -ArgumentList $hostArguments -WorkingDirectory $root -WindowStyle Hidden
+                Start-ReadyRuntime
+            }
+        }
+        'Restart' {
+            if ($PSCmdlet.ShouldProcess($root, 'Drain the authenticated runtime and start its replacement')) {
+                $status = Read-RuntimeStatus
+                if (-not $status -or $status.state -ne 'running' -or -not $status.runtimePid -or $status.runtimePid -le 0) { throw 'Restart requires an authenticated running runtime with a known process identity. Use Status; no replacement was launched.' }
+                $owned = Get-Process -Id $status.runtimePid -ErrorAction Stop
+                try {
+                    $stopped = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop
+                    if ($LASTEXITCODE -ne 0) { throw 'Authenticated runtime shutdown failed; no replacement was launched.' }
+                    $shutdown = $stopped | ConvertFrom-Json
+                    if ($shutdown.runtimePid -ne $status.runtimePid) { throw 'Runtime ownership changed during shutdown; no replacement was launched.' }
+                    if (-not $owned.WaitForExit($TimeoutSeconds * 1000)) { throw 'Runtime shutdown timed out; no replacement was launched and no process was forcibly killed.' }
+                } finally { $owned.Dispose() }
+                Start-ReadyRuntime
             }
         }
         'InstallStartup' {

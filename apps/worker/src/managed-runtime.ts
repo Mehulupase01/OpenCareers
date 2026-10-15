@@ -42,6 +42,7 @@ export async function runtimeCommand(config: Config, command: "status" | "stop")
     .object({
       state: z.enum(["starting", "running", "backoff", "stopping", "stopped"]),
       pids: z.array(z.number().int().positive()).max(2),
+      runtimePid: z.number().int().positive(),
     })
     .strict()
     .parse(result);
@@ -131,7 +132,7 @@ export async function runManagedRuntime(config: Config, cwd: string, env: NodeJS
       return;
     }
     if (request.method === "GET" && request.url === "/status") {
-      response.end(JSON.stringify(supervisor.status()));
+      response.end(JSON.stringify({ ...supervisor.status(), runtimePid: process.pid }));
     } else if (
       request.method === "POST" &&
       request.url === "/stop" &&
@@ -139,7 +140,9 @@ export async function runManagedRuntime(config: Config, cwd: string, env: NodeJS
       Number(request.headers["content-length"] ?? 0) === 0
     ) {
       supervisor.stop();
-      response.writeHead(202).end(JSON.stringify(supervisor.status()));
+      response
+        .writeHead(202)
+        .end(JSON.stringify({ ...supervisor.status(), runtimePid: process.pid }));
     } else response.writeHead(404).end("{}");
   });
   server.maxConnections = 10;
