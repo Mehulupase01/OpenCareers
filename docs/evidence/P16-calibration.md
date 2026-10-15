@@ -9,7 +9,7 @@ score weight, daily limit or submission authorization is changed by this report.
 2026-10-15 acceptance reconciliation: P16-03 and P16-04/G6 engineering criteria
 are satisfied; see P16-engineering-acceptance.md. Optional future breadth and
 missing live volumes are not additional coding blockers. P16's P15 dependency
-and corrected-letter G5 verification remain open.
+remains open; corrected-letter G5 verification now passes CI38710562833 at a8484e4.
 
 Published project evidence contains no certified genuine P08 receipt. Private
 owner databases, messages and review files were not inspected for this report;

@@ -1788,7 +1788,7 @@
         {
           "id": "P15-01",
           "text": "Threat review. Test malicious job descriptions, email instructions, document payloads, unsafe imported URLs, untrusted model output, and attempts to widen execution authority.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": ["T26", "T28", "T29"],
           "evidence": [
             "docs/evidence/P18-hosted-preparation-integration.md",
@@ -1800,7 +1800,7 @@
             "tests/integration/untrusted-mail.test.ts",
             "tests/unit/hostile-letter.test.ts"
           ],
-          "nextAction": "Complete the integrated malicious-input, document, mailbox and authority-widening threat matrix; URL and pricing boundaries alone do not close G1."
+          "nextAction": null
         },
         {
           "id": "P15-02",
@@ -1867,7 +1867,7 @@
         {
           "id": "P15-G1",
           "requirement": "No critical unresolved finding can permit unauthorized submission, secret disclosure, wrong-owner access, or blind duplicate replay.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P15-hostile-input-matrix.md",
             "tests/integration/hostile-inference.test.ts",
@@ -1937,10 +1937,17 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": null,
-      "remoteVerification": [],
+      "lastVerifiedCommit": "a8484e47679baea8d63dd0a8c0efd79cf2ef66a4",
+      "remoteVerification": [
+        {
+          "runId": "38710562833",
+          "commit": "a8484e47679baea8d63dd0a8c0efd79cf2ef66a4",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
+          "covers": "Integrated hostile job/model/document/mail/URL and authority checks, sanitized inference failures, independent new/retained packet and intent/dispatch checks, corrected recovery and artifact guards. All known scoped review findings resolved; full browser and clean Windows install pass. Closes P15-01/G1, not full security/crash/restore/soak acceptance or successor runtime changes."
+        }
+      ],
       "acceptanceTests": ["T26", "T28", "T29"],
-      "nextAction": "P15-01",
+      "nextAction": "P15-02",
       "evidence": [
         "docs/plans/P15-security-release-gates.md",
         "docs/evidence/ENCRYPTION-RESTORE.md"
@@ -1949,7 +1956,7 @@
     {
       "id": "P16",
       "title": "Outcomes, calibration, and continuous improvement",
-      "status": "in_progress",
+      "status": "code_complete_verification_pending",
       "dependsOn": ["P15"],
       "tickets": [
         {
@@ -2024,7 +2031,7 @@
         {
           "id": "P16-05",
           "text": "Controlled experiments. Compare approved wording or ordering variants without applying twice to the same job or weakening truthfulness, recording experiment assignments before outcomes are known.",
-          "status": "in_progress",
+          "status": "complete",
           "acceptanceTests": [],
           "evidence": [
             "docs/evidence/P16-controlled-experiments.md",
@@ -2034,7 +2041,7 @@
             "tests/integration/experiments.test.ts",
             "tests/integration/documents.test.ts"
           ],
-          "nextAction": "Verify source-quote narrative and retained-packet security corrections through full checks and successor CI."
+          "nextAction": null
         }
       ],
       "gates": [
@@ -2079,7 +2086,7 @@
         {
           "id": "P16-G5",
           "requirement": "Experiments cannot create duplicate applications or unsupported claims.",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             "docs/evidence/P16-controlled-experiments.md",
             "docs/evidence/P16-generated-wording.md",
@@ -2123,7 +2130,7 @@
         "status": "not_required",
         "note": "No external prerequisite is recorded for this phase."
       },
-      "lastVerifiedCommit": "7a954e2fd20e73453d105a8a83ca487ebc04421b",
+      "lastVerifiedCommit": "a8484e47679baea8d63dd0a8c0efd79cf2ef66a4",
       "remoteVerification": [
         {
           "runId": "38167046432",
@@ -2190,10 +2197,16 @@
           "commit": "7a954e2fd20e73453d105a8a83ca487ebc04421b",
           "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
           "covers": "Intent-frozen conservative vacancy seniority/sponsorship signals, legacy hash compatibility, fixed cohort provenance, full browser and production-only Windows installation. Closes P16-02 only. G5 was subsequently reopened for unsupported quoted-letter claims; this older green build does not verify that correction."
+        },
+        {
+          "runId": "38710562833",
+          "commit": "a8484e47679baea8d63dd0a8c0efd79cf2ef66a4",
+          "lanes": ["Windows", "Ubuntu", "PostgreSQL", "server-image"],
+          "covers": "Corrected full-text source-quote narrative screening, independent validation, retained packet/artifact invalidation and intent/dispatch checks. Full browser/Windows clean install pass; P16-05/G5 close. All written P16 engineering criteria are satisfied, but P15 dependency, genuine outcomes and release evidence are not waived."
         }
       ],
       "acceptanceTests": [],
-      "nextAction": "Verify corrected-letter P16-05/G5 CI; retain P15 phase dependency and live-data limitations without expanding closed engineering criteria.",
+      "nextAction": "Complete P15 dependency and applicable production verification before phase closure; engineering tickets and gates are complete, with insufficient live outcomes reported honestly.",
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",

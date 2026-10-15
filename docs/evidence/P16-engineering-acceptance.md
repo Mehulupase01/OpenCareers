@@ -38,8 +38,10 @@ frozen local security suite at a8484e4:1,344 passed,398 PostgreSQL/opt-in skips.
 A bounded independent read-only source/acceptance review found no unmet written
 criterion for P16-03, P16-04 or G6. This is not independent live measurement.
 
-P16-05/G5 remain open pending corrected-letter CI. P16 phase closure still requires
+Corrected-letter CI38710562833 at a8484e4 passes all four lanes, including full
+browser and clean Windows installation; P16-05/G5 close. P16 phase closure requires
 its documented P15 dependency; no dependency is waived by closing these tickets.
 The genuine outcome corpus remains insufficient. Genuine receipts, physical
 Windows operation and real elapsed24/72-hour soak evidence are not fabricated or
-substituted with fixture clocks. No inference weight or owner policy is changed.
+substituted with fixture clocks. P16 is code_complete_verification_pending, not a
+completed phase. No inference weight or owner policy is changed.

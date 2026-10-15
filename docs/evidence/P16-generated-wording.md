@@ -5,9 +5,9 @@ d0c2374141b6d2e9d244d77a4b4aaac6f91f93de pass all four lanes: Windows, Ubuntu,
 PostgreSQL and server-image. P16-05/G5 close; the complete P16 phase remains open.
 
 2026-10-15 follow-up: P15 review found source quotations could launder unsupported
-candidate claims into motivation. P16-05/G5 are reopened pending verification of
-the full-text and retained-packet correction in P15-hostile-input-matrix.md.
-The earlier successful CI remains historical evidence, not proof of this fix.
+candidate claims into motivation. P16-05/G5 were reopened, then reclosed after
+CI38710562833 at a8484e4 passed all four lanes for the full-text/retained-packet
+correction in P15-hostile-input-matrix.md. Earlier CI is historical, not this proof.
 
 ## Owner Workflow
 

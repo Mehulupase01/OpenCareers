@@ -1,7 +1,9 @@
 # Hostile Input And Authority Matrix
 
-Engineering milestone, 2026-10-15. Local frozen verification passes; successor
-CI remains pending. This does not close the entire P15 phase.
+Engineering milestone, 2026-10-15. Local frozen verification and CI38710562833 at
+a8484e4 pass all four lanes, including full browser and clean Windows installation.
+P15-01/G1 close with all known scoped findings resolved. This does not close the
+entire P15 phase or certify absence of every possible future vulnerability.
 
 ## Confirmed Findings And Fixes
 
@@ -33,7 +35,7 @@ NEEDS_INPUT; uncertain/dispatched/confirmed states are not rewritten or replayed
 Retained-artifact regressions reconstruct the old valid report around genuinely
 rendered synthetic content; they do not weaken today's validator. Content digest
 checks independently refuse changed packet content at intent and dispatch.
-P16-05/G5 remain reopened until the corrected build has final verification.
+P16-05/G5 reclose after corrected-build CI38710562833 passes all four lanes.
 
 ## Executed Boundaries
 
@@ -81,7 +83,7 @@ in the 28 document/mail cases. Frozen full suite: 1,344 passed, 398 PostgreSQL/o
 skips, 121 passing files and two skipped, 391.98 seconds. Lint, typecheck and ledger
 and production build/native237-component SBOM pass. Affected desktop/mobile
 document and generation workflows: four passed,
-48.8 seconds. Public-source scan: 549 files. Successor CI results follow after
-push; CI includes clean Windows installation rather than repeating that long
+48.8 seconds. Public-source scan: 549 files. Successor CI38710562833 passes all
+four lanes and includes clean Windows installation rather than repeating that long
 installation locally and remotely. No private configuration, employer, model or
 mailbox was activated and no genuine application was submitted.

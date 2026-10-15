@@ -2590,3 +2590,22 @@ P13-recovery-first-scheduling.md. Final unit/joined pair7/7 pass5.65s; separate
 recovery/compiled lifecycle8/8 pass23.03s; types/lint/build/native237-component SBOM
 pass. Full checks and clean installation run in successor CI rather than a duplicate
 local full suite. No new gate closure follows just from scheduling improvement.
+
+## 2026-10-15: Verified Engineering Gate Closure
+
+Security CI38710562833 at a8484e47679baea8d63dd0a8c0efd79cf2ef66a4 now passes
+all four lanes, including Windows full browser and production-only clean install.
+All known scoped threat-review findings are resolved: P15-01/G1 and corrected-letter
+P16-05/G5 close. Combined with the written-acceptance reconciliation, every P16
+engineering ticket/gate is complete. P16 stays code_complete_verification_pending
+because its P15 dependency is unfinished; this is not an additional completed phase.
+Current counts:12/19 phases complete,102/128 gates complete; P08 and P16 are code
+complete with production/dependency verification pending, five phases in progress.
+
+Windows lifecycle e21cd347d67aff420dccfb898c5e179d6ae8d9c2 is pushed with successor
+CI38711591671 pending. Recovery-first worker e843c32 is pushed with its own CI
+pending. Do not reuse older green CI as verification of these newer runtime
+changes. No actual24/72h soak, physical reboot/sleep, genuine employer receipt,
+private activation or complete source/portal coverage is claimed. Next work is
+remaining Windows runtime/scheduling/recovery acceptance and measured installed
+synthetic operation; do not reopen closed P16 engineering for optional breadth.
