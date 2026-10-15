@@ -91,6 +91,43 @@ that could expire before several separately bounded operations. Fixture self-exp
 covers that envelope. Synthetic command-stage traces are attached only on failure;
 they contain no real account/candidate/model data. New hosted CI is still required.
 
+## Caller-Pipe Root Cause And Final Correction
+
+CI38716348738 at0f9c3da passes three launcher scenarios; two aggregate cases hit
+their120-second test envelope. Local stage traces show the runtime already ready
+in under a second while execFile waits for caller-pipe EOF until its60-second
+command envelope. Its apparent success at that deadline was not prompt launcher
+completion. A new check bounds pipe draining after the launcher has exited and
+fails this false-green behavior within5 seconds without killing the runtime.
+
+Redirecting stdio and clearing only standard-handle inheritance did not resolve
+the inherited caller handles; those attempted implementations are removed.
+Native Windows Launch now uses a small reviewed CreateProcessW wrapper with
+handle inheritance disabled, explicit executable/quoted arguments/cwd, no console,
+and a sorted explicit Unicode environment containing only the existing allowlist.
+Returned process/thread handles and environment memory are released. It starts the
+same compiled runtime, not another engine. Scheduled foreground Run is unchanged.
+Implementation follows [Microsoft's CreateProcessW contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
+and [creation flags](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags).
+
+The caller-completion fixture falls from61.34s to4.07s on pinned Node24.21.0.
+This is a synthetic caller-pipe measurement, not a general startup benchmark.
+All27 focused launcher/host/lifecycle/ledger checks pass50.43s. An additional
+compiled Windows-shaped local Start/Restart/Stop workflow passes inside the
+seven-case lifecycle group30.40s: persisted control settings remain identical,
+old/new owned PIDs drain, zero attempts are created, and no private
+owner configuration, credentials, scheduled task or employer is used.
+Independent scoped native-launch review finds no actionable issue; it is static
+review, not additional runtime evidence.
+
+Bootstrap combines version/config/authenticated status into one read-only call,
+preserving version/profile checks and reducing redundant process hops. CI's Linux/
+PostgreSQL failures in0f9c3da were only a ledger nextAction format mismatch. The
+ledger now points at the actual open P15-G2 dependency; the cheap validator also
+enforces an addressable remaining gate after engineering tickets are complete.
+CI preflight now stops on its first failure, while every case still runs on a
+successful build. Final corrected-build CI remains required for hosted parity.
+
 The full suite runs once in successor CI for this narrower launcher-only batch;
 the prior security batch's1,344-test local full check is not presented as evidence
 for these new changes. No real private configuration, installed logon task,

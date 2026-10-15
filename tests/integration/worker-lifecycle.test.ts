@@ -9,7 +9,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { runtimeCommand } from "../../apps/worker/src/managed-runtime.js";
 import { type RuntimeEvent, RuntimeSupervisor } from "../../apps/worker/src/runtime-supervisor.js";
 import { loadConfig } from "../../packages/config/src/index.js";
-import { ensureDemoMarker } from "../../packages/persistence/src/index.js";
+import { connect, ensureDemoMarker } from "../../packages/persistence/src/index.js";
 
 const execute = promisify(execFile);
 const root = process.cwd();
@@ -244,6 +244,16 @@ describe("standalone compiled installation", () => {
     }
     expect(processAlive(pid)).toBe(true);
     expect((await runtimeCommand(config, "status")).runtimePid).toBe(pid);
+    const bootstrap = await execute(
+      process.execPath,
+      [resolve("dist/scripts/runtime.js"), "bootstrap"],
+      { cwd: root, env, timeout: 5000 },
+    );
+    expect(JSON.parse(bootstrap.stdout)).toMatchObject({
+      profile: "demo",
+      nodeVersion: process.version,
+      runtimeStatus: { state: "running", runtimePid: pid },
+    });
     expect((await fetch(`http://127.0.0.1:${port}/health/runtime`)).status).toBe(200);
     const record = JSON.parse(
       await readFile(join(config.dataDir, ".runtime/control.json"), "utf8"),
@@ -300,9 +310,15 @@ describe("standalone compiled installation", () => {
     cleanup.push(() => rm(directory, { recursive: true, force: true }));
     const file = join(directory, "private.env");
     const data = join(directory, "data");
+    const socket = createServer();
+    await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
+    const address = socket.address();
+    if (!address || typeof address === "string") throw new Error("Missing local fixture port.");
+    const port = address.port;
+    await new Promise<void>((resolve) => socket.close(() => resolve()));
     await writeFile(
       file,
-      `AUTOPILOT_PROFILE=local\nAUTOPILOT_DATA_DIR="${data.replaceAll("\\", "/")}"\nAUTOPILOT_OWNER_TOKEN=${"a".repeat(32)}\n`,
+      `AUTOPILOT_PROFILE=local\nAUTOPILOT_PORT=${port}\nAUTOPILOT_DATA_DIR="${data.replaceAll("\\", "/")}"\nAUTOPILOT_OWNER_TOKEN=${"a".repeat(32)}\n`,
     );
     const result = await execute(
       process.execPath,
@@ -320,16 +336,14 @@ describe("standalone compiled installation", () => {
         "-NonInteractive",
         "-File",
         resolve("scripts/windows-runtime.ps1"),
-        "-Mode",
-        "InstallStartup",
         "-NodePath",
         process.execPath,
         "-ConfigFile",
         file,
       ];
-      const runInstaller = async (extra: string[]) => {
+      const runInstaller = async (extra: string[], mode = "InstallStartup") => {
         try {
-          return await execute("powershell.exe", [...args, ...extra], {
+          return await execute("powershell.exe", [...args, "-Mode", mode, ...extra], {
             cwd: root,
             env: environment(),
             timeout: 90000,
@@ -358,6 +372,35 @@ describe("standalone compiled installation", () => {
       );
       const preview = await runInstaller(["-ApproveStartup", "-WhatIf"]);
       expect(preview.stdout).toContain("What if:");
+      const local = loadConfig({
+        AUTOPILOT_PROFILE: "local",
+        AUTOPILOT_DATA_DIR: data,
+        AUTOPILOT_PORT: String(port),
+        AUTOPILOT_OWNER_TOKEN: "a".repeat(32),
+      });
+      const owned: number[] = [];
+      cleanup.push(async () => {
+        await runtimeCommand(local, "stop").catch(() => undefined);
+        await waitFor(() => owned.every((pid) => !processAlive(pid)), 35000);
+      });
+      const started = JSON.parse((await runInstaller([], "Start")).stdout);
+      owned.push(started.runtimePid, ...started.pids);
+      const evidence = await connect(local);
+      try {
+        const policy = await evidence.getControl();
+        expect(policy.submissionsPaused).toBe(true);
+        const restarted = JSON.parse((await runInstaller([], "Restart")).stdout);
+        owned.push(restarted.runtimePid, ...restarted.pids);
+        expect(restarted.runtimePid).not.toBe(started.runtimePid);
+        expect(processAlive(started.runtimePid)).toBe(false);
+        expect(await evidence.getControl()).toEqual(policy);
+        expect(await evidence.db.query("SELECT id FROM attempts")).toHaveLength(0);
+        await runInstaller([], "Stop");
+        await waitFor(() => owned.every((pid) => !processAlive(pid)), 35000);
+        expect(await readFile(file, "utf8")).not.toContain("OPENROUTER");
+      } finally {
+        await evidence.db.close();
+      }
     }
   }, 240000);
 });

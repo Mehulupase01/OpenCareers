@@ -19,24 +19,22 @@ $runtime = Join-Path $root 'dist\scripts\runtime.js'
 $startupHost = Join-Path $root 'scripts\windows-startup-host.ps1'
 if (-not (Test-Path -LiteralPath $runtime -PathType Leaf)) { throw 'Build the application before launching it.' }
 if (-not (Test-Path -LiteralPath $startupHost -PathType Leaf)) { throw 'The Windows startup host is missing.' }
-$powershell = (Get-Command powershell.exe -CommandType Application).Source
 if (-not $NodePath) { $NodePath = (Get-Command node -CommandType Application).Source }
 $node = (Resolve-Path -LiteralPath $NodePath).Path
 if (-not $ConfigFile) { $ConfigFile = Join-Path $root '.env' }
 $config = (Resolve-Path -LiteralPath $ConfigFile).Path
 if ($root.Contains('"') -or $config.Contains('"') -or $runtime.Contains('"') -or $node.Contains('"') -or $startupHost.Contains('"')) { throw 'Paths must not contain quote characters.' }
 $controlSeconds = [Math]::Min($TimeoutSeconds, 15)
-$versionText = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Version -ControlTimeoutSeconds $controlSeconds
-if (-not $versionText -or $LASTEXITCODE -ne 0) { throw 'The Node executable did not return its version.' }
-$version = [Version]($versionText.Trim().TrimStart('v'))
-if ($version -lt [Version]'24.14.0' -or $version -ge [Version]'25.0.0') { throw 'Use the pinned Node 24 runtime.' }
 $previous = Get-Location
 try {
     Set-Location -LiteralPath $root
     $hostArguments = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-File', "`"$startupHost`"", '-InstallRoot', "`"$root`"", '-ConfigFile', "`"$config`"", '-NodePath', "`"$node`"")
-    $validated = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Validate -ControlTimeoutSeconds $controlSeconds
+    $validated = & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Bootstrap -ControlTimeoutSeconds $controlSeconds
     if ($LASTEXITCODE -ne 0) { throw 'Private runtime configuration is invalid.' }
     $settings = $validated | ConvertFrom-Json
+    if (-not $settings.nodeVersion) { throw 'The Node executable did not return its version.' }
+    $version = [Version]($settings.nodeVersion.Trim().TrimStart('v'))
+    if ($version -lt [Version]'24.14.0' -or $version -ge [Version]'25.0.0') { throw 'Use the pinned Node 24 runtime.' }
     if ($settings.profile -ne 'local') { throw 'Windows startup is restricted to the local private profile.' }
     $hash = [System.Security.Cryptography.SHA256]::Create()
     try { $digest = $hash.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant())) }
@@ -53,7 +51,7 @@ try {
         } catch { return $null }
     }
     function Start-ReadyRuntime {
-        $existing = Read-RuntimeStatus
+        param($existing)
         if ($existing) {
             if ($existing.state -eq 'running') { $existing | ConvertTo-Json -Compress; return }
             throw 'A runtime already owns this installation but is not running. Check Status before retrying.'
@@ -75,16 +73,19 @@ try {
         } finally { $launched.Dispose() }
     }
     switch ($Mode) {
-        'Status' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Status -ControlTimeoutSeconds $controlSeconds }
+        'Status' {
+            if (-not $settings.runtimeStatus) { throw 'Authenticated runtime control is unavailable.' }
+            $settings.runtimeStatus | ConvertTo-Json -Compress
+        }
         'Stop' { & $startupHost -InstallRoot $root -ConfigFile $config -NodePath $node -Mode Stop -ControlTimeoutSeconds $controlSeconds }
         'Start' {
             if ($PSCmdlet.ShouldProcess($root, 'Start hidden application runtime')) {
-                Start-ReadyRuntime
+                Start-ReadyRuntime $settings.runtimeStatus
             }
         }
         'Restart' {
             if ($PSCmdlet.ShouldProcess($root, 'Drain the authenticated runtime and start its replacement')) {
-                $status = Read-RuntimeStatus
+                $status = $settings.runtimeStatus
                 if (-not $status -or $status.state -ne 'running' -or -not $status.runtimePid -or $status.runtimePid -le 0) { throw 'Restart requires an authenticated running runtime with a known process identity. Use Status; no replacement was launched.' }
                 $owned = Get-Process -Id $status.runtimePid -ErrorAction Stop
                 try {
@@ -94,12 +95,13 @@ try {
                     if ($shutdown.runtimePid -ne $status.runtimePid) { throw 'Runtime ownership changed during shutdown; no replacement was launched.' }
                     if (-not $owned.WaitForExit($TimeoutSeconds * 1000)) { throw 'Runtime shutdown timed out; no replacement was launched and no process was forcibly killed.' }
                 } finally { $owned.Dispose() }
-                Start-ReadyRuntime
+                Start-ReadyRuntime $null
             }
         }
         'InstallStartup' {
             if ($PSCmdlet.ShouldProcess($taskName, 'Install current-user logon startup')) {
                 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+                $powershell = (Get-Command powershell.exe -CommandType Application).Source
                 $action = New-ScheduledTaskAction -Execute $powershell -Argument ($hostArguments -join ' ') -WorkingDirectory $root
                 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
                 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited

@@ -125,6 +125,14 @@ if (document) {
       } else if (typeof phase.nextAction !== "string" || phase.nextAction.trim().length === 0) {
         fail(at, "is not complete and must declare a nextAction");
       }
+      if (phase.status !== "complete" && !openTicket) {
+        const target = /^close (P\d{2})-(G\d+)$/.exec(phase.nextAction ?? "");
+        const gate = target
+          ? byId.get(target[1] ?? "")?.gates.find((gate) => gate.id === `${target[1]}-${target[2]}`)
+          : undefined;
+        if (!gate || gate.status === "complete")
+          fail(at, "completed engineering must address a concrete remaining gate in nextAction");
+      }
 
       if (!Array.isArray(phase.dependsOn)) {
         fail(at, "dependsOn must be an array");

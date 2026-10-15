@@ -2206,7 +2206,7 @@
         }
       ],
       "acceptanceTests": [],
-      "nextAction": "Complete P15 dependency and applicable production verification before phase closure; engineering tickets and gates are complete, with insufficient live outcomes reported honestly.",
+      "nextAction": "close P15-G2",
       "evidence": [
         "docs/plans/P16-outcomes-calibration.md",
         "docs/evidence/P16-outcome-foundation.md",

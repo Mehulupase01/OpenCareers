@@ -2650,3 +2650,34 @@ before the fixture-envelope-only adjustment; actual compiled lifecycle7/7 passes
 24.39s afterwards. Types/lint/build checks and successor CI must be recorded for
 the final correction. Counts remain12/19 phases and102/128 gates. Prior verified
 security/outcome scope remains distinct from this newer Windows runtime work.
+
+## 2026-10-15: Native Caller-Pipe Fix And Real Compiled Windows Workflow
+
+0f9c3da CI38716348738 fails Windows restart/combined recovery aggregate deadlines;
+three launcher cases pass. Ubuntu/PostgreSQL fail only ledger.test's nextAction
+format requirement. P16 now references the actual open dependency as close P15-G2;
+validate-ledger catches unaddressable/closed targets cheaply before expensive CI.
+
+Root diagnostic: runtime readiness was already reached in under1sec, but detached
+descendants retained caller pipes, delaying execFile until its60sec command bound.
+The new after-exit pipe-drain guard rejects that false green. Per-stream redirection
+and clearing just standard handle flags did not fix it and are removed. Native
+Launch now uses reviewed CreateProcessW with bInheritHandles=false, no console,
+explicit executable/args/cwd and sorted allowlisted Unicode environment. It frees
+environment/process/thread handles and runs the same authoritative runtime. Foreground
+scheduled Run still propagates actual exit status; no execution-policy bypass.
+
+Pinned Node24.21 first caller case61.34s->4.07s; synthetic completion, not production
+startup marketing. Final focused27/27 pass50.43s. A subsequent real compiled
+Windows-shaped local Start/Restart/Stop path passes within lifecycle7/7 in30.40s,
+preserves the persisted submission pause exactly, drains old/new owned processes,
+and creates zero attempts. All storage/config is fresh synthetic TEMP data with
+external submission/inference/mail disabled. Independent native-only static review
+finds no actionable issue. No real private runtime/task/account is activated.
+
+Bootstrap merges version/config/status into one read-only control call without
+weakening checks. CI preflight bails on its first failure and excludes only cases
+already executed from the later full step. Source is ready for successor CI; do
+not count failed earlier runs as parity. No additional gate closure follows from
+this runtime repair:12 complete phases,102 complete gates; P08/P16 verification/
+dependency pending and actual reboot/sleep/24h/72h/live receipt/breadth work open.

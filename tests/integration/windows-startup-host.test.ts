@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execute = promisify(execFile);
 describe.skipIf(process.platform !== "win32")("isolated Windows startup host", () => {
@@ -83,11 +83,20 @@ process.exit(process.argv[2] === "start" ? 17 : 0);\n`,
       expect(observed.keys).not.toContain(key);
   });
   it("returns successful validation and control output from the isolated child", async () => {
-    for (const mode of ["Launch", "Validate", "Status", "Stop"]) {
+    for (const mode of ["Bootstrap", "Validate", "Status", "Stop"]) {
       expect((await run(mode)).stdout.trim()).toBe("SYNTHETIC_HOST_OUTPUT");
       const observed = JSON.parse(await readFile(join(directory, "observed.json"), "utf8"));
       expect(observed.args).toEqual([mode.toLowerCase(), "--config", config]);
     }
+    const launched = JSON.parse((await run("Launch")).stdout);
+    expect(launched.runtimePid).toBeGreaterThan(0);
+    await vi.waitFor(
+      async () => {
+        const observed = JSON.parse(await readFile(join(directory, "observed.json"), "utf8"));
+        expect(observed.args).toEqual(["start", "--config", config]);
+      },
+      { timeout: 5000, interval: 50 },
+    );
     expect((await run("Version")).stdout.trim()).toBe(process.version);
   });
   it("bounds a hung control client without leaving its owned process running", async () => {

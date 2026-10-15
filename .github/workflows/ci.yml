@@ -27,7 +27,7 @@ jobs:
       - run: pnpm public:scan
       - name: Windows launcher preflight
         if: runner.os == 'Windows'
-        run: pnpm exec vitest run tests/integration/windows-launcher.test.ts
+        run: pnpm exec vitest run tests/integration/windows-launcher.test.ts --bail=1 --reporter=verbose
       - if: runner.os == 'Linux'
         run: pnpm exec playwright install --with-deps chromium
       - if: runner.os == 'Windows'

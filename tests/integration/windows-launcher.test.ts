@@ -31,15 +31,16 @@ async function main() {
     console.log(JSON.stringify({profile: "local"}));
     return;
   }
-  if (command === "launch") {
-    const child = require("node:child_process").spawn(process.execPath, [__filename, "start", ...process.argv.slice(3)], {
-      cwd: process.cwd(), env: process.env, detached: true, windowsHide: true, stdio: "ignore",
-    });
-    await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
-    trace("spawned", {childPid: child.pid});
-    child.unref();
-    console.log(JSON.stringify({runtimePid: child.pid}));
-    trace("returning");
+  if (command === "bootstrap") {
+    let runtimeStatus = null;
+    try {
+      const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+      const response = await fetch("http://127.0.0.1:" + record.port + "/status", {
+        headers: {authorization: "Bearer " + record.token}, signal: AbortSignal.timeout(2000),
+      });
+      if (response.ok) runtimeStatus = await response.json();
+    } catch {}
+    console.log(JSON.stringify({profile: "local", nodeVersion: process.version, runtimeStatus}));
     return;
   }
   if (command === "status" || command === "stop") {
@@ -131,8 +132,8 @@ async function fixture(settings: Settings = {}) {
   const configure = (value: Settings) =>
     writeFile(join(directory, "settings.json"), JSON.stringify(value));
   await configure(settings);
-  const run = (mode: string, extra: string[] = [], timeoutSeconds = 15) =>
-    execute(
+  const run = (mode: string, extra: string[] = [], timeoutSeconds = 15) => {
+    const command = execute(
       "powershell.exe",
       [
         "-NoProfile",
@@ -161,16 +162,44 @@ async function fixture(settings: Settings = {}) {
         timeout: 60000,
         windowsHide: true,
       },
-    ).catch(async (error: unknown) => {
-      if (error instanceof Error) {
-        const trace = await readFile(join(directory, "launch-trace.jsonl"), "utf8").catch(
-          () => "No synthetic launch trace.",
-        );
-        const lifecycle = await events(directory);
-        error.message += `\nSynthetic launch trace: ${trace}\nLifecycle: ${JSON.stringify(lifecycle)}`;
-      }
-      throw error;
+    );
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+    let retainedPipes = false;
+    command.child.once("exit", () => {
+      drainTimer = setTimeout(() => {
+        retainedPipes = true;
+        command.child.stdout?.destroy();
+        command.child.stderr?.destroy();
+      }, 5000);
     });
+    const assertReleasedPipes = () => {
+      if (retainedPipes) throw new Error("Detached runtime retained the exited launcher's pipes.");
+    };
+    return command
+      .then(
+        (result) => {
+          assertReleasedPipes();
+          return result;
+        },
+        (error: unknown) => {
+          assertReleasedPipes();
+          throw error;
+        },
+      )
+      .catch(async (error: unknown) => {
+        if (error instanceof Error) {
+          const trace = await readFile(join(directory, "launch-trace.jsonl"), "utf8").catch(
+            () => "No synthetic launch trace.",
+          );
+          const lifecycle = await events(directory);
+          error.message += `\nSynthetic launch trace: ${trace}\nLifecycle: ${JSON.stringify(lifecycle)}`;
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (drainTimer) clearTimeout(drainTimer);
+      });
+  };
   return { directory, config, configure, run, events: () => events(directory) };
 }
 
